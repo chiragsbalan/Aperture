@@ -66,11 +66,15 @@ export function SiteHeader() {
       >
         Aperture
       </Link>
-      <Suspense
-        fallback={<div className="min-w-0 flex-1" aria-hidden="true" />}
-      >
-        <HeaderSearch />
-      </Suspense>
+      {authState === 'signed_in' ? (
+        <Suspense
+          fallback={<div className="min-w-0 flex-1" aria-hidden="true" />}
+        >
+          <HeaderSearch />
+        </Suspense>
+      ) : (
+        <div className="min-w-0 flex-1" aria-hidden="true" />
+      )}
       <nav
         aria-label="Account"
         className="flex shrink-0 items-center gap-4 text-sm"
@@ -100,6 +104,15 @@ export function SiteHeader() {
 
         {authState === 'signed_in' ? (
           <>
+            <Link
+              href="/library/watchlist"
+              aria-current={
+                pathname.startsWith('/library') ? 'page' : undefined
+              }
+              className="text-muted transition hover:text-foreground"
+            >
+              Library
+            </Link>
             <Link
               href="/account"
               aria-current={pathname === '/account' ? 'page' : undefined}

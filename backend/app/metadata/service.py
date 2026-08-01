@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +23,17 @@ from app.metadata.schemas import (
 
 class CatalogNotFoundError(Exception):
     """Requested catalog entity does not exist (or wrong type)."""
+
+
+@dataclass(frozen=True, slots=True)
+class ContentSummaryDTO:
+    """Compact title card for list / library embeddings."""
+
+    content_type: str
+    id: uuid.UUID
+    title: str
+    year: int | None
+    poster_url: str | None
 
 
 def _image_url(path: str | None, *, size: str = 'w500') -> str | None:
@@ -161,6 +173,50 @@ def _person_detail(person: Person) -> PersonDetail:
         profile_url=_image_url(person.profile_path, size='h632'),
         credits=credit_refs,
     )
+
+
+def _content_year(item: ContentItem) -> int | None:
+    if item.movie is not None and item.movie.release_date is not None:
+        return item.movie.release_date.year
+    if item.tv_show is not None and item.tv_show.first_air_date is not None:
+        return item.tv_show.first_air_date.year
+    return None
+
+
+async def content_exists(
+    session: AsyncSession,
+    *,
+    content_type: str,
+    content_id: uuid.UUID,
+) -> bool:
+    """Return True when a catalog title exists for the type + id."""
+    return await metadata_repository.content_item_exists(
+        session,
+        content_type=content_type,
+        content_id=content_id,
+    )
+
+
+async def get_content_summaries(
+    session: AsyncSession,
+    *,
+    refs: list[tuple[str, uuid.UUID]],
+) -> list[ContentSummaryDTO]:
+    """Batch-load compact summaries for ``(db_content_type, id)`` refs."""
+    items = await metadata_repository.get_content_items_by_refs(
+        session,
+        refs=refs,
+    )
+    return [
+        ContentSummaryDTO(
+            content_type=item.content_type,
+            id=item.id,
+            title=item.title,
+            year=_content_year(item),
+            poster_url=_image_url(item.poster_path),
+        )
+        for item in items
+    ]
 
 
 async def get_movie_detail(
