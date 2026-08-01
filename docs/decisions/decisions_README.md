@@ -31,10 +31,12 @@ Examples:
 ## Naming
 
 ```text
-ADR-001-fastapi.md
-ADR-002-postgresql.md
-ADR-003-rest.md
+ADR-0001-phase-authority.md
+ADR-0002-orm-schema.md
+ADR-0003-hosting-and-bff.md
 ```
+
+Zero-padded four-digit ids match PLAN.md. Current accepted ADRs live in this folder (start with [ADR-0003](ADR-0003-hosting-and-bff.md) for early hosting).
 
 ## Template
 
