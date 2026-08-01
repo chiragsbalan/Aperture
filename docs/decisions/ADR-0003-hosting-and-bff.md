@@ -22,7 +22,7 @@ Browser auth remains same-origin Next.js BFF with `__Host-` cookies (backend coo
 
 **Local development** remains Docker Compose: FE + BE + Postgres (no Redis until P2). Compose is the day-to-day source of truth; cloud is for the public URL.
 
-**Auth/BFF (unchanged):** same-origin Next.js BFF; cookies `__Host-ap_at` / `__Host-ap_rt`; FastAPI cookie-agnostic.
+**Auth/BFF transport:** same-origin Next.js BFF; cookies `__Host-ap_at` / `__Host-ap_rt`; FastAPI cookie-agnostic. Token lifetimes, hashing, and OAuth link rules are in [ADR-0005](ADR-0005-auth.md).
 
 **Migrations:** run against Supabase (`DATABASE_URL`; prefer pooler/session settings documented in `.env.example`). Account for Free API sleep and possible Free project pause when automating migrate-on-deploy.
 
@@ -48,4 +48,4 @@ Browser auth remains same-origin Next.js BFF with `__Host-` cookies (backend coo
 - `.env.example` documents Supabase session-pooler `DATABASE_URL` shape and Vercel `API_URL` (P0.6).
 - Render migrate-on-deploy uses the same `DATABASE_URL` (session pooler) via `backend/docker/start.sh`.
 - When upgrading off free tiers, supersede this ADR (or add ADR-0003a) with the new provider mix.
-- Redis (P2) hosting choice is out of scope here.
+- Redis intro timing and search staging are in [ADR-0006](ADR-0006-redis-search-staging.md); Redis cloud provider/tier chosen at P2.4 implementation.
