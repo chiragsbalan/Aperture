@@ -9,7 +9,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (refreshToken) {
     try {
-      await forwardAuthJson('/api/v1/auth/logout', {
+      await forwardAuthJson(request, '/api/v1/auth/logout', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ refresh_token: refreshToken }),

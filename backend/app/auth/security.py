@@ -15,6 +15,8 @@ from argon2.exceptions import VerifyMismatchError
 from app.core.config import Settings
 
 _PASSWORD_HASHER = PasswordHasher()
+# Precomputed so unknown-identifier logins still pay Argon2 verify cost.
+_DUMMY_PASSWORD_HASH: str | None = None
 
 
 def hash_password(password: str) -> str:
@@ -28,6 +30,29 @@ def verify_password(password_hash: str, password: str) -> bool:
         return _PASSWORD_HASHER.verify(password_hash, password)
     except VerifyMismatchError:
         return False
+
+
+def _dummy_password_hash() -> str:
+    global _DUMMY_PASSWORD_HASH
+    if _DUMMY_PASSWORD_HASH is None:
+        _DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(32))
+    return _DUMMY_PASSWORD_HASH
+
+
+def verify_password_or_dummy(password_hash: str | None, password: str) -> bool:
+    """Verify against ``password_hash``, or a dummy hash when missing.
+
+    Always performs an Argon2 verify to reduce timing oracles on login.
+    """
+    if password_hash is None:
+        verify_password(_dummy_password_hash(), password)
+        return False
+    return verify_password(password_hash, password)
+
+
+def hash_rate_limit_subject(raw: str) -> str:
+    """SHA-256 hex digest for rate-limit subject keys (emails, IPs, etc.)."""
+    return hashlib.sha256(raw.encode('utf-8')).hexdigest()
 
 
 def new_refresh_token() -> str:

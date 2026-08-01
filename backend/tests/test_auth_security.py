@@ -10,12 +10,15 @@ import pytest
 from app.auth.security import (
     decode_access_token,
     hash_password,
+    hash_rate_limit_subject,
     hash_refresh_token,
     issue_access_token,
     new_refresh_token,
     normalize_email,
     verify_password,
+    verify_password_or_dummy,
 )
+from app.core.cache import InMemoryCacheBackend
 from app.core.config import Settings
 
 
@@ -87,3 +90,84 @@ def test_decode_rejects_expired_token() -> None:
 
 def test_normalize_email() -> None:
     assert normalize_email('  Alex@Example.COM ') == 'alex@example.com'
+
+
+def test_verify_password_or_dummy_unknown_identity() -> None:
+    assert verify_password_or_dummy(None, 'any-password') is False
+
+
+def test_verify_password_or_dummy_with_hash() -> None:
+    hashed = hash_password('correct horse battery')
+    assert verify_password_or_dummy(hashed, 'correct horse battery')
+    assert not verify_password_or_dummy(hashed, 'wrong')
+
+
+def test_hash_rate_limit_subject_is_stable() -> None:
+    assert hash_rate_limit_subject('a@b.com') == hash_rate_limit_subject('a@b.com')
+    assert hash_rate_limit_subject('a@b.com') != 'a@b.com'
+
+
+def test_client_ip_trusts_aperture_header_only_with_secret() -> None:
+    from app.auth.api import _client_ip
+    from starlette.requests import Request
+
+    settings = Settings(
+        database_url='postgresql+asyncpg://aperture:aperture@localhost:5432/aperture',
+        jwt_secret='unit-test-secret-at-least-32-bytes-long',
+        auth_bff_shared_secret='shared-secret-value',
+    )
+
+    async def _receive() -> dict[str, object]:
+        return {'type': 'http.request'}
+
+    scope = {
+        'type': 'http',
+        'asgi': {'version': '3.0'},
+        'http_version': '1.1',
+        'method': 'POST',
+        'scheme': 'http',
+        'path': '/api/v1/auth/login',
+        'raw_path': b'/api/v1/auth/login',
+        'query_string': b'',
+        'headers': [
+            (b'x-aperture-client-ip', b'203.0.113.50'),
+            (b'x-aperture-bff-secret', b'shared-secret-value'),
+            (b'x-forwarded-for', b'198.51.100.1'),
+        ],
+        'client': ('127.0.0.1', 12345),
+        'server': ('test', 80),
+    }
+    request = Request(scope, _receive)
+    assert _client_ip(request, settings) == '203.0.113.50'
+
+    bad_secret_settings = Settings(
+        database_url='postgresql+asyncpg://aperture:aperture@localhost:5432/aperture',
+        jwt_secret='unit-test-secret-at-least-32-bytes-long',
+        auth_bff_shared_secret='shared-secret-value',
+    )
+    bad_scope = {
+        **scope,
+        'headers': [
+            (b'x-aperture-client-ip', b'203.0.113.50'),
+            (b'x-aperture-bff-secret', b'wrong-secret-value!'),
+            (b'x-forwarded-for', b'198.51.100.1'),
+        ],
+    }
+    bad_request = Request(bad_scope, _receive)
+    assert _client_ip(bad_request, bad_secret_settings) == '127.0.0.1'
+
+    empty_secret = Settings(
+        database_url='postgresql+asyncpg://aperture:aperture@localhost:5432/aperture',
+        jwt_secret='unit-test-secret-at-least-32-bytes-long',
+        auth_bff_shared_secret='',
+    )
+    assert _client_ip(request, empty_secret) == '127.0.0.1'
+
+
+@pytest.mark.asyncio
+async def test_in_memory_cache_ttl() -> None:
+    cache = InMemoryCacheBackend()
+    await cache.set('k', 'v', ttl_seconds=60)
+    assert await cache.get('k') == 'v'
+    await cache.set('k', 'v', ttl_seconds=0)
+    assert await cache.get('k') is None

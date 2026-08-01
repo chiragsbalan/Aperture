@@ -14,6 +14,8 @@ os.environ.setdefault(
     'JWT_SECRET',
     'test-jwt-secret-not-for-production-use-32b',
 )
+# Match docker-compose local default so trusted-IP tests can opt in via headers.
+os.environ.setdefault('AUTH_BFF_SHARED_SECRET', 'test-bff-shared-secret')
 
 import pytest
 from app.main import app
@@ -23,11 +25,14 @@ from fastapi.testclient import TestClient
 @pytest.fixture(autouse=True)
 def _clear_settings_cache() -> Iterator[None]:
     """Ensure settings re-read env between tests when needed."""
+    from app.core.cache import reset_cache
     from app.core.config import get_settings
 
     get_settings.cache_clear()
+    reset_cache()
     yield
     get_settings.cache_clear()
+    reset_cache()
 
 
 @pytest.fixture

@@ -1,5 +1,6 @@
 import {
   applyAuthCookies,
+  clearAuthCookies,
   forwardAuthJson,
   jsonError,
   parseTokenPayload,
@@ -9,8 +10,11 @@ import { type NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-async function fetchMe(accessToken: string): Promise<Response> {
-  return forwardAuthJson('/api/v1/auth/me', {
+async function fetchMe(
+  request: NextRequest,
+  accessToken: string,
+): Promise<Response> {
+  return forwardAuthJson(request, '/api/v1/auth/me', {
     method: 'GET',
     headers: {
       authorization: `Bearer ${accessToken}`,
@@ -32,7 +36,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   if (accessToken) {
     try {
-      upstream = await fetchMe(accessToken);
+      upstream = await fetchMe(request, accessToken);
     } catch {
       return jsonError('Upstream API unreachable', 502);
     }
@@ -40,26 +44,39 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   if ((upstream === null || upstream.status === 401) && refreshToken) {
     try {
-      const refreshRes = await forwardAuthJson('/api/v1/auth/refresh', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
+      const refreshRes = await forwardAuthJson(
+        request,
+        '/api/v1/auth/refresh',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        },
+      );
       const refreshData: unknown = await refreshRes.json().catch(() => null);
       if (!refreshRes.ok) {
-        // Do not clear cookies on refresh 401 — multi-tab rotation race;
-        // 10s grace + singleflight deferred to P1.2.
-        return NextResponse.json(
-          refreshData ?? { detail: 'Not authenticated' },
-          { status: 401 },
+        // Forward 429 (and other non-401 failures) without clearing cookies.
+        const status = refreshRes.status === 429 ? 429 : 401;
+        const response = NextResponse.json(
+          refreshData ?? {
+            detail:
+              status === 429
+                ? 'Too many attempts. Try again later.'
+                : 'Not authenticated',
+          },
+          { status },
         );
+        if (refreshRes.status === 401) {
+          clearAuthCookies(response);
+        }
+        return response;
       }
       refreshedTokens = parseTokenPayload(refreshData);
       if (refreshedTokens === null) {
         return jsonError('Invalid token response from API', 502);
       }
       accessToken = refreshedTokens.access_token;
-      upstream = await fetchMe(accessToken);
+      upstream = await fetchMe(request, accessToken);
     } catch {
       return jsonError('Upstream API unreachable', 502);
     }
@@ -71,10 +88,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const data: unknown = await upstream.json().catch(() => null);
   if (!upstream.ok) {
-    // Do not clear cookies on /me 401 — same multi-tab race as refresh.
-    return NextResponse.json(data ?? { detail: 'Not authenticated' }, {
-      status: upstream.status,
-    });
+    const response = NextResponse.json(
+      data ?? { detail: 'Not authenticated' },
+      {
+        status: upstream.status,
+      },
+    );
+    if (upstream.status === 401) {
+      clearAuthCookies(response);
+    }
+    return response;
   }
 
   const response = NextResponse.json(data);

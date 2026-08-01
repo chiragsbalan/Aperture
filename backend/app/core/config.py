@@ -52,6 +52,17 @@ class Settings(BaseSettings):
     jwt_algorithm: str = 'HS256'
     access_token_ttl_seconds: int = 900  # 15 minutes
     refresh_token_ttl_seconds: int = 60 * 60 * 24 * 30  # 30 days
+    # Parallel-tab refresh reuse window; outside → revoke refresh family (P1.2).
+    refresh_reuse_grace_seconds: int = 10
+
+    # Auth rate limits (DB-backed counters; single Render instance until Redis).
+    auth_rate_limit_window_seconds: int = 15 * 60
+    auth_login_max_failures: int = 10
+    auth_register_max_failures: int = 5
+    # Cap is failure-only (invalid / outside-grace), not every refresh call.
+    auth_refresh_max_per_ip: int = 30
+    # BFF → API shared secret for trusted client IP. Empty = ignore header.
+    auth_bff_shared_secret: str = ''
 
     @model_validator(mode='after')
     def validate_production_jwt_secret(self) -> Self:
