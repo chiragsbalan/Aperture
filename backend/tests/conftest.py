@@ -1,17 +1,19 @@
 """Pytest fixtures and env defaults for the backend suite."""
 
+from __future__ import annotations
+
 import os
 from collections.abc import Iterator
 
-import pytest
-from app.main import app
-from fastapi.testclient import TestClient
-
-# Required before app/settings import in test modules.
+# Must run before importing the FastAPI app (settings require DATABASE_URL).
 os.environ.setdefault(
     'DATABASE_URL',
     'postgresql+asyncpg://aperture:aperture@localhost:5432/aperture',
 )
+
+import pytest
+from app.main import app
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture(autouse=True)
