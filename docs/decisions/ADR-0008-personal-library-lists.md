@@ -1,9 +1,9 @@
-# ADR-0008 — Personal library lists (system watchlist / favorites)
+# ADR-0008 — Personal library (lists + diary)
 
 - **Status:** Accepted
 - **Date:** 2026-08-02
 - **Related:** Lists LLD; Database Design (lists domain); [ADR-0004](ADR-0004-content-identity.md) (content refs); [ADR-0005](ADR-0005-auth.md) (AuthZ); PLAN.md P3; `phases/p3/work-breakdown.md`
-- **Implements in:** P3.1 (watchlist), P3.2 (favorites), P3.3 (custom lists / reorder), P3.4 (diary / `watch_entries`)
+- **Implements in:** P3.1 (watchlist), P3.2 (favorites), P3.3 (custom lists / reorder), P3.4 (diary / `watch_entries`) — shipped as `v0.4.0`
 
 ## Context
 
@@ -11,60 +11,96 @@ Phase 3 ships a personal library on the public product. Watchlist and favorites 
 
 ## Decision
 
-### Storage
+### Storage — lists
 
 - Own tables **`lists`** and **`list_items`** in the Lists domain (`backend/app/lists/`).
 - **`lists.kind`:** `watchlist` | `favorites` | `custom`.
 - **System uniqueness:** partial unique index on `(owner_user_id, kind)` **WHERE** `kind IN ('watchlist','favorites')`.
 - **Owner:** `owner_user_id` → `users.id` (Users profile), resolved from the authenticated Auth identity.
-- **Items:** `(list_id, content_type, content_id)` with **UNIQUE** membership per list; `position` on the item (append-only in P3.1/P3.2; reorder lands in P3.3).
+- **Items:** `(list_id, content_type, content_id)` with **UNIQUE** membership per list; `position` (dense `0..n-1` after reorder / compact delete).
 - Persist **`content_type`** as `content_items` values: `movie` | `tv_show`. Existence is validated in the Lists **service** via Metadata service (no TMDb client; no Metadata repository imports from Lists).
-- Soft-delete is **not** used for system lists in P3; custom-list delete policy remains for P3.3.
+- Soft-delete is **not** used: custom lists are **hard-deleted** (FK cascade on `list_items`). System lists are never deleted by users.
+
+### Storage — diary
+
+- Table **`watch_entries`** in sibling package `backend/app/library/` (not `list_items`).
+- Columns: `owner_user_id`, `content_type` / `content_id`, `watched_at` (**DATE**), optional `note` (≤ 1000), timestamps.
+- Indexes: `(owner_user_id, watched_at DESC, created_at DESC)` and `(owner_user_id, content_type, content_id)`.
+- **No UNIQUE** on content — rewatches are additional rows.
+- import-linter: `library` is a sibling of `lists` — **no** lists↔library imports. Shared content-ref helpers live in `app.common.content_refs`.
 
 ### Public API content refs
 
-Polymorphic bodies and contains keys use public types aligned with search:
-
-| Public `type` | Accepted aliases on input | Stored `list_items.content_type` |
+| Public `type` | Accepted aliases on input | Stored `content_type` |
 |---|---|---|
 | `movie` | — | `movie` |
 | `tv` | `tv_show` | `tv_show` |
 
 - Responses always emit **`movie` | `tv`**.
-- **`person`** (and other types) → **422** for list membership in P3.
-- Unknown Aperture title id → **404** (same convention as Metadata detail).
-- Prefer **idempotent** add (200 if already present) and remove (204 if already absent).
+- **`person`** (and other types) → **422**.
+- Unknown Aperture title id → **404**.
+- System list add/remove: **idempotent** (200 if already present; 204 if already absent).
 
-### HTTP surface (P3.1 / P3.2)
+### HTTP surface
 
-Authenticated routes under `/api/v1/me/watchlist` and `/api/v1/me/favorites` (get page, add/remove item, batch `contains`). System lists are **lazy-created** on first access (race-safe). Clients do not pass `list_id` or `owner_user_id` for these operations.
+**System lists (P3.1 / P3.2)** — authenticated `/api/v1/me/watchlist` and `/me/favorites` (page, add/remove, batch `contains`). Lazy-created on first access.
+
+**Custom lists (P3.3)**
+
+| Method | Path | Auth |
+|---|---|---|
+| GET/POST | `/api/v1/me/lists` | required |
+| GET | `/api/v1/me/lists/membership?type=&id=` | required (batch for Add to list) |
+| GET | `/api/v1/lists/{id}` (+ `/items`) | optional Bearer |
+| PATCH/DELETE | `/api/v1/lists/{id}` | required owner |
+| POST | `/api/v1/lists/{id}/items` | required owner |
+| DELETE | `/api/v1/lists/{id}/items/{item_id}` | required owner |
+| PUT | `/api/v1/lists/{id}/items/reorder` | required owner; body `{ "item_ids": [...] }` |
+| GET | `/api/v1/lists/{id}/contains` | required owner |
+
+**Diary (P3.4)** — authenticated `/api/v1/me/watch-entries` (GET/POST/PATCH/DELETE). Optional create flag `remove_from_watchlist` orchestrated in the **API layer**: flush-only diary create + watchlist remove, then **one** `session.commit()` (never remove-before-create).
+
+### AuthZ / visibility
+
+| Case | Behavior |
+|---|---|
+| Private custom list, non-owner or anon | **404** (no existence leak) |
+| Public / unlisted custom list | Readable by id (OptionalIdentity: missing → anon; invalid token → **401**) |
+| System kinds via `/lists/{id}*` mutate/contains/GET | **404** (`require_custom_list_mutable` / custom-only read surface) |
+| Shareable list DTO | `is_owner` boolean; `owner_user_id` only for owner (null for others) |
+| Diary PATCH/DELETE other user’s entry | **404** |
+
+### Reorder
+
+**Transaction + dense renumber** to `0..n-1` under `lock_list` (not fractional indexing). Body `item_ids` must be a permutation of current membership (else **422**). Item delete compact-renumbers the same way. Acceptable while lists stay capped at 500 items.
+
+### Caps (P3 MVP)
+
+Title ≤ 100; description ≤ 2000; ≤ **500** items/list; ≤ **50** custom lists/user (count under FOR UPDATE of owner’s custom rows); diary note ≤ 1000; write rate limits keyed by identity via `CacheBackend`.
 
 ### What is not a list
 
-- **`watch_entries` / diary** (P3.4): separate table/package; rewatches = additional rows for the same content. Not stored in `list_items`.
-- **“Completed”** as a system kind: not a PLAN ship gate; defer or treat as a custom list later.
+- Diary / `watch_entries` (multi-event history).
+- **“Completed”** as a system kind — not a PLAN ship gate; defer or use a custom list.
 
 ## Alternatives considered
 
-1. **Separate `watchlist_items` / `favorite_items` tables** — rejected; Lists LLD and PLAN model one lists domain with `kind`, shared helpers, and later custom lists.
-2. **Public API type `tv_show` only (match detail DTOs)** — rejected; conflicts with search public types and PLAN/`{"type":"movie|tv"}` guidance; accept `tv_show` as input alias instead.
-3. **Store public `tv` in `list_items.content_type`** — rejected; keep persistence aligned with `content_items.content_type` for validation and future integrity options.
-4. **Put diary rows in `list_items`** — rejected; diary is multi-event history, not 0–1 membership.
-5. **Create system lists at registration only** — rejected for P3; lazy-create on first `/me/...` access is enough and avoids unused rows.
+1. **Separate `watchlist_items` / `favorite_items` tables** — rejected; one lists domain with `kind`.
+2. **Public API type `tv_show` only** — rejected; accept `tv_show` as input alias; emit `tv`.
+3. **Store public `tv` in DB** — rejected; persist `content_items` types.
+4. **Diary rows in `list_items`** — rejected; rewatches need multi-row history.
+5. **Fractional / sparse positions** — deferred; dense renumber under lock is enough at the 500-item cap.
+6. **library → lists import for `remove_from_watchlist`** — rejected; API-layer orchestration preserves sibling isolation.
+7. **Create system lists at registration only** — rejected; lazy-create on first `/me/...` access.
 
 ## Consequences
 
-- Lists module sits beside Search/Auth/`library` in import-linter layers; may call Users + Metadata **services** only (not Metadata ingest/CLI/repository as a public boundary).
-- Caps for P3 MVP: title ≤ 100; description ≤ 2000; ≤ **500** items per list; ≤ **50** custom lists per user; diary note ≤ 1000; write rate limits keyed by identity via `CacheBackend`.
-- Frontend detail actions send public `movie` | `tv` (map detail `tv_show` → `tv` before calling the API).
-- Custom lists (P3.3) reuse the same tables with `kind=custom`; system kinds remain undeletable via custom-list APIs (mutate/contains/GET by id → **404**).
-- **Reorder (P3.3):** transaction + dense renumber to `0..n-1` under `lock_list` (not fractional indexing). Acceptable while lists stay capped at 500 items; documented in `lists` repository/service. Item delete compact-renumbers the same way.
-- **Diary (P3.4):** `watch_entries` lives in sibling package `backend/app/library/` (no lists↔library imports). Rewatches = additional rows; no unique on content. Optional `remove_from_watchlist` is orchestrated in the API layer as create-then-remove with a **single commit**.
-- Content-ref helpers live in `app.common.content_refs` (shared by lists + library).
+- Frontend routes: `/library/watchlist`, `/library/favorites`, `/library/lists`, `/lists/[id]`, `/library/diary`; detail actions for watchlist, favorites, Add to list, Log watch.
 - OpenSearch hosting remains **ADR-0007** at P5 exit — this ADR does not consume that number.
+- Phase exit tag: **`v0.4.0`**.
 
 ## Future evolution
 
-- Fractional / sparse reorder positions if renumber cost becomes measurable beyond the 500-item cap.
+- Fractional / sparse reorder if renumber cost becomes measurable beyond the 500-item cap.
 - Optional FK from `list_items.content_id` → `content_items.id` if orphan cleanup becomes painful.
-- Public list discovery / trending shelves; visibility enum already supports `public` | `unlisted` | `private`.
+- Public list discovery / trending; diary privacy on profiles; episode-level diary; Letterboxd import.
