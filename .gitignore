@@ -12,6 +12,8 @@ skills-lock.json
 .env
 .env.*
 !.env.example
+# Local credential dumps (e.g. Google OAuth client JSON) — never commit
+private/
 
 # Python
 __pycache__/

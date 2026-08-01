@@ -1,5 +1,6 @@
 import { SiteHeader } from '@/components/site-header';
 import { AccountPanel } from '@/components/account-panel';
+import { Suspense } from 'react';
 
 export default function AccountPage() {
   return (
@@ -12,7 +13,15 @@ export default function AccountPage() {
         <p className="mt-2 text-muted">
           Protected demo — loads your identity via the BFF.
         </p>
-        <AccountPanel />
+        <Suspense
+          fallback={
+            <p className="mt-8 text-muted" role="status">
+              Loading account…
+            </p>
+          }
+        >
+          <AccountPanel />
+        </Suspense>
       </div>
     </main>
   );

@@ -70,6 +70,10 @@ services:
       API_URL: http://api:8000
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
       AUTH_BFF_SHARED_SECRET: ${AUTH_BFF_SHARED_SECRET:-local-dev-bff-shared-secret-change-me}
+      AUTH_GOOGLE_MOCK: ${AUTH_GOOGLE_MOCK:-true}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/auth/google/callback}
     depends_on:
       api:
         condition: service_healthy

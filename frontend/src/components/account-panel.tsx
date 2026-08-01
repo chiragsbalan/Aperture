@@ -1,6 +1,8 @@
 'use client';
 
+import { oauthErrorMessage } from '@/lib/google-oauth-errors';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 interface MeResponse {
@@ -11,6 +13,7 @@ interface MeResponse {
     username: string | null;
     display_name: string | null;
   } | null;
+  providers: Array<'password' | 'google'>;
 }
 
 type LoadState =
@@ -18,7 +21,13 @@ type LoadState =
   | { status: 'error'; message: string }
   | { status: 'ok'; me: MeResponse };
 
+function providerLabel(provider: 'password' | 'google'): string {
+  return provider === 'password' ? 'Password' : 'Google';
+}
+
 export function AccountPanel() {
+  const searchParams = useSearchParams();
+  const queryError = oauthErrorMessage(searchParams.get('error'));
   const [state, setState] = useState<LoadState>({ status: 'loading' });
 
   useEffect(() => {
@@ -74,6 +83,9 @@ export function AccountPanel() {
     return (
       <div className="mt-8 space-y-4" role="alert">
         <p className="text-[var(--color-danger)]">{state.message}</p>
+        {queryError ? (
+          <p className="text-sm text-[var(--color-danger)]">{queryError}</p>
+        ) : null}
         <p className="text-sm text-muted">
           <Link
             href="/login"
@@ -94,24 +106,56 @@ export function AccountPanel() {
   }
 
   const { me } = state;
+  const providers = me.providers ?? [];
+  const hasGoogle = providers.includes('google');
+
   return (
-    <dl className="mt-8 space-y-4 text-left">
-      <div>
-        <dt className="text-sm text-muted">Email</dt>
-        <dd className="mt-1 text-foreground">{me.email}</dd>
-      </div>
-      <div>
-        <dt className="text-sm text-muted">Identity ID</dt>
-        <dd className="mt-1 break-all font-mono text-sm text-foreground">
-          {me.identity_id}
-        </dd>
-      </div>
-      <div>
-        <dt className="text-sm text-muted">Username</dt>
-        <dd className="mt-1 text-foreground">
-          {me.user?.username ?? 'Not set'}
-        </dd>
-      </div>
-    </dl>
+    <div className="mt-8 space-y-6 text-left">
+      {queryError ? (
+        <p role="alert" className="text-sm text-[var(--color-danger)]">
+          {queryError}
+        </p>
+      ) : null}
+
+      <dl className="space-y-4">
+        <div>
+          <dt className="text-sm text-muted">Email</dt>
+          <dd className="mt-1 text-foreground">{me.email}</dd>
+        </div>
+        <div>
+          <dt className="text-sm text-muted">Identity ID</dt>
+          <dd className="mt-1 break-all font-mono text-sm text-foreground">
+            {me.identity_id}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-sm text-muted">Username</dt>
+          <dd className="mt-1 text-foreground">
+            {me.user?.username ?? 'Not set'}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-sm text-muted">Sign-in methods</dt>
+          <dd className="mt-1 text-foreground">
+            {providers.length > 0
+              ? providers.map(providerLabel).join(', ')
+              : 'None'}
+          </dd>
+        </div>
+      </dl>
+
+      {!hasGoogle ? (
+        <p className="text-sm text-muted">
+          <a
+            href="/api/auth/google/start?intent=link"
+            className="text-foreground underline-offset-2 hover:underline"
+          >
+            Link Google
+          </a>
+        </p>
+      ) : (
+        <p className="text-sm text-muted">Google is linked to this account.</p>
+      )}
+    </div>
   );
 }

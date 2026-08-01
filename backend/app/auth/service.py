@@ -1,4 +1,4 @@
-"""Auth domain service: register, login, logout, refresh, me."""
+"""Auth domain service: register, login, logout, refresh, me, Google OAuth."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 import jwt
 from fastapi import HTTPException, status
@@ -32,6 +33,14 @@ from app.users.service import UserProfile
 
 _INVALID_CREDENTIALS = 'Invalid credentials'
 _INVALID_REFRESH = 'Invalid refresh token'
+_EMAIL_EXISTS_NO_AUTO_LINK = (
+    'An account with this email already exists. '
+    'Log in with your password, then link Google from Account.'
+)
+_GOOGLE_ALREADY_LINKED = 'This Google account is already linked to another user.'
+_GOOGLE_ALREADY_ON_IDENTITY = 'Google is already linked to this account.'
+
+AuthProviderName = Literal['password', 'google']
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,10 +54,11 @@ class IssuedTokens:
 
 @dataclass(frozen=True, slots=True)
 class AuthContext:
-    """Authenticated identity with optional profile."""
+    """Authenticated identity with optional profile and linked providers."""
 
     identity: Identity
     user: UserProfile | None
+    providers: list[AuthProviderName]
 
 
 def _grace_cache_key(token_hash: str) -> str:
@@ -526,7 +536,213 @@ async def get_me(
         session,
         identity_id=identity.id,
     )
-    return AuthContext(identity=identity, user=user)
+    raw_providers = await auth_repository.list_providers_for_identity(
+        session,
+        identity.id,
+    )
+    providers: list[AuthProviderName] = []
+    for name in raw_providers:
+        if name == 'password':
+            providers.append('password')
+        elif name == 'google':
+            providers.append('google')
+    return AuthContext(identity=identity, user=user, providers=providers)
+
+
+async def google_sign_in(
+    session: AsyncSession,
+    *,
+    settings: Settings,
+    sub: str,
+    email: str,
+    given_name: str | None = None,
+    family_name: str | None = None,
+    user_agent: str | None = None,
+    client_ip: str | None = None,
+) -> IssuedTokens:
+    """Sign in or create a Google-only identity from verified BFF claims."""
+    await auth_rate_limit.enforce_oauth_limits(
+        session,
+        settings=settings,
+        client_ip=client_ip,
+    )
+    # Count every OAuth API call (ADR: attempts / window), not only failures.
+    await auth_rate_limit.record_oauth_attempt(
+        session,
+        settings=settings,
+        client_ip=client_ip,
+    )
+    normalized = normalize_email(email)
+
+    existing_cred = await auth_repository.get_credential_by_provider_subject(
+        session,
+        provider=auth_repository.GOOGLE_PROVIDER,
+        subject=sub,
+    )
+    if existing_cred is not None:
+        identity = await auth_repository.get_identity_by_id(
+            session,
+            existing_cred.identity_id,
+        )
+        if identity is None or identity.status != 'active':
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail='Invalid Google account',
+            )
+        tokens = await _issue_token_pair(
+            session,
+            settings=settings,
+            identity_id=identity.id,
+            user_agent=user_agent,
+        )
+        await session.commit()
+        return tokens
+
+    email_identity = await auth_repository.get_identity_by_email(session, normalized)
+    if email_identity is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_EMAIL_EXISTS_NO_AUTO_LINK,
+        )
+
+    try:
+        identity = await auth_repository.create_identity(session, email=normalized)
+        await auth_repository.create_oauth_credential(
+            session,
+            identity_id=identity.id,
+            provider=auth_repository.GOOGLE_PROVIDER,
+            subject=sub,
+        )
+        await users_service.create_profile_for_google(
+            session,
+            identity_id=identity.id,
+            given_name=given_name,
+            family_name=family_name,
+        )
+        tokens = await _issue_token_pair(
+            session,
+            settings=settings,
+            identity_id=identity.id,
+            user_agent=user_agent,
+        )
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        # Race: another request created the same google subject or email.
+        raced = await auth_repository.get_credential_by_provider_subject(
+            session,
+            provider=auth_repository.GOOGLE_PROVIDER,
+            subject=sub,
+        )
+        if raced is not None:
+            identity = await auth_repository.get_identity_by_id(
+                session,
+                raced.identity_id,
+            )
+            if identity is not None and identity.status == 'active':
+                tokens = await _issue_token_pair(
+                    session,
+                    settings=settings,
+                    identity_id=identity.id,
+                    user_agent=user_agent,
+                )
+                await session.commit()
+                return tokens
+        message = str(getattr(exc, 'orig', exc)).lower()
+        if 'username' in message or 'uq_users_username' in message:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Could not allocate username. Try again.',
+            ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_EMAIL_EXISTS_NO_AUTO_LINK,
+        ) from exc
+    return tokens
+
+
+async def google_link(
+    session: AsyncSession,
+    *,
+    settings: Settings,
+    identity: Identity,
+    sub: str,
+    email: str,
+    user_agent: str | None = None,
+    client_ip: str | None = None,
+) -> IssuedTokens:
+    """Link a Google subject to the authenticated identity (explicit link)."""
+    await auth_rate_limit.enforce_oauth_limits(
+        session,
+        settings=settings,
+        client_ip=client_ip,
+    )
+    await auth_rate_limit.record_oauth_attempt(
+        session,
+        settings=settings,
+        client_ip=client_ip,
+    )
+    if identity.status != 'active':
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Not authenticated',
+        )
+
+    existing_on_identity = await auth_repository.get_oauth_credential(
+        session,
+        identity_id=identity.id,
+        provider=auth_repository.GOOGLE_PROVIDER,
+    )
+    if existing_on_identity is not None:
+        if existing_on_identity.subject == sub:
+            tokens = await _issue_token_pair(
+                session,
+                settings=settings,
+                identity_id=identity.id,
+                user_agent=user_agent,
+            )
+            await session.commit()
+            return tokens
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_GOOGLE_ALREADY_ON_IDENTITY,
+        )
+
+    existing_cred = await auth_repository.get_credential_by_provider_subject(
+        session,
+        provider=auth_repository.GOOGLE_PROVIDER,
+        subject=sub,
+    )
+    if existing_cred is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_GOOGLE_ALREADY_LINKED,
+        )
+
+    # Link trusts the authenticated identity; claim email is not used to match.
+    _ = email
+
+    try:
+        await auth_repository.create_oauth_credential(
+            session,
+            identity_id=identity.id,
+            provider=auth_repository.GOOGLE_PROVIDER,
+            subject=sub,
+        )
+        tokens = await _issue_token_pair(
+            session,
+            settings=settings,
+            identity_id=identity.id,
+            user_agent=user_agent,
+        )
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_GOOGLE_ALREADY_LINKED,
+        ) from exc
+    return tokens
 
 
 async def resolve_identity_from_access_token(

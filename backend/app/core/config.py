@@ -23,6 +23,14 @@ _JWT_SECRET_PLACEHOLDERS = frozenset(
     }
 )
 
+_BFF_SECRET_PLACEHOLDERS = frozenset(
+    {
+        'change-me',
+        'secret',
+        'local-dev-bff-shared-secret-change-me',
+    }
+)
+
 
 class Settings(BaseSettings):
     """Runtime configuration. Fail fast on invalid types."""
@@ -61,12 +69,14 @@ class Settings(BaseSettings):
     auth_register_max_failures: int = 5
     # Cap is failure-only (invalid / outside-grace), not every refresh call.
     auth_refresh_max_per_ip: int = 30
+    # Google OAuth API abuse cap per trusted client IP (P1.3).
+    auth_google_oauth_max_per_ip: int = 20
     # BFF → API shared secret for trusted client IP. Empty = ignore header.
     auth_bff_shared_secret: str = ''
 
     @model_validator(mode='after')
-    def validate_production_jwt_secret(self) -> Self:
-        """Require a strong JWT_SECRET when ENVIRONMENT is exactly production."""
+    def validate_production_secrets(self) -> Self:
+        """Require strong JWT + BFF secrets when ENVIRONMENT is production."""
         if self.environment != 'production':
             return self
         secret = self.jwt_secret
@@ -81,6 +91,17 @@ class Settings(BaseSettings):
         if 'change-me' in secret.lower():
             raise ValueError(
                 'JWT_SECRET must not contain change-me when ENVIRONMENT=production'
+            )
+        bff = self.auth_bff_shared_secret
+        if len(bff) < 32:
+            raise ValueError(
+                'AUTH_BFF_SHARED_SECRET must be at least 32 characters '
+                'when ENVIRONMENT=production'
+            )
+        if bff.lower() in _BFF_SECRET_PLACEHOLDERS or 'change-me' in bff.lower():
+            raise ValueError(
+                'AUTH_BFF_SHARED_SECRET must not be a known placeholder '
+                'when ENVIRONMENT=production'
             )
         return self
 

@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import secrets
+from typing import Annotated
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth.deps import CurrentIdentityDep
 from app.auth.schemas import (
+    GoogleAuthRequest,
     LoginRequest,
     LogoutRequest,
     MeResponse,
@@ -19,15 +22,19 @@ from app.auth.schemas import (
 from app.auth.service import (
     IssuedTokens,
     get_me,
+    google_link,
+    google_sign_in,
     login,
     logout,
     refresh,
     register,
+    resolve_identity_from_access_token,
 )
 from app.core.config import Settings
 from app.core.deps import DbSessionDep, SettingsDep
 
 router = APIRouter(prefix='/auth', tags=['auth'])
+_bearer = HTTPBearer(auto_error=False)
 
 
 def _user_agent(request: Request) -> str | None:
@@ -45,6 +52,17 @@ def _bff_secret_matches(configured: str, provided: str) -> bool:
         secrets.compare_digest(configured, configured)
         return False
     return secrets.compare_digest(configured, provided)
+
+
+def _require_bff_secret(request: Request, settings: Settings) -> None:
+    """Require a matching non-empty BFF shared secret (Google verified claims)."""
+    configured = settings.auth_bff_shared_secret
+    provided = request.headers.get('x-aperture-bff-secret') or ''
+    if not configured or not _bff_secret_matches(configured, provided):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Forbidden',
+        )
 
 
 def _client_ip(request: Request, settings: Settings) -> str | None:
@@ -146,6 +164,58 @@ async def refresh_endpoint(
     return _token_response(tokens)
 
 
+@router.post('/google', response_model=TokenResponse)
+async def google_endpoint(
+    body: GoogleAuthRequest,
+    request: Request,
+    session: DbSessionDep,
+    settings: SettingsDep,
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Depends(_bearer),
+    ],
+) -> TokenResponse:
+    """Accept verified Google claims from the BFF; sign in or link."""
+    _require_bff_secret(request, settings)
+    client_ip = _client_ip(request, settings)
+    user_agent = _user_agent(request)
+
+    if body.intent == 'link':
+        if credentials is None or credentials.scheme.lower() != 'bearer':
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail='Not authenticated',
+                headers={'WWW-Authenticate': 'Bearer'},
+            )
+        identity = await resolve_identity_from_access_token(
+            session,
+            settings=settings,
+            token=credentials.credentials,
+        )
+        tokens = await google_link(
+            session,
+            settings=settings,
+            identity=identity,
+            sub=body.sub,
+            email=str(body.email),
+            user_agent=user_agent,
+            client_ip=client_ip,
+        )
+        return _token_response(tokens)
+
+    tokens = await google_sign_in(
+        session,
+        settings=settings,
+        sub=body.sub,
+        email=str(body.email),
+        given_name=body.given_name,
+        family_name=body.family_name,
+        user_agent=user_agent,
+        client_ip=client_ip,
+    )
+    return _token_response(tokens)
+
+
 @router.get('/me', response_model=MeResponse)
 async def me_endpoint(
     session: DbSessionDep,
@@ -164,4 +234,5 @@ async def me_endpoint(
         identity_id=context.identity.id,
         email=context.identity.email,
         user=user_summary,
+        providers=context.providers,
     )

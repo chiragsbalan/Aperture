@@ -83,3 +83,30 @@ class MeResponse(BaseModel):
     identity_id: uuid.UUID
     email: str
     user: UserSummary | None
+    providers: list[Literal['password', 'google']]
+
+
+class GoogleAuthRequest(BaseModel):
+    """Verified Google claims forwarded by the BFF (never from the browser)."""
+
+    sub: str = Field(min_length=1, max_length=255)
+    email: EmailStr
+    given_name: str | None = Field(default=None, max_length=120)
+    family_name: str | None = Field(default=None, max_length=120)
+    intent: Literal['sign_in', 'link'] = 'sign_in'
+
+    @field_validator('sub')
+    @classmethod
+    def sub_not_blank(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError('sub must not be blank')
+        return trimmed
+
+    @field_validator('given_name', 'family_name')
+    @classmethod
+    def optional_name_trim(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        return trimmed if trimmed else None

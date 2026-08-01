@@ -17,6 +17,7 @@
     "a11y": "node scripts/a11y.mjs"
   },
   "dependencies": {
+    "jose": "^6.2.6",
     "next": "15.5.22",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

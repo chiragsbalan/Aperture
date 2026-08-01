@@ -1,10 +1,13 @@
-"""Production JWT_SECRET fail-fast validation."""
+"""Production JWT_SECRET / AUTH_BFF_SHARED_SECRET fail-fast validation."""
 
 from __future__ import annotations
 
 import pytest
 from app.core.config import Settings
 from pydantic import ValidationError
+
+_STRONG_JWT = 'prod-grade-secret-value-with-enough-entropy-01'
+_STRONG_BFF = 'prod-grade-bff-shared-secret-with-entropy-02'
 
 
 def _base_kwargs() -> dict[str, str]:
@@ -30,6 +33,7 @@ def test_production_rejects_short_jwt_secret() -> None:
             **_base_kwargs(),
             environment='production',
             jwt_secret='too-short-for-production',
+            auth_bff_shared_secret=_STRONG_BFF,
         )
 
 
@@ -39,17 +43,29 @@ def test_production_rejects_placeholder_jwt_secret() -> None:
             **_base_kwargs(),
             environment='production',
             jwt_secret='local-dev-only-change-me-before-any-real-use',
+            auth_bff_shared_secret=_STRONG_BFF,
         )
 
 
-def test_production_accepts_strong_jwt_secret() -> None:
-    secret = 'prod-grade-secret-value-with-enough-entropy-01'
+def test_production_rejects_short_bff_secret() -> None:
+    with pytest.raises(ValidationError, match='AUTH_BFF_SHARED_SECRET'):
+        Settings(
+            **_base_kwargs(),
+            environment='production',
+            jwt_secret=_STRONG_JWT,
+            auth_bff_shared_secret='too-short',
+        )
+
+
+def test_production_accepts_strong_secrets() -> None:
     settings = Settings(
         **_base_kwargs(),
         environment='production',
-        jwt_secret=secret,
+        jwt_secret=_STRONG_JWT,
+        auth_bff_shared_secret=_STRONG_BFF,
     )
-    assert settings.jwt_secret == secret
+    assert settings.jwt_secret == _STRONG_JWT
+    assert settings.auth_bff_shared_secret == _STRONG_BFF
 
 
 def test_staging_skips_production_jwt_checks() -> None:
