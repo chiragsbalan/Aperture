@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any, cast
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.lists.models import List, ListItem
@@ -135,14 +137,17 @@ async def delete_item_by_content(
     content_id: uuid.UUID,
 ) -> bool:
     """Delete a membership row. Returns True when a row was removed."""
-    result = await session.execute(
-        delete(ListItem).where(
-            ListItem.list_id == list_id,
-            ListItem.content_type == content_type,
-            ListItem.content_id == content_id,
-        )
+    result = cast(
+        CursorResult[Any],
+        await session.execute(
+            delete(ListItem).where(
+                ListItem.list_id == list_id,
+                ListItem.content_type == content_type,
+                ListItem.content_id == content_id,
+            )
+        ),
     )
-    return bool(result.rowcount)
+    return (result.rowcount or 0) > 0
 
 
 async def membership_for_refs(
