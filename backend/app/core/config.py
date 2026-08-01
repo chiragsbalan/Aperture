@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     # BFF → API shared secret for trusted client IP. Empty = ignore header.
     auth_bff_shared_secret: str = ''
 
+    # TMDb (P2 metadata). Server-only; never expose to the browser.
+    # Empty = fixture seed / image CDN only; live ``--source tmdb`` requires a key.
+    tmdb_api_key: str = ''
+
     @model_validator(mode='after')
     def validate_production_secrets(self) -> Self:
         """Require strong JWT + BFF secrets when ENVIRONMENT is production."""

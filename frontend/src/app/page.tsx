@@ -15,6 +15,14 @@ export default function Home() {
         A personal cinema companion for tracking, reviewing, and rediscovering
         what you watch.
       </p>
+      <p className="motion-fade-in mt-8 max-w-md text-sm text-muted">
+        Catalog pages live at{' '}
+        <span className="text-foreground">/movies/[id]</span>,{' '}
+        <span className="text-foreground">/tv/[id]</span>, and{' '}
+        <span className="text-foreground">/people/[id]</span>. Seed locally with{' '}
+        <span className="text-foreground">make seed-metadata</span> to print
+        sample UUIDs.
+      </p>
       <div className="mt-10">
         <ShellHealth />
       </div>

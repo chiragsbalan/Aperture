@@ -33,6 +33,10 @@ def test_reserved_usernames() -> None:
     assert is_reserved_username('admin')
     assert is_reserved_username('settings')
     assert is_reserved_username('u')
+    assert is_reserved_username('movies')
+    assert is_reserved_username('tv')
+    assert is_reserved_username('people')
+    assert is_reserved_username('search')
     assert not is_reserved_username('ada_lovelace')
     assert not is_reserved_username('user')
 

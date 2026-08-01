@@ -38,6 +38,10 @@ RESERVED_USERNAMES = frozenset(
         'system',
         'mod',
         'moderator',
+        'movies',
+        'tv',
+        'people',
+        'search',
     }
 )
 

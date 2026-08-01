@@ -8,7 +8,7 @@ const contentSecurityPolicy = [
   // next/font and Next.js runtime need these in practice for the shell.
   `script-src 'self' 'unsafe-inline'${isProd ? '' : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https://image.tmdb.org",
   "font-src 'self' data:",
   "connect-src 'self'",
   "frame-ancestors 'none'",
@@ -20,6 +20,15 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   // Avoid picking up unrelated lockfiles outside this monorepo.
   outputFileTracingRoot: path.join(__dirname),
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'image.tmdb.org',
+        pathname: '/t/p/**',
+      },
+    ],
+  },
   async headers() {
     return [
       {

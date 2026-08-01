@@ -15,6 +15,7 @@ dependencies = [
   "argon2-cffi>=25.1.0",
   "pyjwt[crypto]>=2.13.0",
   "pydantic[email]>=2.13.4",
+  "httpx>=0.28.0",
 ]
 
 [project.optional-dependencies]
@@ -23,7 +24,6 @@ dev = [
   "mypy>=1.13.0",
   "pytest>=8.3.0",
   "pytest-asyncio>=0.24.0",
-  "httpx>=0.28.0",
   "pre-commit>=4.0.0",
   "import-linter>=2.1",
 ]
@@ -34,6 +34,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"app/metadata/fixtures" = "app/metadata/fixtures"
 
 [tool.ruff]
 target-version = "py312"
@@ -79,10 +82,11 @@ containers = ["app"]
 # contracts for cross-domain repository isolation when domains exist.
 # Higher may import lower. ``|`` marks independent siblings (no cross-imports).
 # Auth may call Users service; Users must not depend on Auth.
+# Users and Metadata are independent siblings.
 layers = [
   "api",
   "auth",
-  "users",
+  "users | metadata",
   "common | core",
 ]
 
@@ -97,3 +101,21 @@ forbidden_modules = [
   "app.auth.api",
   "app.auth.models",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Users must not import Metadata"
+type = "forbidden"
+source_modules = ["app.users"]
+forbidden_modules = ["app.metadata"]
+
+[[tool.importlinter.contracts]]
+name = "Metadata must not import Users"
+type = "forbidden"
+source_modules = ["app.metadata"]
+forbidden_modules = ["app.users"]
+
+[[tool.importlinter.contracts]]
+name = "Metadata must not import Auth"
+type = "forbidden"
+source_modules = ["app.metadata"]
+forbidden_modules = ["app.auth"]

@@ -1,4 +1,4 @@
-.PHONY: help install lint typecheck import-lint alembic-heads test test-integration frontend-build frontend-test frontend-a11y docker-build ci up down logs migrate dev-api dev-web
+.PHONY: help install lint typecheck import-lint alembic-heads test test-integration frontend-build frontend-test frontend-a11y docker-build ci up down logs migrate seed-metadata dev-api dev-web
 
 help:
 	@echo "Aperture targets:"
@@ -17,6 +17,7 @@ help:
 	@echo "  make down              - docker compose down"
 	@echo "  make logs              - docker compose logs -f"
 	@echo "  make migrate           - alembic upgrade head"
+	@echo "  make seed-metadata     - offline fixture seed for catalog (no TMDb key)"
 	@echo "  make dev-api           - FastAPI on host (needs DATABASE_URL / Compose db)"
 	@echo "  make dev-web           - run Next.js locally"
 
@@ -79,3 +80,6 @@ logs:
 
 migrate:
 	cd backend && uv run alembic upgrade head
+
+seed-metadata:
+	cd backend && uv run python -m app.metadata.cli seed --source fixtures

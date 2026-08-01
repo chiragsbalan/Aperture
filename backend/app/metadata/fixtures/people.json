@@ -1,0 +1,308 @@
+[
+  {
+    "id": 192,
+    "name": "Tim Robbins",
+    "biography": "American actor and filmmaker.",
+    "birthday": "1958-10-16",
+    "deathday": null,
+    "place_of_birth": "West Covina, California, USA",
+    "profile_path": "/dsAJhCLH71JkV3lemDh35OOjZyN.jpg"
+  },
+  {
+    "id": 193,
+    "name": "Morgan Freeman",
+    "biography": "American actor, director, and narrator.",
+    "birthday": "1937-06-01",
+    "deathday": null,
+    "place_of_birth": "Memphis, Tennessee, USA",
+    "profile_path": "/jPsLqiYGSofU4s6BjrxnefPUcA.jpg"
+  },
+  {
+    "id": 4027,
+    "name": "Frank Darabont",
+    "biography": "American film director, screenwriter and producer.",
+    "birthday": "1959-01-28",
+    "deathday": null,
+    "place_of_birth": "Montb\u00e9liard, Doubs, France",
+    "profile_path": "/6Iiz85nU4eYNqxF4p97XC78TaVw.jpg"
+  },
+  {
+    "id": 1158,
+    "name": "Al Pacino",
+    "biography": "American actor and filmmaker.",
+    "birthday": "1940-04-25",
+    "deathday": null,
+    "place_of_birth": "New York City, New York, USA",
+    "profile_path": "/2dGBb1fOcNdZjtQToVPFxXb75G1.jpg"
+  },
+  {
+    "id": 3084,
+    "name": "Marlon Brando",
+    "biography": "American actor and film director.",
+    "birthday": "1924-04-03",
+    "deathday": "2004-07-01",
+    "place_of_birth": "Omaha, Nebraska, USA",
+    "profile_path": "/e2u2VGc9iFFzjlnO1jtzjh16iTM.jpg"
+  },
+  {
+    "id": 1776,
+    "name": "Francis Ford Coppola",
+    "biography": "American film director, producer and screenwriter.",
+    "birthday": "1939-04-07",
+    "deathday": null,
+    "place_of_birth": "Detroit, Michigan, USA",
+    "profile_path": "/3Pblihd6KjXliie9vj4LQUobLJq.jpg"
+  },
+  {
+    "id": 3894,
+    "name": "Christian Bale",
+    "biography": "English actor.",
+    "birthday": "1974-01-30",
+    "deathday": null,
+    "place_of_birth": "Haverfordwest, Pembrokeshire, Wales, UK",
+    "profile_path": "/qCpZn2e3dimwbryFnJQ8LFFHVnc.jpg"
+  },
+  {
+    "id": 1810,
+    "name": "Heath Ledger",
+    "biography": "Australian actor.",
+    "birthday": "1979-04-04",
+    "deathday": "2008-01-22",
+    "place_of_birth": "Perth, Western Australia, Australia",
+    "profile_path": "/5Y9HnYBoTw6iLYx3pF1nW2xQx.jpg"
+  },
+  {
+    "id": 525,
+    "name": "Christopher Nolan",
+    "biography": "British-American film director and producer.",
+    "birthday": "1970-07-30",
+    "deathday": null,
+    "place_of_birth": "London, England, UK",
+    "profile_path": "/xuAIuYSmsUzKlUMBFGVZaWsY3DZ.jpg"
+  },
+  {
+    "id": 139,
+    "name": "Uma Thurman",
+    "biography": "American actress and model.",
+    "birthday": "1970-04-29",
+    "deathday": null,
+    "place_of_birth": "Boston, Massachusetts, USA",
+    "profile_path": "/tLNVAlX4dv71xQrvL2o83OjRiPg.jpg"
+  },
+  {
+    "id": 2231,
+    "name": "Samuel L. Jackson",
+    "biography": "American actor and producer.",
+    "birthday": "1948-12-21",
+    "deathday": null,
+    "place_of_birth": "Washington, D.C., USA",
+    "profile_path": "/AiAYAqwcM5Y1KtzonQv0Hzt9x8E.jpg"
+  },
+  {
+    "id": 138,
+    "name": "Quentin Tarantino",
+    "biography": "American film director, screenwriter, and actor.",
+    "birthday": "1963-03-27",
+    "deathday": null,
+    "place_of_birth": "Knoxville, Tennessee, USA",
+    "profile_path": "/1gjcpAa99FAOWGHrAzpWZh6ZLsH.jpg"
+  },
+  {
+    "id": 6193,
+    "name": "Leonardo DiCaprio",
+    "biography": "American actor and film producer.",
+    "birthday": "1974-11-11",
+    "deathday": null,
+    "place_of_birth": "Los Angeles, California, USA",
+    "profile_path": "/wo2hJpnE8xqX8M0eW1d4vR7qZ.jpg"
+  },
+  {
+    "id": 287,
+    "name": "Brad Pitt",
+    "biography": "American actor and film producer.",
+    "birthday": "1963-12-18",
+    "deathday": null,
+    "place_of_birth": "Shawnee, Oklahoma, USA",
+    "profile_path": "/cckcYHYQ5AcmNxMLrn9X8x6Xw.jpg"
+  },
+  {
+    "id": 7467,
+    "name": "David Fincher",
+    "biography": "American film director.",
+    "birthday": "1962-08-28",
+    "deathday": null,
+    "place_of_birth": "Denver, Colorado, USA",
+    "profile_path": "/tpEczFclQZeKAiCeKZZ0adRvtfz.jpg"
+  },
+  {
+    "id": 31,
+    "name": "Tom Hanks",
+    "biography": "American actor and filmmaker.",
+    "birthday": "1956-07-09",
+    "deathday": null,
+    "place_of_birth": "Concord, California, USA",
+    "profile_path": "/xndWFsBlClOJFRghCyMhR.jpg"
+  },
+  {
+    "id": 6384,
+    "name": "Keanu Reeves",
+    "biography": "Canadian actor.",
+    "birthday": "1964-09-02",
+    "deathday": null,
+    "place_of_birth": "Beirut, Lebanon",
+    "profile_path": "/rRdru6REr9i3WIHv2mrp3m.jpg"
+  },
+  {
+    "id": 10990,
+    "name": "Lana Wachowski",
+    "biography": "American film and television director.",
+    "birthday": "1965-06-21",
+    "deathday": null,
+    "place_of_birth": "Chicago, Illinois, USA",
+    "profile_path": "/6Y0oXL.jpg"
+  },
+  {
+    "id": 20738,
+    "name": "Matthew McConaughey",
+    "biography": "American actor.",
+    "birthday": "1969-11-04",
+    "deathday": null,
+    "place_of_birth": "Uvalde, Texas, USA",
+    "profile_path": "/wJiGedOCZmp3afNvJMh9.jpg"
+  },
+  {
+    "id": 1813,
+    "name": "Anne Hathaway",
+    "biography": "American actress.",
+    "birthday": "1982-11-12",
+    "deathday": null,
+    "place_of_birth": "Brooklyn, New York City, USA",
+    "profile_path": "/tL0qhk.jpg"
+  },
+  {
+    "id": 20739,
+    "name": "Song Kang-ho",
+    "biography": "South Korean actor.",
+    "birthday": "1967-01-17",
+    "deathday": null,
+    "place_of_birth": "Gimhae, South Gyeongsang, South Korea",
+    "profile_path": "/person_20739.jpg"
+  },
+  {
+    "id": 21657,
+    "name": "Bong Joon-ho",
+    "biography": "South Korean film director.",
+    "birthday": "1969-09-14",
+    "deathday": null,
+    "place_of_birth": "Daegu, South Korea",
+    "profile_path": "/sWg97.jpg"
+  },
+  {
+    "id": 17419,
+    "name": "Bryan Cranston",
+    "biography": "American actor and director.",
+    "birthday": "1956-03-07",
+    "deathday": null,
+    "place_of_birth": "Hollywood, Los Angeles, California, USA",
+    "profile_path": "/7Jahy5LZX2Fo8fGJltMou3.jpg"
+  },
+  {
+    "id": 84427,
+    "name": "Aaron Paul",
+    "biography": "American actor.",
+    "birthday": "1979-08-27",
+    "deathday": null,
+    "place_of_birth": "Emmett, Idaho, USA",
+    "profile_path": "/uoykg7B.jpg"
+  },
+  {
+    "id": 66646,
+    "name": "Vince Gilligan",
+    "biography": "American writer, director and producer.",
+    "birthday": "1967-02-10",
+    "deathday": null,
+    "place_of_birth": "Richmond, Virginia, USA",
+    "profile_path": "/person_66646.jpg"
+  },
+  {
+    "id": 11287,
+    "name": "James Gandolfini",
+    "biography": "American actor.",
+    "birthday": "1961-09-18",
+    "deathday": "2013-06-19",
+    "place_of_birth": "Westwood, New Jersey, USA",
+    "profile_path": "/person_11287.jpg"
+  },
+  {
+    "id": 11355,
+    "name": "Lorraine Bracco",
+    "biography": "American actress.",
+    "birthday": "1954-10-02",
+    "deathday": null,
+    "place_of_birth": "Bay Ridge, Brooklyn, New York, USA",
+    "profile_path": "/person_11355.jpg"
+  },
+  {
+    "id": 17288,
+    "name": "David Chase",
+    "biography": "American writer and producer.",
+    "birthday": "1945-08-22",
+    "deathday": null,
+    "place_of_birth": "Mount Vernon, New York, USA",
+    "profile_path": "/person_17288.jpg"
+  },
+  {
+    "id": 239019,
+    "name": "Emilia Clarke",
+    "biography": "English actress.",
+    "birthday": "1986-10-23",
+    "deathday": null,
+    "place_of_birth": "London, England, UK",
+    "profile_path": "/person_239019.jpg"
+  },
+  {
+    "id": 239020,
+    "name": "Kit Harington",
+    "biography": "English actor.",
+    "birthday": "1986-12-26",
+    "deathday": null,
+    "place_of_birth": "London, England, UK",
+    "profile_path": "/person_239020.jpg"
+  },
+  {
+    "id": 4495,
+    "name": "Steve Carell",
+    "biography": "American actor and comedian.",
+    "birthday": "1962-08-16",
+    "deathday": null,
+    "place_of_birth": "Concord, Massachusetts, USA",
+    "profile_path": "/5tYOh5Y.jpg"
+  },
+  {
+    "id": 17697,
+    "name": "John Krasinski",
+    "biography": "American actor and filmmaker.",
+    "birthday": "1979-10-20",
+    "deathday": null,
+    "place_of_birth": "Boston, Massachusetts, USA",
+    "profile_path": "/mpEzG.jpg"
+  },
+  {
+    "id": 135621,
+    "name": "Millie Bobby Brown",
+    "biography": "British actress.",
+    "birthday": "2004-02-19",
+    "deathday": null,
+    "place_of_birth": "Marbella, Spain",
+    "profile_path": "/person_135621.jpg"
+  },
+  {
+    "id": 135651,
+    "name": "Finn Wolfhard",
+    "biography": "Canadian actor and musician.",
+    "birthday": "2002-12-23",
+    "deathday": null,
+    "place_of_birth": "Vancouver, British Columbia, Canada",
+    "profile_path": "/person_135651.jpg"
+  }
+]
