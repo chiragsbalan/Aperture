@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import case, func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import Identity, IdentityCredential, RefreshSession
+from app.auth.models import (
+    AuthFailedAttempt,
+    Identity,
+    IdentityCredential,
+    RefreshGracePayload,
+    RefreshSession,
+)
+from app.core.ids import new_uuid7
 
 PASSWORD_PROVIDER = 'password'
 
@@ -171,3 +179,151 @@ async def revoke_refresh_session(
         )
         .values(revoked_at=revoked_at)
     )
+
+
+async def get_refresh_session_by_rotated_from_id(
+    session: AsyncSession,
+    rotated_from_id: uuid.UUID,
+) -> RefreshSession | None:
+    """Return the successor session created by rotating ``rotated_from_id``."""
+    result = await session.execute(
+        select(RefreshSession).where(
+            RefreshSession.rotated_from_id == rotated_from_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def revoke_refresh_family(
+    session: AsyncSession,
+    family_id: uuid.UUID,
+    *,
+    revoked_at: datetime,
+) -> None:
+    """Revoke all unrevoked sessions in a refresh family (theft response)."""
+    await session.execute(
+        update(RefreshSession)
+        .where(
+            RefreshSession.family_id == family_id,
+            RefreshSession.revoked_at.is_(None),
+        )
+        .values(revoked_at=revoked_at)
+    )
+
+
+async def upsert_refresh_grace_payload(
+    session: AsyncSession,
+    *,
+    token_hash: str,
+    access_token: str,
+    refresh_token: str,
+    expires_in: int,
+    expires_at: datetime,
+    created_at: datetime,
+) -> None:
+    """Persist successor tokens for grace reuse (same txn as rotation)."""
+    stmt = pg_insert(RefreshGracePayload).values(
+        token_hash=token_hash,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=expires_in,
+        expires_at=expires_at,
+        created_at=created_at,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[RefreshGracePayload.token_hash],
+        set_={
+            'access_token': stmt.excluded.access_token,
+            'refresh_token': stmt.excluded.refresh_token,
+            'expires_in': stmt.excluded.expires_in,
+            'expires_at': stmt.excluded.expires_at,
+            'created_at': stmt.excluded.created_at,
+        },
+    )
+    await session.execute(stmt)
+
+
+async def get_refresh_grace_payload(
+    session: AsyncSession,
+    *,
+    token_hash: str,
+    now: datetime,
+) -> RefreshGracePayload | None:
+    """Return an unexpired grace payload for ``token_hash``, if any."""
+    result = await session.execute(
+        select(RefreshGracePayload).where(
+            RefreshGracePayload.token_hash == token_hash,
+            RefreshGracePayload.expires_at > now,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_failed_attempt(
+    session: AsyncSession,
+    *,
+    action: str,
+    subject_key: str,
+) -> AuthFailedAttempt | None:
+    """Look up a durable failure counter row."""
+    result = await session.execute(
+        select(AuthFailedAttempt).where(
+            AuthFailedAttempt.action == action,
+            AuthFailedAttempt.subject_key == subject_key,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def upsert_failed_attempt(
+    session: AsyncSession,
+    *,
+    action: str,
+    subject_key: str,
+    window_started_at: datetime,
+    window_seconds: int,
+) -> None:
+    """Atomically insert or increment a failure counter (SQL-side +1 / reset)."""
+    stmt = pg_insert(AuthFailedAttempt).values(
+        id=new_uuid7(),
+        action=action,
+        subject_key=subject_key,
+        window_started_at=window_started_at,
+        attempt_count=1,
+    )
+    window_expired = (
+        window_started_at - AuthFailedAttempt.window_started_at
+        >= timedelta(seconds=window_seconds)
+    )
+    stmt = stmt.on_conflict_do_update(
+        constraint='uq_auth_failed_attempts_action_subject',
+        set_={
+            'attempt_count': case(
+                (window_expired, 1),
+                else_=AuthFailedAttempt.attempt_count + 1,
+            ),
+            'window_started_at': case(
+                (window_expired, window_started_at),
+                else_=AuthFailedAttempt.window_started_at,
+            ),
+            'updated_at': func.now(),
+        },
+    )
+    await session.execute(stmt)
+
+
+async def clear_failed_attempt(
+    session: AsyncSession,
+    *,
+    action: str,
+    subject_key: str,
+) -> None:
+    """Delete a failure counter row if present."""
+    row = await get_failed_attempt(
+        session,
+        action=action,
+        subject_key=subject_key,
+    )
+    if row is not None:
+        await session.delete(row)
+        await session.flush()

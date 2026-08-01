@@ -43,6 +43,13 @@ Browsers must authenticate to FastAPI without exposing long-lived secrets to Jav
 - Production API stays at **Render Free, single instance** until Redis (ADR-0006 / P2.4) enables multi-instance shared counters.
 - Enumeration-safe errors on auth endpoints (P1.2).
 
+### P1.2 hardening (as implemented)
+
+- **Refresh reuse:** 10s grace after rotation returns the same successor token pair. L1 in-memory `CacheBackend` is read-through; durable `refresh_grace_payloads` is written in the same DB transaction as rotation (survives process restart within grace). Within grace + payload miss → 401 with **no** family revoke and **no** successor re-rotate. Reuse outside grace **revokes that refresh family only** (not all sessions for the identity). Logout without a successor is a plain 401 (no family revoke).
+- **Login enumeration:** same `"Invalid credentials"` body for unknown identifier vs bad password; Argon2 verify always runs (dummy hash when no credential).
+- **Register:** may return 409 with distinct email/username conflict messages for UX; compensated by rate limits.
+- **Trusted client IP:** BFF sets `X-Aperture-Client-IP` + `X-Aperture-BFF-Secret` from the browser's forwarded IP and server env `AUTH_BFF_SHARED_SECRET`. API trusts the IP header only when the configured secret is non-empty and matches; otherwise uses the socket peer. Inbound `X-Forwarded-For` is ignored for rate limiting.
+- **Rate limits (defaults):** 10 login failures / 15m (identifier hash + IP hash; cleared on successful login), 5 register failures / 15m (email hash + IP hash), 30 **failed** refresh outcomes / 15m per IP (not every call). Tunable via env (`AUTH_*`). Counters live in `auth_failed_attempts` with atomic `INSERT … ON CONFLICT` upserts.
 ### Authorization
 
 - Authentication establishes identity; **AuthZ stays in the service layer** (not “trust the BFF”).

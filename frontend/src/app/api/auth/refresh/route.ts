@@ -20,7 +20,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   let upstream: Response;
   try {
-    upstream = await forwardAuthJson('/api/v1/auth/refresh', {
+    upstream = await forwardAuthJson(request, '/api/v1/auth/refresh', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken }),
@@ -31,12 +31,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const data: unknown = await upstream.json().catch(() => null);
   if (!upstream.ok) {
-    // Do not clear cookies on refresh 401 — concurrent tabs may race; the
-    // loser must not wipe the winner's rotated cookies. 10s grace +
-    // singleflight deferred to P1.2.
-    return NextResponse.json(data ?? { detail: 'Refresh failed' }, {
-      status: upstream.status === 401 ? 401 : upstream.status,
-    });
+    // Clear cookies only on 401. Keep them on 429/5xx so the client can retry.
+    const response = NextResponse.json(
+      data ?? { detail: 'Refresh failed' },
+      { status: upstream.status },
+    );
+    if (upstream.status === 401) {
+      clearAuthCookies(response);
+    }
+    return response;
   }
 
   const tokens = parseTokenPayload(data);

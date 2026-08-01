@@ -5,7 +5,15 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.base import Base
@@ -100,3 +108,47 @@ class RefreshSession(UuidPrimaryKeyMixin, TimestampMixin, Base):
     )
 
     identity: Mapped[Identity] = relationship(back_populates='refresh_sessions')
+
+
+class AuthFailedAttempt(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    """Durable per-subject failure counters for auth rate limits (P1.2)."""
+
+    __tablename__ = 'auth_failed_attempts'
+
+    # login | register | refresh
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    # Privacy-preserving key, e.g. ``id:<sha256>`` or ``ip:<sha256>``.
+    subject_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    window_started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    attempt_count: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
+
+    __table_args__ = (
+        UniqueConstraint(
+            'action',
+            'subject_key',
+            name='uq_auth_failed_attempts_action_subject',
+        ),
+    )
+
+
+class RefreshGracePayload(Base):
+    """Durable successor token pair for the refresh reuse grace window."""
+
+    __tablename__ = 'refresh_grace_payloads'
+
+    # Hash of the *rotated* (old) refresh token presented during grace reuse.
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    access_token: Mapped[str] = mapped_column(Text(), nullable=False)
+    refresh_token: Mapped[str] = mapped_column(Text(), nullable=False)
+    expires_in: Mapped[int] = mapped_column(Integer(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )

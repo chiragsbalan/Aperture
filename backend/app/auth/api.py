@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import secrets
+
 from fastapi import APIRouter, Request, status
 
 from app.auth.deps import CurrentIdentityDep
@@ -22,6 +24,7 @@ from app.auth.service import (
     refresh,
     register,
 )
+from app.core.config import Settings
 from app.core.deps import DbSessionDep, SettingsDep
 
 router = APIRouter(prefix='/auth', tags=['auth'])
@@ -32,6 +35,37 @@ def _user_agent(request: Request) -> str | None:
     if value is None:
         return None
     return value[:512]
+
+
+def _bff_secret_matches(configured: str, provided: str) -> bool:
+    """Constant-time compare; unequal lengths never match."""
+    if not configured:
+        return False
+    if len(configured) != len(provided):
+        secrets.compare_digest(configured, configured)
+        return False
+    return secrets.compare_digest(configured, provided)
+
+
+def _client_ip(request: Request, settings: Settings) -> str | None:
+    """Trusted BFF client IP when secret matches; else socket peer.
+
+    Ignores inbound ``X-Forwarded-For`` so browsers cannot spoof rate-limit keys.
+    Trusts ``X-Aperture-Client-IP`` only when ``AUTH_BFF_SHARED_SECRET`` is set
+    and matches ``X-Aperture-BFF-Secret``.
+    """
+    configured = settings.auth_bff_shared_secret
+    if configured:
+        provided = request.headers.get('x-aperture-bff-secret') or ''
+        if _bff_secret_matches(configured, provided):
+            raw = request.headers.get('x-aperture-client-ip')
+            if raw:
+                ip = raw.strip()
+                if ip:
+                    return ip[:64]
+    if request.client is None:
+        return None
+    return request.client.host
 
 
 def _token_response(tokens: IssuedTokens) -> TokenResponse:
@@ -61,6 +95,7 @@ async def register_endpoint(
         username=body.username,
         password=body.password,
         user_agent=_user_agent(request),
+        client_ip=_client_ip(request, settings),
     )
     return _token_response(tokens)
 
@@ -79,6 +114,7 @@ async def login_endpoint(
         identifier=body.identifier,
         password=body.password,
         user_agent=_user_agent(request),
+        client_ip=_client_ip(request, settings),
     )
     return _token_response(tokens)
 
@@ -105,6 +141,7 @@ async def refresh_endpoint(
         settings=settings,
         refresh_token=body.refresh_token,
         user_agent=_user_agent(request),
+        client_ip=_client_ip(request, settings),
     )
     return _token_response(tokens)
 

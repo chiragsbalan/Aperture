@@ -66,13 +66,10 @@ export function clearAuthCookies(response: NextResponse): void {
 
 /**
  * Clear auth cookies only when the refresh cookie is unchanged from the
- * value we sent upstream. Used so a concurrent rotator cannot wipe a
- * winner's cookies when a re-read is available.
- *
- * Note: Next.js request cookies are per-invocation, so multi-tab losers
- * still see sent===current. For P1.1, refresh/me handlers must not clear
- * on upstream refresh 401 at all (401 body only). Full grace + singleflight
- * is P1.2.
+ * value we sent upstream. Kept for callers that can re-read cookies after
+ * an upstream round-trip; request-scoped Next.js cookies alone cannot see
+ * a sibling tab's Set-Cookie. With API 10s reuse grace, refresh/me routes
+ * clear on upstream 401 directly.
  */
 export function clearAuthCookiesIfRefreshUnchanged(
   response: NextResponse,
@@ -86,13 +83,43 @@ export function clearAuthCookiesIfRefreshUnchanged(
   return true;
 }
 
+/** First hop from `x-forwarded-for`, else null. */
+export function clientIpFromRequest(request: NextRequest): string | null {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) {
+    const first = forwarded.split(',')[0]?.trim();
+    if (first) {
+      return first.slice(0, 64);
+    }
+  }
+  return null;
+}
+
+/**
+ * Forward JSON to the upstream auth API with trusted client-IP headers.
+ *
+ * Always overwrites `X-Aperture-Client-IP` / `X-Aperture-BFF-Secret` from the
+ * browser request IP and server env — never trusts browser-supplied copies.
+ */
 export async function forwardAuthJson(
+  request: NextRequest,
   path: string,
-  init: RequestInit,
+  init: RequestInit = {},
 ): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const clientIp = clientIpFromRequest(request);
+  if (clientIp) {
+    headers.set('X-Aperture-Client-IP', clientIp);
+  } else {
+    headers.delete('X-Aperture-Client-IP');
+  }
+  const secret = process.env.AUTH_BFF_SHARED_SECRET ?? '';
+  headers.set('X-Aperture-BFF-Secret', secret);
+
   const base = upstreamApiBaseUrl();
   return fetch(`${base}${path}`, {
     ...init,
+    headers,
     cache: 'no-store',
     redirect: 'manual',
     signal: AbortSignal.timeout(UPSTREAM_FETCH_TIMEOUT_MS),

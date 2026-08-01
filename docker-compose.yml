@@ -39,6 +39,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-local-dev-only-change-me-before-any-real-use}
       ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS:-900}
       REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS:-2592000}
+      AUTH_BFF_SHARED_SECRET: ${AUTH_BFF_SHARED_SECRET:-local-dev-bff-shared-secret-change-me}
     depends_on:
       db:
         condition: service_healthy
@@ -68,6 +69,7 @@ services:
       # Server-only upstream for `/api/proxy/...` (BFF).
       API_URL: http://api:8000
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      AUTH_BFF_SHARED_SECRET: ${AUTH_BFF_SHARED_SECRET:-local-dev-bff-shared-secret-change-me}
     depends_on:
       api:
         condition: service_healthy

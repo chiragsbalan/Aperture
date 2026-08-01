@@ -17,7 +17,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   let upstream: Response;
   try {
-    upstream = await forwardAuthJson('/api/v1/auth/register', {
+    upstream = await forwardAuthJson(request, '/api/v1/auth/register', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
