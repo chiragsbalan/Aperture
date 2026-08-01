@@ -37,9 +37,10 @@ ADR-0003-hosting-and-bff.md
 ADR-0004-content-identity.md
 ADR-0005-auth.md
 ADR-0006-redis-search-staging.md
+ADR-0008-personal-library-lists.md
 ```
 
-Zero-padded four-digit ids match PLAN.md. The six accepted foundation ADRs:
+Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
 
 | ADR | Decision |
 |---|---|
@@ -49,9 +50,9 @@ Zero-padded four-digit ids match PLAN.md. The six accepted foundation ADRs:
 | [ADR-0004](ADR-0004-content-identity.md) | Canonical content identity (`content_items` / `external_ids`) |
 | [ADR-0005](ADR-0005-auth.md) | Auth / sessions (BFF cookies, JWT, Argon2id, email-or-username login, OAuth link rules) |
 | [ADR-0006](ADR-0006-redis-search-staging.md) | Redis at P2; PG FTS → OpenSearch staging |
+| [ADR-0008](ADR-0008-personal-library-lists.md) | Personal library system lists + public `movie`/`tv` content refs |
 
-Follow-on (not yet written): **ADR-0007** — OpenSearch hosting (due at P5 exit per PLAN).
-
+Reserved / not yet written: **ADR-0007** — OpenSearch hosting (due at P5 exit per PLAN).
 ## Template
 
 Every ADR should contain:
