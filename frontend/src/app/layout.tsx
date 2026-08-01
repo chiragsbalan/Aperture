@@ -1,20 +1,23 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Fraunces, Source_Sans_3 } from 'next/font/google';
+
 import './globals.css';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const fraunces = Fraunces({
+  variable: '--font-fraunces',
   subsets: ['latin'],
+  display: 'swap',
 });
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+const sourceSans = Source_Sans_3({
+  variable: '--font-source-sans',
   subsets: ['latin'],
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
   title: 'Aperture',
-  description: 'Aperture local development shell',
+  description: 'A cinematic window into film and television.',
 };
 
 export default function RootLayout({
@@ -23,9 +26,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${fraunces.variable} ${sourceSans.variable} antialiased`}
       >
         {children}
       </body>

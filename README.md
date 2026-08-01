@@ -10,7 +10,7 @@ Monorepo for the Aperture product (Phase 0 foundation).
 
 Backend formatting uses **Ruff** (lint + format) instead of Black.
 
-## Quick start (P0.2 — Compose)
+## Quick start (Compose)
 
 ```bash
 cp .env.example .env
@@ -19,7 +19,8 @@ make up
 
 Then:
 
-- Web: http://localhost:3000 (shows API readiness + version)
+- Web: http://localhost:3000 (shell + health via same-origin BFF `/api/proxy/...`)
+- BFF examples: http://localhost:3000/api/proxy/health/ready · `/api/proxy/version`
 - API live: http://localhost:8000/health/live
 - API ready (Postgres): http://localhost:8000/health/ready
 - API version: http://localhost:8000/version
@@ -54,10 +55,15 @@ make migrate              # alembic upgrade head (needs Postgres)
 make test                 # unit tests (DB mocked for readiness)
 make test-integration     # needs Postgres (e.g. docker compose up -d db)
 make frontend-build
+make frontend-a11y        # axe shell scan (Playwright Chromium)
 make docker-build         # needs Docker
 # Full local parity with required GitHub checks (needs Postgres + Docker):
 docker compose up -d db && make ci
 ```
+
+### Frontend shell (P0.5)
+
+Dark cinematic shell with design tokens (`frontend/src/styles/tokens.css`), Fraunces + Source Sans 3, and a11y baseline. Browser traffic to the API goes through the Next.js BFF at `/api/proxy/*` (reserved cookies `__Host-ap_at` / `__Host-ap_rt` for P1 — not set yet).
 
 Optional pre-commit hooks:
 

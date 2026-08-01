@@ -1,4 +1,4 @@
-.PHONY: help install lint typecheck import-lint alembic-heads test test-integration frontend-build docker-build ci up down logs migrate dev-api dev-web
+.PHONY: help install lint typecheck import-lint alembic-heads test test-integration frontend-build frontend-test frontend-a11y docker-build ci up down logs migrate dev-api dev-web
 
 help:
 	@echo "Aperture targets:"
@@ -10,6 +10,7 @@ help:
 	@echo "  make test              - unit tests (no Postgres required)"
 	@echo "  make test-integration  - Postgres integration (compose/CI db)"
 	@echo "  make frontend-build    - Next.js production build"
+	@echo "  make frontend-a11y     - axe scan shell (needs prior frontend-build)"
 	@echo "  make docker-build      - build backend Docker image"
 	@echo "  make ci                - full local parity with GitHub CI jobs"
 	@echo "  make up                - docker compose up --build -d"
@@ -46,13 +47,20 @@ test-integration:
 	cd backend && uv run pytest -m integration
 
 frontend-build:
-	cd frontend && NEXT_PUBLIC_API_URL=http://localhost:8000 pnpm build
+	cd frontend && API_URL=http://localhost:8000 NEXT_PUBLIC_API_URL=http://localhost:8000 pnpm build
+
+frontend-test:
+	cd frontend && pnpm test
+
+frontend-a11y:
+	cd frontend && pnpm exec playwright install chromium
+	cd frontend && pnpm a11y
 
 docker-build:
 	docker build -f backend/docker/Dockerfile -t aperture-api:local backend
 
 # Mirrors required GitHub checks: Backend + Frontend + Docker (integration needs Postgres).
-ci: lint typecheck import-lint alembic-heads test test-integration frontend-build docker-build
+ci: lint typecheck import-lint alembic-heads test test-integration frontend-test frontend-build frontend-a11y docker-build
 
 dev-api:
 	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

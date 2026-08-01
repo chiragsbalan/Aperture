@@ -109,10 +109,22 @@ jobs:
       - name: Typecheck
         run: pnpm exec tsc --noEmit
 
+      - name: Unit tests
+        run: pnpm test
+
       - name: Build
         run: pnpm build
         env:
+          API_URL: http://localhost:8000
           NEXT_PUBLIC_API_URL: http://localhost:8000
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Accessibility (axe shell)
+        run: pnpm a11y
+        env:
+          API_URL: http://127.0.0.1:9
 
   docker:
     name: Docker

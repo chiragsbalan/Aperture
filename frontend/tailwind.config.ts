@@ -9,8 +9,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: 'var(--background)',
-        foreground: 'var(--foreground)',
+        background: 'var(--color-bg)',
+        foreground: 'var(--color-fg)',
+        accent: 'var(--color-accent)',
+        muted: 'var(--color-fg-muted)',
+      },
+      fontFamily: {
+        display: ['var(--font-display)'],
+        body: ['var(--font-body)'],
       },
     },
   },

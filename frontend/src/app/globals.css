@@ -1,21 +1,110 @@
+@import '../styles/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@layer base {
+  html {
+    background: var(--color-bg);
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  body {
+    min-height: 100dvh;
+    color: var(--color-fg);
+    background: var(--color-bg);
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: var(--leading-body);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background: var(--color-accent-soft);
+    color: var(--color-fg);
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .shell-atmosphere {
+    background:
+      radial-gradient(120% 80% at 50% -10%, var(--bg-glow-1), transparent 55%),
+      radial-gradient(80% 50% at 100% 100%, var(--bg-glow-2), transparent 50%),
+      linear-gradient(180deg, transparent 40%, var(--bg-vignette)),
+      var(--color-bg);
+  }
+
+  .motion-fade-rise {
+    animation: fade-rise var(--duration-slow) var(--ease-out) both;
+  }
+
+  .motion-fade-rise-delay {
+    animation: fade-rise var(--duration-slow) var(--ease-out) both;
+    animation-delay: 120ms;
+  }
+
+  .motion-fade-in {
+    animation: fade-in var(--duration-med) var(--ease-out) both;
+    animation-delay: 220ms;
+  }
+
+  .status-pulse::before {
+    content: '';
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-right: 0.5rem;
+    border-radius: 999px;
+    background: currentColor;
+    vertical-align: 0.05em;
+    animation: pulse-dot 2.2s var(--ease-out) infinite;
+  }
+}
+
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-fade-rise,
+  .motion-fade-rise-delay,
+  .motion-fade-in,
+  .status-pulse::before {
+    animation: none !important;
+  }
 }

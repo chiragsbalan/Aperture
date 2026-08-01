@@ -28,6 +28,32 @@ class Settings(BaseSettings):
     api_v1_prefix: str = '/api/v1'
     log_level: str = 'INFO'
     database_url: str
+    # Comma-separated browser origins. Empty (default) = no CORS middleware;
+    # browsers should use the Next.js BFF (`/api/proxy/...`), not the API directly.
+    cors_origins: str = ''
+
+    def cors_origin_list(self) -> list[str]:
+        """Parse ``cors_origins`` into a list of allowed origins.
+
+        Rejects ``*`` and non-http(s) values so misconfiguration fails loudly.
+        """
+        if not self.cors_origins.strip():
+            return []
+        origins: list[str] = []
+        for raw in self.cors_origins.split(','):
+            origin = raw.strip()
+            if not origin:
+                continue
+            if origin == '*':
+                raise ValueError(
+                    'CORS_ORIGINS must not be *; list explicit http(s) origins'
+                )
+            if not (origin.startswith('http://') or origin.startswith('https://')):
+                raise ValueError(
+                    f'CORS_ORIGINS entry must be an http(s) URL, got: {origin!r}'
+                )
+            origins.append(origin)
+        return origins
 
 
 @lru_cache
