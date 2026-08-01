@@ -32,10 +32,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const data: unknown = await upstream.json().catch(() => null);
   if (!upstream.ok) {
     // Clear cookies only on 401. Keep them on 429/5xx so the client can retry.
-    const response = NextResponse.json(
-      data ?? { detail: 'Refresh failed' },
-      { status: upstream.status },
-    );
+    const response = NextResponse.json(data ?? { detail: 'Refresh failed' }, {
+      status: upstream.status,
+    });
     if (upstream.status === 401) {
       clearAuthCookies(response);
     }

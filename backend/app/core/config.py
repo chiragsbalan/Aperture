@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     auth_register_max_failures: int = 5
     # Cap is failure-only (invalid / outside-grace), not every refresh call.
     auth_refresh_max_per_ip: int = 30
-    # Shared secret for BFF → API trusted client IP (X-Aperture-*). Empty = ignore header.
+    # BFF → API shared secret for trusted client IP. Empty = ignore header.
     auth_bff_shared_secret: str = ''
 
     @model_validator(mode='after')

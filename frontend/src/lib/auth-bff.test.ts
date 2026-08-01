@@ -61,7 +61,9 @@ describe('forwardAuthJson', () => {
   it('sets trusted IP headers from request and env (overwrites caller)', async () => {
     vi.stubEnv('AUTH_BFF_SHARED_SECRET', 'compose-shared-secret');
     vi.stubEnv('API_URL', 'http://api.test');
-    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
     const request = new NextRequest('http://localhost/api/auth/login', {

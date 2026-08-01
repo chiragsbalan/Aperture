@@ -44,11 +44,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   if ((upstream === null || upstream.status === 401) && refreshToken) {
     try {
-      const refreshRes = await forwardAuthJson(request, '/api/v1/auth/refresh', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
+      const refreshRes = await forwardAuthJson(
+        request,
+        '/api/v1/auth/refresh',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        },
+      );
       const refreshData: unknown = await refreshRes.json().catch(() => null);
       if (!refreshRes.ok) {
         // Forward 429 (and other non-401 failures) without clearing cookies.
@@ -84,9 +88,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const data: unknown = await upstream.json().catch(() => null);
   if (!upstream.ok) {
-    const response = NextResponse.json(data ?? { detail: 'Not authenticated' }, {
-      status: upstream.status,
-    });
+    const response = NextResponse.json(
+      data ?? { detail: 'Not authenticated' },
+      {
+        status: upstream.status,
+      },
+    );
     if (upstream.status === 401) {
       clearAuthCookies(response);
     }
