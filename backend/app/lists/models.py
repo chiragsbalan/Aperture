@@ -56,6 +56,7 @@ class List(UuidPrimaryKeyMixin, TimestampMixin, Base):
             name='visibility',
         ),
         Index('ix_lists_owner_user_id', 'owner_user_id'),
+        Index('ix_lists_owner_kind', 'owner_user_id', 'kind'),
         Index('ix_lists_visibility', 'visibility'),
         Index(
             'uq_lists_owner_system_kind',

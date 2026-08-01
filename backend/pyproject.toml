@@ -87,7 +87,7 @@ containers = ["app"]
 # Search sits with Auth (may import Metadata services; not Auth/Users).
 layers = [
   "api",
-  "auth | search | lists",
+  "auth | search | lists | library",
   "users | metadata",
   "common | core",
 ]
@@ -172,3 +172,48 @@ name = "Users must not import Lists"
 type = "forbidden"
 source_modules = ["app.users"]
 forbidden_modules = ["app.lists"]
+
+[[tool.importlinter.contracts]]
+name = "Library must not import Auth"
+type = "forbidden"
+source_modules = ["app.library"]
+forbidden_modules = ["app.auth"]
+
+[[tool.importlinter.contracts]]
+name = "Library must not import Search"
+type = "forbidden"
+source_modules = ["app.library"]
+forbidden_modules = ["app.search"]
+
+[[tool.importlinter.contracts]]
+name = "Library must not import Lists"
+type = "forbidden"
+source_modules = ["app.library"]
+forbidden_modules = ["app.lists"]
+
+[[tool.importlinter.contracts]]
+name = "Lists must not import Library"
+type = "forbidden"
+source_modules = ["app.lists"]
+forbidden_modules = ["app.library"]
+
+[[tool.importlinter.contracts]]
+name = "Library must not import Metadata ingest or CLI"
+type = "forbidden"
+source_modules = ["app.library"]
+forbidden_modules = [
+  "app.metadata.ingest",
+  "app.metadata.cli",
+]
+
+[[tool.importlinter.contracts]]
+name = "Metadata must not import Library"
+type = "forbidden"
+source_modules = ["app.metadata"]
+forbidden_modules = ["app.library"]
+
+[[tool.importlinter.contracts]]
+name = "Users must not import Library"
+type = "forbidden"
+source_modules = ["app.users"]
+forbidden_modules = ["app.library"]

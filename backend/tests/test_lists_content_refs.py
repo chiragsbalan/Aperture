@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from app.lists.content_refs import (
+from app.common.content_refs import (
     UnsupportedContentTypeError,
     to_db_content_type,
     to_public_content_type,
