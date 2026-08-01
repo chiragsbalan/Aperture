@@ -109,7 +109,7 @@ async function main() {
   try {
     await waitForServer(BASE_URL);
 
-    const routes = ['/', '/login', '/signup'];
+    const routes = ['/', '/login', '/signup', '/account', '/settings'];
     const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
 

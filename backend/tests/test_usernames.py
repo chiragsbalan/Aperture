@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.users.usernames import (
+    is_reserved_username,
     is_valid_username,
     normalize_username,
     username_from_display_names,
@@ -26,6 +27,14 @@ def test_invalid_usernames() -> None:
     assert not is_valid_username('FilmFan')
     assert not is_valid_username('bad-name')
     assert not is_valid_username('has space')
+
+
+def test_reserved_usernames() -> None:
+    assert is_reserved_username('admin')
+    assert is_reserved_username('settings')
+    assert is_reserved_username('u')
+    assert not is_reserved_username('ada_lovelace')
+    assert not is_reserved_username('user')
 
 
 def test_username_from_display_names() -> None:

@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
+from typing import Any
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base
 from app.core.mixins import SoftDeleteMixin, TimestampMixin, UuidPrimaryKeyMixin
+from app.users.preferences import DEFAULT_PREFERENCES
 
 
 class User(UuidPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -23,6 +27,15 @@ class User(UuidPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    preferences: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=lambda: dict(DEFAULT_PREFERENCES),
+    )
+    username_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     __table_args__ = (
         UniqueConstraint('identity_id', name='uq_users_identity_id'),

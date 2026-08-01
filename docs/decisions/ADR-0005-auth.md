@@ -73,6 +73,14 @@ Cloud env is provisioned; secrets stay in host dashboards (never git). Local Com
 
 `AUTH_BFF_SHARED_SECRET` must be identical across Vercel and Render. Local may use the same value for end-to-end Google testing with `AUTH_GOOGLE_MOCK=false`.
 
+### P1.4 Profiles (as implemented)
+
+- **Users owns profile APIs:** `GET/PATCH /api/v1/users/me`, `GET/PATCH /api/v1/users/me/preferences`, `GET /api/v1/users/{username}` (public). Auth `/me` remains identity summary (email, providers, nested user summary).
+- **Editable fields:** username, display name, bio (max 500). Avatar is **initials only** (no URL/upload in P1.4).
+- **Username rename cooldown:** once every **30 days** (`username_changed_at`); first rename after signup/Google seed is allowed immediately; reserved handles (`admin`, `settings`, `u`, …) rejected as unavailable.
+- **Preferences (JSONB):** `theme` (`system|light|dark`), `spoilers` (`show|hide`), `language` (short locale stub). Defaults: system / show / en.
+- **UI:** `/account` overview + Google link; `/settings` edit form; public `/u/[username]`.
+
 ### Authorization
 
 - Authentication establishes identity; **AuthZ stays in the service layer** (not “trust the BFF”).

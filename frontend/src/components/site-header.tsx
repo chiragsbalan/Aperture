@@ -82,9 +82,17 @@ export function SiteHeader() {
           <>
             <Link
               href="/account"
+              aria-current={pathname === '/account' ? 'page' : undefined}
               className="text-muted transition hover:text-foreground"
             >
               Account
+            </Link>
+            <Link
+              href="/settings"
+              aria-current={pathname === '/settings' ? 'page' : undefined}
+              className="text-muted transition hover:text-foreground"
+            >
+              Settings
             </Link>
             <button
               type="button"
