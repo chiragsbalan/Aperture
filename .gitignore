@@ -1,4 +1,48 @@
+# Local planning / agent notes (not shipped in git)
 phases/
 .cursor/
 PLAN.md
 CONTRIBUTING.md
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.dmypy.json
+dmypy.json
+
+# Node
+node_modules/
+frontend/node_modules/
+.pnpm-store/
+frontend/.next/
+frontend/out/
+frontend/dist/
+*.tsbuildinfo
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+docker-data/
