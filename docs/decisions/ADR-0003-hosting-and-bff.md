@@ -20,7 +20,7 @@ Browser auth remains same-origin Next.js BFF with `__Host-` cookies (backend coo
 | FastAPI API | **Render** web service | **Free** instance; cold start after idle is accepted |
 | PostgreSQL | **Supabase** | **Free** project; use as **Postgres only** (connection string + SSL/pooler). Do **not** adopt Supabase Auth, Realtime, or client `service_role` usage for Aperture product auth |
 
-**Local development** remains Docker Compose: FE + BE + Postgres (no Redis until P2). Compose is the day-to-day source of truth; cloud is for the public URL.
+**Local development** remains Docker Compose: FE + BE + Postgres + Redis (from P2.4; see ADR-0006). Compose is the day-to-day source of truth; cloud is for the public URL.
 
 **Auth/BFF transport:** same-origin Next.js BFF; cookies `__Host-ap_at` / `__Host-ap_rt`; FastAPI cookie-agnostic. Token lifetimes, hashing, and OAuth link rules are in [ADR-0005](ADR-0005-auth.md).
 

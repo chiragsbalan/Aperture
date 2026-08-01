@@ -50,11 +50,6 @@ def verify_password_or_dummy(password_hash: str | None, password: str) -> bool:
     return verify_password(password_hash, password)
 
 
-def hash_rate_limit_subject(raw: str) -> str:
-    """SHA-256 hex digest for rate-limit subject keys (emails, IPs, etc.)."""
-    return hashlib.sha256(raw.encode('utf-8')).hexdigest()
-
-
 def new_refresh_token() -> str:
     """Generate a high-entropy opaque refresh token (raw; return once)."""
     return secrets.token_urlsafe(32)

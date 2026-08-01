@@ -41,3 +41,6 @@ services:
       # Set in the Render dashboard when using --source tmdb; leave unset otherwise.
       # - key: TMDB_API_KEY
       #   sync: false
+      # Upstash Redis TCP URL (rediss://…). Required for multi-instance cache/rate limits.
+      - key: REDIS_URL
+        sync: false

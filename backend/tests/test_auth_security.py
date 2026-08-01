@@ -10,7 +10,6 @@ import pytest
 from app.auth.security import (
     decode_access_token,
     hash_password,
-    hash_rate_limit_subject,
     hash_refresh_token,
     issue_access_token,
     new_refresh_token,
@@ -20,6 +19,8 @@ from app.auth.security import (
 )
 from app.core.cache import InMemoryCacheBackend
 from app.core.config import Settings
+from app.core.security import hash_rate_limit_subject
+from app.core.trusted_client import resolve_client_ip
 
 
 def _settings() -> Settings:
@@ -108,7 +109,6 @@ def test_hash_rate_limit_subject_is_stable() -> None:
 
 
 def test_client_ip_trusts_aperture_header_only_with_secret() -> None:
-    from app.auth.api import _client_ip
     from starlette.requests import Request
 
     settings = Settings(
@@ -138,7 +138,7 @@ def test_client_ip_trusts_aperture_header_only_with_secret() -> None:
         'server': ('test', 80),
     }
     request = Request(scope, _receive)
-    assert _client_ip(request, settings) == '203.0.113.50'
+    assert resolve_client_ip(request, settings) == '203.0.113.50'
 
     bad_secret_settings = Settings(
         database_url='postgresql+asyncpg://aperture:aperture@localhost:5432/aperture',
@@ -154,14 +154,35 @@ def test_client_ip_trusts_aperture_header_only_with_secret() -> None:
         ],
     }
     bad_request = Request(bad_scope, _receive)
-    assert _client_ip(bad_request, bad_secret_settings) == '127.0.0.1'
+    assert resolve_client_ip(bad_request, bad_secret_settings) == '127.0.0.1'
 
     empty_secret = Settings(
         database_url='postgresql+asyncpg://aperture:aperture@localhost:5432/aperture',
         jwt_secret='unit-test-secret-at-least-32-bytes-long',
         auth_bff_shared_secret='',
     )
-    assert _client_ip(request, empty_secret) == '127.0.0.1'
+    assert resolve_client_ip(request, empty_secret) == '127.0.0.1'
+
+    whitespace_scope = {
+        **scope,
+        'headers': [
+            (b'x-aperture-client-ip', b'   '),
+            (b'x-aperture-bff-secret', b'shared-secret-value'),
+        ],
+    }
+    whitespace_request = Request(whitespace_scope, _receive)
+    assert resolve_client_ip(whitespace_request, settings) == '127.0.0.1'
+
+    long_ip = '9' * 80
+    long_scope = {
+        **scope,
+        'headers': [
+            (b'x-aperture-client-ip', long_ip.encode()),
+            (b'x-aperture-bff-secret', b'shared-secret-value'),
+        ],
+    }
+    long_request = Request(long_scope, _receive)
+    assert resolve_client_ip(long_request, settings) == '9' * 64
 
 
 @pytest.mark.asyncio

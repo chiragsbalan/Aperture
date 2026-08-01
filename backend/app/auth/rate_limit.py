@@ -1,4 +1,8 @@
-"""DB-backed auth rate limits (P1.2; Redis CacheBackend in P2.4)."""
+"""DB-backed auth rate limits (Postgres through P10; Redis in P11).
+
+Per ADR-0005 / ADR-0006, shared Redis auth RL is deferred to P11. Until then
+counters live in Postgres so multi-instance deployments stay correct.
+"""
 
 from __future__ import annotations
 
@@ -8,8 +12,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import repository as auth_repository
-from app.auth.security import hash_rate_limit_subject
 from app.core.config import Settings
+from app.core.security import hash_rate_limit_subject
 
 ACTION_LOGIN = 'login'
 ACTION_REGISTER = 'register'

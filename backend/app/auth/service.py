@@ -25,11 +25,14 @@ from app.auth.security import (
     normalize_email,
     verify_password_or_dummy,
 )
-from app.core.cache import CacheBackend, get_cache
+from app.core.cache import InMemoryCacheBackend, run_coro_sync
 from app.core.config import Settings
 from app.core.ids import new_uuid7
 from app.users import service as users_service
 from app.users.service import UserProfile
+
+# Process-local L1 only — never Redis (tokens must not leave the API process).
+_REFRESH_GRACE_L1 = InMemoryCacheBackend()
 
 _INVALID_CREDENTIALS = 'Invalid credentials'
 _INVALID_REFRESH = 'Invalid refresh token'
@@ -336,16 +339,20 @@ async def logout(
         await session.commit()
 
 
+def reset_refresh_grace_l1() -> None:
+    """Clear process-local refresh-grace L1 (tests)."""
+    run_coro_sync(_REFRESH_GRACE_L1.clear())
+
+
 async def _store_grace_tokens(
     session: AsyncSession,
-    cache: CacheBackend,
     *,
     settings: Settings,
     old_token_hash: str,
     tokens: IssuedTokens,
     now: datetime,
 ) -> None:
-    """Write durable + L1 grace payloads (caller commits the DB txn)."""
+    """Write durable + process-local L1 grace payloads (caller commits)."""
     grace_expires = now + timedelta(seconds=settings.refresh_reuse_grace_seconds)
     await auth_repository.upsert_refresh_grace_payload(
         session,
@@ -356,7 +363,7 @@ async def _store_grace_tokens(
         expires_at=grace_expires,
         created_at=now,
     )
-    await cache.set(
+    await _REFRESH_GRACE_L1.set(
         _grace_cache_key(old_token_hash),
         _tokens_to_cache(tokens),
         ttl_seconds=settings.refresh_reuse_grace_seconds,
@@ -365,12 +372,11 @@ async def _store_grace_tokens(
 
 async def _load_grace_tokens(
     session: AsyncSession,
-    cache: CacheBackend,
     *,
     token_hash: str,
     now: datetime,
 ) -> IssuedTokens | None:
-    cached = await cache.get(_grace_cache_key(token_hash))
+    cached = await _REFRESH_GRACE_L1.get(_grace_cache_key(token_hash))
     if cached is not None:
         tokens = _tokens_from_cache(cached)
         if tokens is not None:
@@ -393,7 +399,6 @@ async def _rotate_claimed_session(
     session: AsyncSession,
     *,
     settings: Settings,
-    cache: CacheBackend,
     claimed: RefreshSession,
     old_token_hash: str,
     user_agent: str | None,
@@ -416,7 +421,6 @@ async def _rotate_claimed_session(
     )
     await _store_grace_tokens(
         session,
-        cache,
         settings=settings,
         old_token_hash=old_token_hash,
         tokens=tokens,
@@ -430,7 +434,6 @@ async def _handle_refresh_reuse(
     session: AsyncSession,
     *,
     settings: Settings,
-    cache: CacheBackend,
     token_hash: str,
     now: datetime,
 ) -> IssuedTokens:
@@ -458,7 +461,6 @@ async def _handle_refresh_reuse(
     if within_grace:
         tokens = await _load_grace_tokens(
             session,
-            cache,
             token_hash=token_hash,
             now=now,
         )
@@ -489,10 +491,8 @@ async def refresh(
     refresh_token: str,
     user_agent: str | None = None,
     client_ip: str | None = None,
-    cache: CacheBackend | None = None,
 ) -> IssuedTokens:
     """Rotate refresh token; honor 10s reuse grace; revoke family outside grace."""
-    cache_backend = cache if cache is not None else get_cache()
     await auth_rate_limit.enforce_refresh_limits(
         session,
         settings=settings,
@@ -511,7 +511,6 @@ async def refresh(
             return await _handle_refresh_reuse(
                 session,
                 settings=settings,
-                cache=cache_backend,
                 token_hash=token_hash,
                 now=now,
             )
@@ -519,7 +518,6 @@ async def refresh(
         return await _rotate_claimed_session(
             session,
             settings=settings,
-            cache=cache_backend,
             claimed=claimed,
             old_token_hash=token_hash,
             user_agent=user_agent,

@@ -68,6 +68,14 @@ Live TMDb seed (`--source tmdb`) requires `TMDB_API_KEY` in the environment and 
 
 TMDb image CDN URLs are built server-side from relative `poster_path` / `profile_path` values; the API key is never required for images and must never be exposed to the browser.
 
+## Search (P2.3)
+
+`GET /api/v1/search?q=&types=movie,tv,person&page=&limit=` — PostgreSQL FTS over seeded movies, TV, and people. Empty or oversized `q` → 400. Frontend: header search → `/search?q=…`.
+
+## Redis cache (P2.4)
+
+Set `REDIS_URL` (Compose: `redis://redis:6379/0`; prod: Upstash `rediss://…`). Empty URL uses in-memory cache. See [docs/ops/redis-and-multi-instance.md](../docs/ops/redis-and-multi-instance.md). Detail responses may include `X-Cache: HIT|MISS`.
+
 ## Docker image
 
 ```bash

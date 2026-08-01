@@ -26,9 +26,11 @@ PostgreSQL remains the only authoritative store (Database Design). Redis and Ope
 **Usage rules:**
 
 - Redis is **non-authoritative**; all entries disposable and rebuildable from Postgres.
-- Prefer: hot metadata reads, rate-limit counters (evolving `CacheBackend` from ADR-0005), optional job coordination precursors.
-- Avoid: caching auth identity payloads; caching highly personalized results until profiling demands it.
+- Prefer (P2.4): hot metadata reads; **search** IP rate-limit counters via atomic `CacheBackend.incr`; optional job coordination precursors.
+- **Auth** login/register/refresh rate limits stay on **Postgres** through P2–P10; migrate those counters to Redis in **P11** (with Redis harden). See ADR-0005 Future evolution.
+- Avoid: caching auth identity payloads; refresh-grace L1 (process memory only — never Redis); caching highly personalized results until profiling demands it.
 - Invalidation: update/expire affected keys after writes; no global flush as the default tool.
+- Degrade: metadata miss → Postgres; search RL `incr` failure → process-local counter (do not go open).
 
 Local Compose adds Redis when P2.4 lands. Cloud Redis provider/tier is chosen at implementation time (cost still driven by ADR-0003 free-tier posture until upgrade).
 
@@ -55,14 +57,14 @@ Local Compose adds Redis when P2.4 lands. Cloud Redis provider/tier is chosen at
 
 ## Consequences
 
-- P2.3 can ship search without Redis; P2.4 wires Redis and documents multi-instance readiness (including notes for `watch_entries` / P3 as PLAN requires).
-- P1 rate limits may start on single-instance + DB counters; migrating counters to Redis is expected in P2.4.
+- P2.3 can ship search without Redis; P2.4 wires Redis for **metadata cache + search RL** and documents multi-instance readiness (including notes for `watch_entries` / P3 as PLAN requires).
+- P1 auth rate limits remain DB-backed after P2.4; **auth RL → Redis is deferred to P11** (correct under multi-instance today; avoids expanding Redis trust boundary for auth paths in P2).
 - P5 must close **ADR-0007** (OpenSearch host) before P6 implementation work depends on a cluster URL.
-- Roadmap Phase 11 Redis bullets are interpreted as hardening/ops, not greenfield adoption.
+- Roadmap Phase 11 Redis bullets are interpreted as hardening/ops **plus** finishing auth counter migration, not greenfield Redis adoption.
 - Search LLD “Phase 2 OpenSearch” language is staged by **this ADR + PLAN** (FTS in product P2, OpenSearch in product P6).
 
 ## Future evolution
 
 - ADR-0007: OpenSearch provider, sizing, and network placement (P5 exit).
-- P11: Redis HA, eviction policy review, cache hit SLOs.
+- **P11:** Redis HA, eviction policy review, cache hit SLOs; **migrate auth rate-limit counters** to shared Redis `CacheBackend` (ADR-0005); keep Postgres counters as durable audit/backup if useful.
 - Vector/semantic index (P8+) should reuse the same “derived index + API façade” pattern; supersede or extend this ADR if the fallback matrix changes.

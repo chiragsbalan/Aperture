@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { NextRequest } from 'next/server';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildUpstreamUrl,
+  clientIpFromRequest,
   filterRequestHeaders,
   filterResponseHeaders,
+  injectTrustedClientIpHeaders,
   isDeniedProxyPath,
 } from './bff-proxy';
 
@@ -76,5 +79,44 @@ describe('filterResponseHeaders', () => {
     expect(filtered.get('cache-control')).toBe('no-store');
     expect(filtered.get('set-cookie')).toBeNull();
     expect(filtered.get('access-control-allow-origin')).toBeNull();
+  });
+});
+
+describe('injectTrustedClientIpHeaders', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('overwrites client IP and sets BFF secret when configured', () => {
+    vi.stubEnv('AUTH_BFF_SHARED_SECRET', 'compose-shared-secret');
+    const request = new NextRequest(
+      'http://localhost/api/proxy/api/v1/search',
+      {
+        headers: { 'x-forwarded-for': '203.0.113.44, 10.0.0.1' },
+      },
+    );
+    const headers = filterRequestHeaders(
+      new Headers({
+        Accept: 'application/json',
+        'X-Aperture-Client-IP': 'spoofed',
+        'X-Aperture-BFF-Secret': 'spoofed-secret',
+      }),
+    );
+    injectTrustedClientIpHeaders(request, headers);
+    expect(headers.get('X-Aperture-Client-IP')).toBe('203.0.113.44');
+    expect(headers.get('X-Aperture-BFF-Secret')).toBe('compose-shared-secret');
+    expect(clientIpFromRequest(request)).toBe('203.0.113.44');
+  });
+
+  it('deletes trusted headers when IP and secret are absent', () => {
+    vi.stubEnv('AUTH_BFF_SHARED_SECRET', '');
+    const request = new NextRequest('http://localhost/api/proxy/api/v1/search');
+    const headers = new Headers({
+      'X-Aperture-Client-IP': 'spoofed',
+      'X-Aperture-BFF-Secret': 'spoofed-secret',
+    });
+    injectTrustedClientIpHeaders(request, headers);
+    expect(headers.get('X-Aperture-Client-IP')).toBeNull();
+    expect(headers.get('X-Aperture-BFF-Secret')).toBeNull();
   });
 });

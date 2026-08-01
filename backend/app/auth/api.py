@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import secrets
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -32,6 +31,7 @@ from app.auth.service import (
 )
 from app.core.config import Settings
 from app.core.deps import DbSessionDep, SettingsDep
+from app.core.trusted_client import bff_secret_matches, resolve_client_ip
 
 router = APIRouter(prefix='/auth', tags=['auth'])
 _bearer = HTTPBearer(auto_error=False)
@@ -44,21 +44,11 @@ def _user_agent(request: Request) -> str | None:
     return value[:512]
 
 
-def _bff_secret_matches(configured: str, provided: str) -> bool:
-    """Constant-time compare; unequal lengths never match."""
-    if not configured:
-        return False
-    if len(configured) != len(provided):
-        secrets.compare_digest(configured, configured)
-        return False
-    return secrets.compare_digest(configured, provided)
-
-
 def _require_bff_secret(request: Request, settings: Settings) -> None:
     """Require a matching non-empty BFF shared secret (Google verified claims)."""
     configured = settings.auth_bff_shared_secret
     provided = request.headers.get('x-aperture-bff-secret') or ''
-    if not configured or not _bff_secret_matches(configured, provided):
+    if not configured or not bff_secret_matches(configured, provided):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail='Forbidden',
@@ -66,24 +56,8 @@ def _require_bff_secret(request: Request, settings: Settings) -> None:
 
 
 def _client_ip(request: Request, settings: Settings) -> str | None:
-    """Trusted BFF client IP when secret matches; else socket peer.
-
-    Ignores inbound ``X-Forwarded-For`` so browsers cannot spoof rate-limit keys.
-    Trusts ``X-Aperture-Client-IP`` only when ``AUTH_BFF_SHARED_SECRET`` is set
-    and matches ``X-Aperture-BFF-Secret``.
-    """
-    configured = settings.auth_bff_shared_secret
-    if configured:
-        provided = request.headers.get('x-aperture-bff-secret') or ''
-        if _bff_secret_matches(configured, provided):
-            raw = request.headers.get('x-aperture-client-ip')
-            if raw:
-                ip = raw.strip()
-                if ip:
-                    return ip[:64]
-    if request.client is None:
-        return None
-    return request.client.host
+    """Trusted BFF client IP when secret matches; else socket peer."""
+    return resolve_client_ip(request, settings)
 
 
 def _token_response(tokens: IssuedTokens) -> TokenResponse:
