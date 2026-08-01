@@ -2,22 +2,22 @@
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Literal, TypedDict, cast
 
-Theme = str  # 'system' | 'light' | 'dark'
-Spoilers = str  # 'show' | 'hide'
+Theme = Literal['system', 'light', 'dark']
+Spoilers = Literal['show', 'hide']
 
 
 class PreferencesDict(TypedDict):
     """Normalized preferences document stored in JSONB."""
 
-    theme: str
-    spoilers: str
+    theme: Theme
+    spoilers: Spoilers
     language: str
 
 
-DEFAULT_THEME = 'system'
-DEFAULT_SPOILERS = 'show'
+DEFAULT_THEME: Theme = 'system'
+DEFAULT_SPOILERS: Spoilers = 'show'
 DEFAULT_LANGUAGE = 'en'
 
 DEFAULT_PREFERENCES: PreferencesDict = {
@@ -26,8 +26,8 @@ DEFAULT_PREFERENCES: PreferencesDict = {
     'language': DEFAULT_LANGUAGE,
 }
 
-_VALID_THEMES = frozenset({'system', 'light', 'dark'})
-_VALID_SPOILERS = frozenset({'show', 'hide'})
+_VALID_THEMES: frozenset[str] = frozenset({'system', 'light', 'dark'})
+_VALID_SPOILERS: frozenset[str] = frozenset({'show', 'hide'})
 
 
 def normalize_preferences(raw: object | None) -> PreferencesDict:
@@ -41,10 +41,10 @@ def normalize_preferences(raw: object | None) -> PreferencesDict:
         return base
     theme = raw.get('theme')
     if isinstance(theme, str) and theme in _VALID_THEMES:
-        base['theme'] = theme
+        base['theme'] = cast(Theme, theme)
     spoilers = raw.get('spoilers')
     if isinstance(spoilers, str) and spoilers in _VALID_SPOILERS:
-        base['spoilers'] = spoilers
+        base['spoilers'] = cast(Spoilers, spoilers)
     language = raw.get('language')
     if isinstance(language, str):
         cleaned = language.strip().lower()

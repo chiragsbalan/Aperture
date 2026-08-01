@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.users.models import User
-from app.users.preferences import DEFAULT_PREFERENCES
+from app.users.preferences import DEFAULT_PREFERENCES, PreferencesDict
 
 
 async def create_user(
@@ -88,9 +87,9 @@ async def update_user_profile(
 async def update_user_preferences(
     session: AsyncSession,
     user: User,
-    preferences: dict[str, Any],
+    preferences: PreferencesDict,
 ) -> User:
     """Replace the preferences JSON document and flush."""
-    user.preferences = preferences
+    user.preferences = dict(preferences)
     await session.flush()
     return user

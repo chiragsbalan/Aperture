@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.users import repository as users_repository
 from app.users.models import User
 from app.users.preferences import (
+    PreferencesDict,
     merge_preference_patch,
     normalize_preferences,
 )
@@ -64,7 +65,7 @@ class OwnedProfile:
     username: str
     display_name: str | None
     bio: str | None
-    preferences: dict[str, str]
+    preferences: PreferencesDict
     username_changed_at: datetime | None
     username_rename_available_at: datetime | None
 
