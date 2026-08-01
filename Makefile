@@ -6,16 +6,16 @@ help:
 	@echo "  make lint              - lint backend + frontend"
 	@echo "  make typecheck         - mypy + tsc"
 	@echo "  make import-lint       - import-linter contracts"
-	@echo "  make alembic-heads     - single Alembic head gate (stub until P0.4)"
+	@echo "  make alembic-heads     - single Alembic head gate"
 	@echo "  make test              - unit tests (no Postgres required)"
-	@echo "  make test-integration  - readiness vs Postgres (docker compose up -d db)"
+	@echo "  make test-integration  - Postgres integration (compose/CI db)"
 	@echo "  make frontend-build    - Next.js production build"
 	@echo "  make docker-build      - build backend Docker image"
 	@echo "  make ci                - full local parity with GitHub CI jobs"
 	@echo "  make up                - docker compose up --build -d"
 	@echo "  make down              - docker compose down"
 	@echo "  make logs              - docker compose logs -f"
-	@echo "  make migrate           - alembic upgrade (P0.4+)"
+	@echo "  make migrate           - alembic upgrade head"
 	@echo "  make dev-api           - FastAPI on host (needs DATABASE_URL / Compose db)"
 	@echo "  make dev-web           - run Next.js locally"
 
@@ -24,8 +24,8 @@ install:
 	cd frontend && pnpm install
 
 lint:
-	cd backend && uv run ruff check app tests scripts
-	cd backend && uv run ruff format --check app tests scripts
+	cd backend && uv run ruff check app tests scripts migrations
+	cd backend && uv run ruff format --check app tests scripts migrations
 	cd frontend && pnpm lint
 	cd frontend && pnpm format:check
 
@@ -70,4 +70,4 @@ logs:
 	docker compose logs -f
 
 migrate:
-	@echo "P0.4: alembic migrate not wired yet"
+	cd backend && uv run alembic upgrade head

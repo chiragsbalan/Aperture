@@ -49,7 +49,8 @@ Useful checks:
 make lint
 make typecheck
 make import-lint          # minimal layering contracts (expand when domains land)
-make alembic-heads        # single Alembic head (stub until P0.4)
+make alembic-heads        # single Alembic head gate
+make migrate              # alembic upgrade head (needs Postgres)
 make test                 # unit tests (DB mocked for readiness)
 make test-integration     # needs Postgres (e.g. docker compose up -d db)
 make frontend-build

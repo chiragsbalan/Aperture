@@ -36,7 +36,7 @@ ADR-0002-orm-schema.md
 ADR-0003-hosting-and-bff.md
 ```
 
-Zero-padded four-digit ids match PLAN.md. Accepted ADRs in this folder include [ADR-0001](ADR-0001-phase-authority.md) (phase authority) and [ADR-0003](ADR-0003-hosting-and-bff.md) (early hosting).
+Zero-padded four-digit ids match PLAN.md. Accepted ADRs in this folder include [ADR-0001](ADR-0001-phase-authority.md) (phase authority), [ADR-0002](ADR-0002-orm-schema.md) (ORM/schema), and [ADR-0003](ADR-0003-hosting-and-bff.md) (early hosting).
 
 ## Template
 

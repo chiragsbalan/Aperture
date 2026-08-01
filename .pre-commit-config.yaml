@@ -3,13 +3,13 @@ repos:
     hooks:
       - id: backend-ruff-check
         name: backend ruff check
-        entry: bash -c 'cd backend && uv run ruff check app tests scripts'
+        entry: bash -c 'cd backend && uv run ruff check app tests scripts migrations'
         language: system
         pass_filenames: false
         types: [python]
       - id: backend-ruff-format
         name: backend ruff format
-        entry: bash -c 'cd backend && uv run ruff format --check app tests scripts'
+        entry: bash -c 'cd backend && uv run ruff format --check app tests scripts migrations'
         language: system
         pass_filenames: false
         types: [python]

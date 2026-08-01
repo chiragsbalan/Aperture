@@ -1,0 +1,13 @@
+# Alembic migrations
+
+Async environment (`env.py`) reads `DATABASE_URL` via app settings and uses
+asyncpg (official Alembic async recipe).
+
+```bash
+# from backend/
+uv run alembic revision -m "describe_change"   # new revision
+uv run alembic upgrade head                    # apply
+uv run alembic downgrade -1                    # roll back one
+```
+
+Or from the repo root: `make migrate`.

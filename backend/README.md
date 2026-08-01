@@ -30,4 +30,17 @@ Settings loads the repo-root `.env` (and optional `backend/.env` overrides).
 | `GET /health/ready` | Postgres reachable |
 | `GET /version` | App metadata |
 
+## Schema / migrations (P0.4)
+
+ORM conventions live in `app/core/` (`base.py`, `mixins.py`, `ids.py`). See [ADR-0002](../docs/decisions/ADR-0002-orm-schema.md).
+
+```bash
+# repo root — applies Alembic revisions to DATABASE_URL
+make migrate
+
+# or from backend/
+uv run alembic upgrade head
+uv run alembic downgrade base
+```
+
 Formatting/lint uses **Ruff** (lint + format) rather than Black; see root README.

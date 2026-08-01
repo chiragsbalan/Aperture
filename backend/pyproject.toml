@@ -10,6 +10,8 @@ dependencies = [
   "pydantic-settings>=2.6.0",
   "sqlalchemy[asyncio]>=2.0.36",
   "asyncpg>=0.30.0",
+  "alembic>=1.18.5",
+  "uuid-utils>=0.17.0",
 ]
 
 [project.optional-dependencies]

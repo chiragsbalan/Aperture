@@ -20,7 +20,8 @@ Architecture Decision Records (ADRs) and the Design System evolve during develop
 
 ## Conflicts and authority
 
-- **Phase order:** Development Roadmap + [PLAN.md](../PLAN.md) (see ADR-0001 when written).
+- **Phase order:** Development Roadmap + [PLAN.md](../PLAN.md) (see [ADR-0001](decisions/ADR-0001-phase-authority.md)).
+- **ORM / schema foundation:** [ADR-0002](decisions/ADR-0002-orm-schema.md) — naming convention, UUIDv7, mixins, Alembic async.
 - **Early cloud hosting:** [ADR-0003](decisions/ADR-0003-hosting-and-bff.md) — **Vercel** (FE/BFF) + **Render Free** (FastAPI) + **Supabase Free** (Postgres only). This supersedes PDF passages that assume paid always-on Render for API+Postgres or unnamed “managed Postgres” without Supabase.
 - Architecture/engineering **PDFs** are not rewritten for every hosting tweak; new ADRs + PLAN carry the current decision until PDFs are revised.
 
