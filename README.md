@@ -48,8 +48,11 @@ Useful checks:
 ```bash
 make lint
 make typecheck
+make import-lint          # modular-monolith import contracts
+make alembic-heads        # single Alembic head (stub until P0.4)
 make test                 # unit tests (DB mocked for readiness)
 make test-integration     # needs Postgres (e.g. docker compose up -d db)
+make ci                   # lint + types + import-lint + alembic-heads + unit tests
 ```
 
 Optional pre-commit hooks:
@@ -59,6 +62,16 @@ cd backend && uv run pre-commit install --config ../.pre-commit-config.yaml
 ```
 
 Optional Dev Container: open the repo in a VS Code/Cursor Dev Container (`.devcontainer/`), then `make up` for the full stack.
+
+## CI (P0.3)
+
+Every PR and push to `main` runs GitHub Actions (`.github/workflows/ci.yml`):
+
+- **Backend** — Ruff, mypy, import-linter, Alembic single-head gate, unit + integration tests (CI Postgres)
+- **Frontend** — ESLint, Prettier, `tsc`, Next.js build
+- **Docker** — backend image build
+
+Required check names and branch-protection settings: [`.github/README.md`](.github/README.md).
 
 ## Layout
 
@@ -73,6 +86,7 @@ docker-compose.yml
 
 - [docs/](docs/) — PRD, roadmap, architecture, design, engineering, ADRs
 - Local-only (gitignored): `PLAN.md`, `CONTRIBUTING.md`, `phases/` — shipping plan and git workflow notes on this machine
+- CI / branch protection: [`.github/README.md`](.github/README.md)
 - Hosting decision: [docs/decisions/ADR-0003-hosting-and-bff.md](docs/decisions/ADR-0003-hosting-and-bff.md)
 - Phase authority: [docs/decisions/ADR-0001-phase-authority.md](docs/decisions/ADR-0001-phase-authority.md)
 

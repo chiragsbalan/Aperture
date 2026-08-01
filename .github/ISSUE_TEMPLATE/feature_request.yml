@@ -1,0 +1,39 @@
+name: Feature request
+description: Propose a product or engineering improvement
+title: 'feat: '
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or engineering problem does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should change? Prefer a vertical slice when possible.
+    validations:
+      required: true
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Likely phase
+      description: Best-guess PLAN/Roadmap phase (can be TBD).
+      options:
+        - TBD
+        - P0 Foundation
+        - P1 User Platform
+        - P2 Metadata
+        - P3+ later
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context
+      description: Links to docs, ADRs, or prior discussion.
+    validations:
+      required: false

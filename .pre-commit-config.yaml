@@ -3,13 +3,13 @@ repos:
     hooks:
       - id: backend-ruff-check
         name: backend ruff check
-        entry: bash -c 'cd backend && uv run ruff check app tests'
+        entry: bash -c 'cd backend && uv run ruff check app tests scripts'
         language: system
         pass_filenames: false
         types: [python]
       - id: backend-ruff-format
         name: backend ruff format
-        entry: bash -c 'cd backend && uv run ruff format --check app tests'
+        entry: bash -c 'cd backend && uv run ruff format --check app tests scripts'
         language: system
         pass_filenames: false
         types: [python]
@@ -19,6 +19,18 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
+      - id: backend-import-linter
+        name: backend import-linter
+        entry: bash -c 'cd backend && uv run lint-imports'
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: backend-alembic-heads
+        name: backend alembic single head
+        entry: bash -c 'cd backend && uv run python scripts/check_alembic_heads.py'
+        language: system
+        pass_filenames: false
+        files: ^(backend/migrations/|backend/alembic\.ini|backend/scripts/check_alembic_heads\.py)
       - id: frontend-lint
         name: frontend eslint
         entry: bash -c 'cd frontend && pnpm lint'
@@ -28,6 +40,12 @@ repos:
       - id: frontend-tsc
         name: frontend tsc
         entry: bash -c 'cd frontend && pnpm exec tsc --noEmit'
+        language: system
+        pass_filenames: false
+        files: ^frontend/
+      - id: frontend-prettier
+        name: frontend prettier
+        entry: bash -c 'cd frontend && pnpm format:check'
         language: system
         pass_filenames: false
         files: ^frontend/
