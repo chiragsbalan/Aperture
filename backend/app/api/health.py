@@ -1,8 +1,14 @@
 """Operational health and version endpoints (outside /api/v1)."""
 
-from fastapi import APIRouter
+import logging
 
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.core.db import ping_database
 from app.core.deps import SettingsDep
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=['ops'])
 
@@ -14,8 +20,17 @@ def live() -> dict[str, str]:
 
 
 @router.get('/health/ready')
-def ready() -> dict[str, str]:
-    """Readiness stub without DB (DB check lands in P0.2)."""
+async def ready() -> dict[str, str]:
+    """Readiness: Postgres is reachable."""
+    try:
+        await ping_database()
+    except (SQLAlchemyError, OSError, TimeoutError) as exc:
+        # Log type only — driver errors can embed DSN credentials.
+        logger.warning('Readiness check failed (%s)', type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={'status': 'not_ready'},
+        ) from None
     return {'status': 'ready'}
 
 
