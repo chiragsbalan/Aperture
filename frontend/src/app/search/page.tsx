@@ -1,7 +1,7 @@
-import type {Metadata} from 'next';
+import type { Metadata } from 'next';
 
-import {SearchResults} from '@/components/search-results';
-import {SiteHeader} from '@/components/site-header';
+import { SearchResults } from '@/components/search-results';
+import { SiteHeader } from '@/components/site-header';
 
 export const metadata: Metadata = {
   title: 'Search · Aperture',
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{q?: string}>;
+  searchParams: Promise<{ q?: string }>;
 }) {
   const params = await searchParams;
   const q = typeof params.q === 'string' ? params.q : '';

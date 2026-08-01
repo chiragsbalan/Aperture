@@ -54,12 +54,8 @@ async def test_search_rl_falls_back_when_incr_fails() -> None:
         search_rate_limit_window_seconds=60,
     )
     cache = _FailingIncrCache()
-    await enforce_search_rate_limit(
-        cache, settings=settings, client_ip='203.0.113.9'
-    )
-    await enforce_search_rate_limit(
-        cache, settings=settings, client_ip='203.0.113.9'
-    )
+    await enforce_search_rate_limit(cache, settings=settings, client_ip='203.0.113.9')
+    await enforce_search_rate_limit(cache, settings=settings, client_ip='203.0.113.9')
     with pytest.raises(HTTPException) as exc_info:
         await enforce_search_rate_limit(
             cache, settings=settings, client_ip='203.0.113.9'
@@ -69,9 +65,7 @@ async def test_search_rl_falls_back_when_incr_fails() -> None:
 
 def test_search_rl_key_is_hashed() -> None:
     ip = '203.0.113.9'
-    assert _search_rl_key(ip) == (
-        f'search:rl:ip:{hash_rate_limit_subject(ip)}'
-    )
+    assert _search_rl_key(ip) == (f'search:rl:ip:{hash_rate_limit_subject(ip)}')
     assert ip not in _search_rl_key(ip)
 
 
@@ -94,9 +88,7 @@ async def test_search_rl_enforces_unknown_bucket() -> None:
     await enforce_search_rate_limit(cache, settings=settings, client_ip=None)
     await enforce_search_rate_limit(cache, settings=settings, client_ip='  ')
     with pytest.raises(HTTPException) as exc_info:
-        await enforce_search_rate_limit(
-            cache, settings=settings, client_ip=None
-        )
+        await enforce_search_rate_limit(cache, settings=settings, client_ip=None)
     assert exc_info.value.status_code == 429
 
 

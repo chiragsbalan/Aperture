@@ -57,8 +57,7 @@ def test_search_finds_movie_and_person(api_client: TestClient) -> None:
     assert person.status_code == 200, person.text
     pbody = person.json()
     assert any(
-        hit['type'] == 'person' and 'Morgan' in hit['title']
-        for hit in pbody['results']
+        hit['type'] == 'person' and 'Morgan' in hit['title'] for hit in pbody['results']
     )
 
 

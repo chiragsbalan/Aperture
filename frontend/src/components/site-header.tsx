@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import {usePathname, useRouter, useSearchParams} from 'next/navigation';
-import {Suspense, useEffect, useState} from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
 
-import {SiteSearch} from '@/components/site-search';
+import { SiteSearch } from '@/components/site-search';
 
 type AuthState = 'loading' | 'signed_out' | 'signed_in';
 
@@ -13,7 +13,9 @@ function HeaderSearch() {
   const searchParams = useSearchParams();
   const headerQuery =
     pathname === '/search' ? (searchParams.get('q') ?? '') : '';
-  return <SiteSearch key={`${pathname}:${headerQuery}`} initialQuery={headerQuery} />;
+  return (
+    <SiteSearch key={`${pathname}:${headerQuery}`} initialQuery={headerQuery} />
+  );
 }
 
 export function SiteHeader() {
@@ -27,7 +29,7 @@ export function SiteHeader() {
 
     async function loadAuth() {
       try {
-        const res = await fetch('/api/auth/me', {cache: 'no-store'});
+        const res = await fetch('/api/auth/me', { cache: 'no-store' });
         if (!cancelled) {
           setAuthState(res.ok ? 'signed_in' : 'signed_out');
         }
@@ -47,7 +49,7 @@ export function SiteHeader() {
   async function handleLogout() {
     setLoggingOut(true);
     try {
-      await fetch('/api/auth/logout', {method: 'POST'});
+      await fetch('/api/auth/logout', { method: 'POST' });
       setAuthState('signed_out');
       router.push('/login');
       router.refresh();
@@ -64,7 +66,9 @@ export function SiteHeader() {
       >
         Aperture
       </Link>
-      <Suspense fallback={<div className="min-w-0 flex-1" aria-hidden="true" />}>
+      <Suspense
+        fallback={<div className="min-w-0 flex-1" aria-hidden="true" />}
+      >
         <HeaderSearch />
       </Suspense>
       <nav

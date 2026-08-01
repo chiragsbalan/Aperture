@@ -89,9 +89,12 @@ describe('injectTrustedClientIpHeaders', () => {
 
   it('overwrites client IP and sets BFF secret when configured', () => {
     vi.stubEnv('AUTH_BFF_SHARED_SECRET', 'compose-shared-secret');
-    const request = new NextRequest('http://localhost/api/proxy/api/v1/search', {
-      headers: { 'x-forwarded-for': '203.0.113.44, 10.0.0.1' },
-    });
+    const request = new NextRequest(
+      'http://localhost/api/proxy/api/v1/search',
+      {
+        headers: { 'x-forwarded-for': '203.0.113.44, 10.0.0.1' },
+      },
+    );
     const headers = filterRequestHeaders(
       new Headers({
         Accept: 'application/json',

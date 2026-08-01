@@ -21,12 +21,12 @@ export interface SearchResponse {
 }
 
 export type SearchFetchResult =
-  | {ok: true; data: SearchResponse}
-  | {ok: false; status: number; error: string};
+  | { ok: true; data: SearchResponse }
+  | { ok: false; status: number; error: string };
 
 export async function fetchSearch(
   q: string,
-  options?: {types?: string; page?: number; limit?: number},
+  options?: { types?: string; page?: number; limit?: number },
 ): Promise<SearchFetchResult> {
   const params = new URLSearchParams();
   params.set('q', q);
@@ -41,26 +41,25 @@ export async function fetchSearch(
   }
 
   try {
-    const res = await fetch(
-      `/api/proxy/api/v1/search?${params.toString()}`,
-      {cache: 'no-store'},
-    );
+    const res = await fetch(`/api/proxy/api/v1/search?${params.toString()}`, {
+      cache: 'no-store',
+    });
     if (!res.ok) {
       let detail = `HTTP ${res.status}`;
       try {
-        const body = (await res.json()) as {detail?: string};
+        const body = (await res.json()) as { detail?: string };
         if (typeof body.detail === 'string') {
           detail = body.detail;
         }
       } catch {
         // ignore parse errors
       }
-      return {ok: false, status: res.status, error: detail};
+      return { ok: false, status: res.status, error: detail };
     }
     const data = (await res.json()) as SearchResponse;
-    return {ok: true, data};
+    return { ok: true, data };
   } catch {
-    return {ok: false, status: 0, error: 'Failed to reach the API'};
+    return { ok: false, status: 0, error: 'Failed to reach the API' };
   }
 }
 

@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import {useEffect, useState} from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   fetchSearch,
@@ -13,7 +13,7 @@ import {
 
 const DEBOUNCE_MS = 250;
 
-export function SearchResults({query}: {query: string}) {
+export function SearchResults({ query }: { query: string }) {
   const [results, setResults] = useState<SearchHit[] | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);

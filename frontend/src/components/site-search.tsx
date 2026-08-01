@@ -1,9 +1,9 @@
 'use client';
 
-import {useRouter} from 'next/navigation';
-import {type FormEvent, useState} from 'react';
+import { useRouter } from 'next/navigation';
+import { type FormEvent, useState } from 'react';
 
-export function SiteSearch({initialQuery = ''}: {initialQuery?: string}) {
+export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
   const router = useRouter();
   const [q, setQ] = useState(initialQuery);
 

@@ -30,9 +30,7 @@ def parse_types_param(raw: str | None) -> frozenset[str]:
     parts = {part.strip().lower() for part in raw.split(',') if part.strip()}
     unknown = parts - allowed
     if unknown:
-        raise SearchQueryError(
-            f'unsupported types: {", ".join(sorted(unknown))}'
-        )
+        raise SearchQueryError(f'unsupported types: {", ".join(sorted(unknown))}')
     if not parts:
         return frozenset(allowed)
     return frozenset(parts)
