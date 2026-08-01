@@ -1,17 +1,18 @@
-.PHONY: help lint typecheck test up down logs migrate dev-api dev-web install
+.PHONY: help lint typecheck test test-integration up down logs migrate dev-api dev-web install
 
 help:
 	@echo "Aperture targets:"
-	@echo "  make install     - sync backend (uv) and frontend (pnpm) deps"
-	@echo "  make lint        - lint backend + frontend"
-	@echo "  make typecheck   - mypy + tsc"
-	@echo "  make test        - run tests (P0.1: backend smoke only)"
-	@echo "  make dev-api     - run FastAPI locally (no Docker)"
-	@echo "  make dev-web     - run Next.js locally (no Docker)"
-	@echo "  make up          - docker compose up (P0.2+)"
-	@echo "  make down        - docker compose down (P0.2+)"
-	@echo "  make logs        - docker compose logs (P0.2+)"
-	@echo "  make migrate     - alembic upgrade (P0.4+)"
+	@echo "  make install           - sync backend (uv) and frontend (pnpm) deps"
+	@echo "  make lint              - lint backend + frontend"
+	@echo "  make typecheck         - mypy + tsc"
+	@echo "  make test              - unit tests (no Postgres required)"
+	@echo "  make test-integration  - readiness vs Postgres (docker compose up -d db)"
+	@echo "  make up                - docker compose up --build -d"
+	@echo "  make down              - docker compose down"
+	@echo "  make logs              - docker compose logs -f"
+	@echo "  make migrate           - alembic upgrade (P0.4+)"
+	@echo "  make dev-api           - FastAPI on host (needs DATABASE_URL / Compose db)"
+	@echo "  make dev-web           - run Next.js locally"
 
 install:
 	cd backend && uv sync --all-extras
@@ -27,7 +28,10 @@ typecheck:
 	cd frontend && pnpm exec tsc --noEmit
 
 test:
-	cd backend && uv run pytest
+	cd backend && uv run pytest -m 'not integration'
+
+test-integration:
+	cd backend && uv run pytest -m integration
 
 dev-api:
 	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -36,13 +40,13 @@ dev-web:
 	cd frontend && pnpm dev
 
 up:
-	@echo "P0.2: docker compose up not wired yet"
+	docker compose up --build -d
 
 down:
-	@echo "P0.2: docker compose down not wired yet"
+	docker compose down
 
 logs:
-	@echo "P0.2: docker compose logs not wired yet"
+	docker compose logs -f
 
 migrate:
 	@echo "P0.4: alembic migrate not wired yet"

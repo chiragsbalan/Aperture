@@ -1,0 +1,71 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aperture}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aperture}
+      POSTGRES_DB: ${POSTGRES_DB:-aperture}
+    ports:
+      # Loopback only — local tooling can still reach Postgres; not LAN-exposed.
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile
+    ports:
+      - '${API_PORT:-8000}:8000'
+    environment:
+      APP_NAME: ${APP_NAME:-Aperture}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
+      # Always use the Compose service hostname (root .env DATABASE_URL is for host runs).
+      # Keep POSTGRES_USER/PASSWORD URL-safe (no @ : / #) or encode them yourself.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aperture}:${POSTGRES_PASSWORD:-aperture}@db:5432/${POSTGRES_DB:-aperture}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    environment:
+      API_URL: http://api:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:
