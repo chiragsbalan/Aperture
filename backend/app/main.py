@@ -7,6 +7,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.health import router as health_router
+from app.api.users import router as users_router
 from app.auth.api import router as auth_router
 from app.core.config import get_settings
 from app.core.db import dispose_db, init_db
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
 
     api_v1 = APIRouter(prefix=settings.api_v1_prefix)
     api_v1.include_router(auth_router)
+    api_v1.include_router(users_router)
     app.include_router(api_v1)
 
     return app

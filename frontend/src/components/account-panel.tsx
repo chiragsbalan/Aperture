@@ -1,5 +1,6 @@
 'use client';
 
+import { ProfileAvatar } from '@/components/profile-avatar';
 import { oauthErrorMessage } from '@/lib/google-oauth-errors';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -81,10 +82,14 @@ export function AccountPanel() {
 
   if (state.status === 'error') {
     return (
-      <div className="mt-8 space-y-4" role="alert">
-        <p className="text-[var(--color-danger)]">{state.message}</p>
+      <div className="mt-8 space-y-4">
+        <p role="alert" className="text-[var(--color-danger)]">
+          {state.message}
+        </p>
         {queryError ? (
-          <p className="text-sm text-[var(--color-danger)]">{queryError}</p>
+          <p role="alert" className="text-sm text-[var(--color-danger)]">
+            {queryError}
+          </p>
         ) : null}
         <p className="text-sm text-muted">
           <Link
@@ -108,6 +113,7 @@ export function AccountPanel() {
   const { me } = state;
   const providers = me.providers ?? [];
   const hasGoogle = providers.includes('google');
+  const username = me.user?.username;
 
   return (
     <div className="mt-8 space-y-6 text-left">
@@ -117,22 +123,25 @@ export function AccountPanel() {
         </p>
       ) : null}
 
+      {username ? (
+        <div className="flex items-center gap-4">
+          <ProfileAvatar
+            username={username}
+            displayName={me.user?.display_name}
+          />
+          <div>
+            <p className="font-display text-xl font-semibold text-foreground">
+              {me.user?.display_name?.trim() || username}
+            </p>
+            <p className="text-sm text-muted">@{username}</p>
+          </div>
+        </div>
+      ) : null}
+
       <dl className="space-y-4">
         <div>
           <dt className="text-sm text-muted">Email</dt>
           <dd className="mt-1 text-foreground">{me.email}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-muted">Identity ID</dt>
-          <dd className="mt-1 break-all font-mono text-sm text-foreground">
-            {me.identity_id}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-sm text-muted">Username</dt>
-          <dd className="mt-1 text-foreground">
-            {me.user?.username ?? 'Not set'}
-          </dd>
         </div>
         <div>
           <dt className="text-sm text-muted">Sign-in methods</dt>
@@ -143,6 +152,23 @@ export function AccountPanel() {
           </dd>
         </div>
       </dl>
+
+      <p className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted">
+        <Link
+          href="/settings"
+          className="text-foreground underline-offset-2 hover:underline"
+        >
+          Settings
+        </Link>
+        {username ? (
+          <Link
+            href={`/u/${encodeURIComponent(username)}`}
+            className="text-foreground underline-offset-2 hover:underline"
+          >
+            Public profile
+          </Link>
+        ) : null}
+      </p>
 
       {!hasGoogle ? (
         <p className="text-sm text-muted">

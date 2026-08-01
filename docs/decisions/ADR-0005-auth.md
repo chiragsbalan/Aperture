@@ -61,6 +61,26 @@ Browsers must authenticate to FastAPI without exposing long-lived secrets to Jav
 - **Mock mode:** `AUTH_GOOGLE_MOCK=true` for local Compose/CI — **forbidden when `VERCEL_ENV=production`** (hard fail; Compose `next start` may still have `NODE_ENV=production`). Mock start redirects to the local callback; `exchangeCode` returns a deterministic mock profile. Integration tests hit the API directly with the BFF secret.
 - **`/me` providers:** response includes `providers: ('password' | 'google')[]` from `identity_credentials`. Unlink is deferred; Account UI shows providers and a Link Google control.
 
+### P1.3 production wiring (as of 2026-08-01)
+
+Cloud env is provisioned; secrets stay in host dashboards (never git). Local Compose uses root `.env` (gitignored); Google client JSON dumps live under gitignored `private/`.
+
+| Host | Required for Google / auth |
+|---|---|
+| **Vercel (BFF)** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (prod callback on the public Vercel origin), `AUTH_GOOGLE_MOCK=false`, `AUTH_BFF_SHARED_SECRET` (same value as Render), plus existing `API_URL` |
+| **Render (API)** | `AUTH_BFF_SHARED_SECRET` (match Vercel), `JWT_SECRET` (≥32, non-placeholder; required for Settings / migrate-on-start), `ENVIRONMENT=production`, `DATABASE_URL` (Supabase session pooler + `postgresql+asyncpg://`). No Google client secret on the API |
+| **Google Cloud OAuth client** | Web application; authorized redirect URIs for local BFF callback and production Vercel callback; JS origins for those same hosts |
+
+`AUTH_BFF_SHARED_SECRET` must be identical across Vercel and Render. Local may use the same value for end-to-end Google testing with `AUTH_GOOGLE_MOCK=false`.
+
+### P1.4 Profiles (as implemented)
+
+- **Users owns profile APIs:** `GET/PATCH /api/v1/users/me`, `GET/PATCH /api/v1/users/me/preferences`, `GET /api/v1/users/{username}` (public). Auth `/me` remains identity summary (email, providers, nested user summary).
+- **Editable fields:** username, display name, bio (max 500). Avatar is **initials only** (no URL/upload in P1.4).
+- **Username rename cooldown:** once every **30 days** (`username_changed_at`); first rename after signup/Google seed is allowed immediately; reserved handles (`admin`, `settings`, `u`, …) rejected as unavailable.
+- **Preferences (JSONB):** `theme` (`system|light|dark`), `spoilers` (`show|hide`), `language` (short locale stub). Defaults: system / show / en.
+- **UI:** `/account` overview + Google link; `/settings` edit form; public `/u/[username]`.
+
 ### Authorization
 
 - Authentication establishes identity; **AuthZ stays in the service layer** (not “trust the BFF”).
@@ -77,8 +97,9 @@ Browsers must authenticate to FastAPI without exposing long-lived secrets to Jav
 ## Consequences
 
 - P1.1 ships register (email + username + password) / login (email **or** username + password) / logout / refresh on the public URL using the BFF cookie names already reserved in `frontend/src/lib/auth-cookies.ts`.
+- P1.2 hardening and P1.3 Google sign-in / Link Google are implemented; production hosts hold Google + shared BFF secret + `JWT_SECRET` as above.
 - Refresh rotation tests must cover the 10s grace window and reuse-outside-grace behavior.
-- Google OAuth needs app credentials (user-supplied) and explicit link UX in settings.
+- Explicit Link Google UX lives on Account; unlink remains deferred.
 - Multi-instance deploy waits on Redis (ADR-0006); until then sticky single-instance rate limits are acceptable.
 - Authentication LLD remains the module narrative; **this ADR is authoritative for lifetimes, Argon2id, no auto-link, and CacheBackend-before-Redis**.
 

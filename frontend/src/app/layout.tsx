@@ -1,3 +1,4 @@
+import { ThemeSync } from '@/components/theme-sync';
 import type { Metadata } from 'next';
 import { Fraunces, Source_Sans_3 } from 'next/font/google';
 
@@ -30,6 +31,7 @@ export default function RootLayout({
       <body
         className={`${fraunces.variable} ${sourceSans.variable} antialiased`}
       >
+        <ThemeSync />
         {children}
       </body>
     </html>

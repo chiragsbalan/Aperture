@@ -164,6 +164,19 @@ async def register(
             status_code=status.HTTP_409_CONFLICT,
             detail='Email already registered',
         )
+    from app.users.usernames import is_reserved_username
+
+    if is_reserved_username(username):
+        await auth_rate_limit.record_register_failure(
+            session,
+            settings=settings,
+            email=normalized,
+            client_ip=client_ip,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='Username already taken',
+        )
     taken = await users_service.get_identity_id_by_username(
         session,
         username=username,

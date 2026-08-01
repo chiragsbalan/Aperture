@@ -1,5 +1,5 @@
-import { SiteHeader } from '@/components/site-header';
 import { AccountPanel } from '@/components/account-panel';
+import { SiteHeader } from '@/components/site-header';
 import { Suspense } from 'react';
 
 export default function AccountPage() {
@@ -11,7 +11,8 @@ export default function AccountPage() {
           Your account
         </h1>
         <p className="mt-2 text-muted">
-          Protected demo — loads your identity via the BFF.
+          Overview of your identity and sign-in methods. Edit profile in
+          Settings.
         </p>
         <Suspense
           fallback={
