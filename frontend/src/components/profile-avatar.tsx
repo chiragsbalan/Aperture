@@ -13,9 +13,7 @@ export function ProfileAvatar({
 }: ProfileAvatarProps) {
   const initials = initialsFromProfile(displayName, username);
   const sizeClass =
-    size === 'lg'
-      ? 'h-20 w-20 text-2xl'
-      : 'h-12 w-12 text-base';
+    size === 'lg' ? 'h-20 w-20 text-2xl' : 'h-12 w-12 text-base';
 
   return (
     <div

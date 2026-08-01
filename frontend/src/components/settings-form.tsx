@@ -181,7 +181,11 @@ export function SettingsForm() {
       aria-busy={pending}
     >
       {error ? (
-        <p id={errorId} role="alert" className="text-sm text-[var(--color-danger)]">
+        <p
+          id={errorId}
+          role="alert"
+          className="text-sm text-[var(--color-danger)]"
+        >
           {error}
         </p>
       ) : null}

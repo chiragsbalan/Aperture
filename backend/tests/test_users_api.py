@@ -128,9 +128,7 @@ def test_atomic_profile_and_preferences_patch(api_client: TestClient) -> None:
 @pytest.mark.integration
 def test_unauthenticated_me_is_401(api_client: TestClient) -> None:
     assert api_client.get('/api/v1/users/me').status_code == 401
-    assert (
-        api_client.patch('/api/v1/users/me', json={'bio': 'x'}).status_code == 401
-    )
+    assert api_client.patch('/api/v1/users/me', json={'bio': 'x'}).status_code == 401
 
 
 @pytest.mark.integration

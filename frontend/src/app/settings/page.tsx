@@ -15,9 +15,7 @@ export default function SettingsPage() {
         <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
           Settings
         </h1>
-        <p className="mt-2 text-muted">
-          Edit your profile and preferences.
-        </p>
+        <p className="mt-2 text-muted">Edit your profile and preferences.</p>
         <SettingsForm />
       </div>
     </main>

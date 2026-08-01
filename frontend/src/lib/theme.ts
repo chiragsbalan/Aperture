@@ -8,7 +8,9 @@ export function applyThemePreference(theme: ThemePreference): void {
   }
   const root = document.documentElement;
   if (theme === 'system') {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const prefersDark = window.matchMedia(
+      '(prefers-color-scheme: dark)',
+    ).matches;
     root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
     return;
   }
