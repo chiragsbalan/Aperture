@@ -109,34 +109,40 @@ async function main() {
   try {
     await waitForServer(BASE_URL);
 
+    const routes = ['/', '/login', '/signup'];
     const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
-    const page = await context.newPage();
-    await page.goto(BASE_URL, { waitUntil: 'networkidle' });
 
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze();
+    for (const route of routes) {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}${route}`, { waitUntil: 'networkidle' });
+
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+
+      await page.close();
+
+      if (results.violations.length > 0) {
+        failed = true;
+        console.error(`Accessibility violations on ${route}:`);
+        for (const violation of results.violations) {
+          console.error(`\n[${violation.id}] ${violation.help}`);
+          console.error(`  impact: ${violation.impact}`);
+          console.error(`  ${violation.helpUrl}`);
+          for (const node of violation.nodes.slice(0, 5)) {
+            console.error(`  - ${node.target.join(' ')}`);
+            console.error(`    ${node.failureSummary}`);
+          }
+        }
+        process.exitCode = 1;
+      } else {
+        console.log(`a11y: no axe violations on ${route}`);
+      }
+    }
 
     await context.close();
     await browser.close();
-
-    if (results.violations.length > 0) {
-      failed = true;
-      console.error('Accessibility violations:');
-      for (const violation of results.violations) {
-        console.error(`\n[${violation.id}] ${violation.help}`);
-        console.error(`  impact: ${violation.impact}`);
-        console.error(`  ${violation.helpUrl}`);
-        for (const node of violation.nodes.slice(0, 5)) {
-          console.error(`  - ${node.target.join(' ')}`);
-          console.error(`    ${node.failureSummary}`);
-        }
-      }
-      process.exitCode = 1;
-    } else {
-      console.log('a11y: no axe violations on shell route');
-    }
   } catch (err) {
     failed = true;
     process.exitCode = 1;

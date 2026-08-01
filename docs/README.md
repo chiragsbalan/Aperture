@@ -24,7 +24,7 @@ Architecture Decision Records (ADRs) and the Design System evolve during develop
 - **ORM / schema foundation:** [ADR-0002](decisions/ADR-0002-orm-schema.md) — naming convention, UUIDv7, mixins, Alembic async.
 - **Early cloud hosting:** [ADR-0003](decisions/ADR-0003-hosting-and-bff.md) — **Vercel** (FE/BFF) + **Render Free** (FastAPI) + **Supabase Free** (Postgres only). This supersedes PDF passages that assume paid always-on Render for API+Postgres or unnamed “managed Postgres” without Supabase.
 - **Content identity:** [ADR-0004](decisions/ADR-0004-content-identity.md) — canonical `content_items` + `external_ids` uniqueness; not raw provider ids as FKs.
-- **Auth / sessions:** [ADR-0005](decisions/ADR-0005-auth.md) — BFF `__Host-` cookies, 15m JWT, opaque refresh + 10s reuse grace, Argon2id, no OAuth auto-link.
+- **Auth / sessions:** [ADR-0005](decisions/ADR-0005-auth.md) — BFF `__Host-` cookies, 15m JWT, opaque refresh + 10s reuse grace, Argon2id, login via email **or** username, no OAuth auto-link.
 - **Redis / search staging:** [ADR-0006](decisions/ADR-0006-redis-search-staging.md) — Redis intro at P2 (Roadmap P11 = harden); PG FTS then OpenSearch+FTS fallback; OpenSearch host is ADR-0007 at P5 exit.
 - Architecture/engineering **PDFs** are not rewritten for every decision tweak; ADRs + PLAN carry the current decision until PDFs are revised.
 

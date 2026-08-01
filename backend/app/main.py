@@ -7,6 +7,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.health import router as health_router
+from app.auth.api import router as auth_router
 from app.core.config import get_settings
 from app.core.db import dispose_db, init_db
 from app.core.logging import configure_logging
@@ -47,8 +48,8 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
 
-    # Public API surface reserved for later phases (empty in P0).
     api_v1 = APIRouter(prefix=settings.api_v1_prefix)
+    api_v1.include_router(auth_router)
     app.include_router(api_v1)
 
     return app
