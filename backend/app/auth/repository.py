@@ -19,6 +19,7 @@ from app.auth.models import (
 from app.core.ids import new_uuid7
 
 PASSWORD_PROVIDER = 'password'
+GOOGLE_PROVIDER = 'google'
 
 
 async def get_identity_by_email(
@@ -92,6 +93,73 @@ async def get_password_credential(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def get_credential_by_provider_subject(
+    session: AsyncSession,
+    *,
+    provider: str,
+    subject: str,
+) -> IdentityCredential | None:
+    """Return a credential for ``provider`` + ``subject``, if any."""
+    result = await session.execute(
+        select(IdentityCredential).where(
+            IdentityCredential.provider == provider,
+            IdentityCredential.subject == subject,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_oauth_credential(
+    session: AsyncSession,
+    *,
+    identity_id: uuid.UUID,
+    provider: str,
+) -> IdentityCredential | None:
+    """Return the OAuth credential for ``identity_id`` + ``provider``, if any."""
+    result = await session.execute(
+        select(IdentityCredential).where(
+            IdentityCredential.identity_id == identity_id,
+            IdentityCredential.provider == provider,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def create_oauth_credential(
+    session: AsyncSession,
+    *,
+    identity_id: uuid.UUID,
+    provider: str,
+    subject: str,
+) -> IdentityCredential:
+    """Attach an OAuth provider subject to ``identity_id``."""
+    credential = IdentityCredential(
+        identity_id=identity_id,
+        provider=provider,
+        subject=subject,
+        secret_hash=None,
+    )
+    session.add(credential)
+    await session.flush()
+    return credential
+
+
+async def list_providers_for_identity(
+    session: AsyncSession,
+    identity_id: uuid.UUID,
+) -> list[str]:
+    """Return credential provider names for ``identity_id`` (stable order)."""
+    result = await session.execute(
+        select(IdentityCredential.provider).where(
+            IdentityCredential.identity_id == identity_id,
+        )
+    )
+    providers = list(result.scalars().all())
+    order = {PASSWORD_PROVIDER: 0, GOOGLE_PROVIDER: 1}
+    providers.sort(key=lambda name: order.get(name, 99))
+    return providers
 
 
 async def create_refresh_session(

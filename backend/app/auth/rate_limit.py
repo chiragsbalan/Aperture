@@ -14,6 +14,7 @@ from app.core.config import Settings
 ACTION_LOGIN = 'login'
 ACTION_REGISTER = 'register'
 ACTION_REFRESH = 'refresh'
+ACTION_OAUTH = 'oauth'
 
 
 def _subject_id_key(raw: str) -> str:
@@ -231,6 +232,47 @@ async def record_refresh_attempt(
     await _record(
         session,
         action=ACTION_REFRESH,
+        subject_key=_subject_ip_key(client_ip),
+        window_seconds=settings.auth_rate_limit_window_seconds,
+        now=now,
+    )
+    await session.commit()
+
+
+async def enforce_oauth_limits(
+    session: AsyncSession,
+    *,
+    settings: Settings,
+    client_ip: str | None,
+) -> None:
+    """Raise 429 when OAuth IP has exceeded the per-window attempt cap."""
+    if not client_ip:
+        return
+    now = datetime.now(UTC)
+    if await _is_limited(
+        session,
+        action=ACTION_OAUTH,
+        subject_key=_subject_ip_key(client_ip),
+        max_attempts=settings.auth_google_oauth_max_per_ip,
+        window_seconds=settings.auth_rate_limit_window_seconds,
+        now=now,
+    ):
+        raise _rate_limited_error()
+
+
+async def record_oauth_attempt(
+    session: AsyncSession,
+    *,
+    settings: Settings,
+    client_ip: str | None,
+) -> None:
+    """Count an OAuth API attempt against the IP bucket (anti-abuse)."""
+    if not client_ip:
+        return
+    now = datetime.now(UTC)
+    await _record(
+        session,
+        action=ACTION_OAUTH,
         subject_key=_subject_ip_key(client_ip),
         window_seconds=settings.auth_rate_limit_window_seconds,
         now=now,

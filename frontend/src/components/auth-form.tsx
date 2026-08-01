@@ -1,11 +1,13 @@
 'use client';
 
+import { oauthErrorMessage } from '@/lib/google-oauth-errors';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useId, useState, type FormEvent } from 'react';
 
 interface AuthFormProps {
   mode: 'login' | 'signup';
+  initialError?: string | null;
 }
 
 function errorMessage(data: unknown, fallback: string): string {
@@ -24,7 +26,7 @@ function errorMessage(data: unknown, fallback: string): string {
   return fallback;
 }
 
-export function AuthForm({ mode }: AuthFormProps) {
+export function AuthForm({ mode, initialError = null }: AuthFormProps) {
   const router = useRouter();
   const emailId = useId();
   const usernameId = useId();
@@ -35,7 +37,9 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [username, setUsername] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    oauthErrorMessage(initialError),
+  );
   const [pending, setPending] = useState(false);
 
   const isSignup = mode === 'signup';
@@ -216,6 +220,15 @@ export function AuthForm({ mode }: AuthFormProps) {
           {pending ? 'Please wait…' : submitLabel}
         </button>
       </form>
+
+      <div className="mt-5">
+        <a
+          href="/api/auth/google/start?intent=sign_in"
+          className="flex w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-[var(--color-accent)]"
+        >
+          Continue with Google
+        </a>
+      </div>
 
       <p className="mt-6 text-sm text-muted">
         {isSignup ? (

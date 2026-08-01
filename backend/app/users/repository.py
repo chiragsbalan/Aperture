@@ -15,9 +15,14 @@ async def create_user(
     *,
     identity_id: uuid.UUID,
     username: str | None = None,
+    display_name: str | None = None,
 ) -> User:
     """Insert a profile shell row for ``identity_id``."""
-    user = User(identity_id=identity_id, username=username)
+    user = User(
+        identity_id=identity_id,
+        username=username,
+        display_name=display_name,
+    )
     session.add(user)
     await session.flush()
     return user
