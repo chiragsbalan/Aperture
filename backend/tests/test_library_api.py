@@ -93,8 +93,7 @@ def _latest_system_list_id(*, kind: str) -> uuid.UUID:
         conn = await asyncpg.connect(dsn)
         try:
             row = await conn.fetchrow(
-                'SELECT id FROM lists WHERE kind = $1 '
-                'ORDER BY created_at DESC LIMIT 1',
+                'SELECT id FROM lists WHERE kind = $1 ORDER BY created_at DESC LIMIT 1',
                 kind,
             )
         finally:
@@ -331,9 +330,7 @@ def test_unlisted_and_public_list_read_authz(
     assert anon_unlisted.json()['visibility'] == 'unlisted'
     assert anon_unlisted.json()['is_owner'] is False
     assert anon_unlisted.json()['owner_user_id'] is None
-    assert (
-        api_client.get(f'/api/v1/lists/{unlisted_id}/items').status_code == 200
-    )
+    assert api_client.get(f'/api/v1/lists/{unlisted_id}/items').status_code == 200
 
     public = api_client.post(
         '/api/v1/me/lists',

@@ -343,10 +343,9 @@ export async function removeCustomListItem(
   listId: string,
   itemId: string,
 ): Promise<{ ok: true } | ApiError> {
-  const res = await fetch(
-    `/api/proxy/api/v1/lists/${listId}/items/${itemId}`,
-    { method: 'DELETE' },
-  );
+  const res = await fetch(`/api/proxy/api/v1/lists/${listId}/items/${itemId}`, {
+    method: 'DELETE',
+  });
   if (!res.ok && res.status !== 204) {
     return {
       ok: false,
