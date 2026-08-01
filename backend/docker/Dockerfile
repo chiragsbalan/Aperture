@@ -16,12 +16,16 @@ RUN groupadd --system --gid 1001 app \
 
 COPY pyproject.toml uv.lock README.md ./
 COPY app ./app
+COPY alembic.ini ./
+COPY migrations ./migrations
+COPY docker/start.sh ./docker/start.sh
 
 RUN uv sync --frozen --no-dev \
+    && chmod +x /app/docker/start.sh \
     && chown -R app:app /app
 
 USER app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["./docker/start.sh"]

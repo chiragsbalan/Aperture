@@ -65,6 +65,21 @@ docker compose up -d db && make ci
 
 Dark cinematic shell with design tokens (`frontend/src/styles/tokens.css`), Fraunces + Source Sans 3, and a11y baseline. Browser traffic to the API goes through the Next.js BFF at `/api/proxy/*` (reserved cookies `__Host-ap_at` / `__Host-ap_rt` for P1 — not set yet).
 
+## Production (P0.6)
+
+Early hosting ([ADR-0003](docs/decisions/ADR-0003-hosting-and-bff.md)):
+
+| Layer | Provider | URL |
+|---|---|---|
+| Web + BFF | Vercel | https://aperture-sepia.vercel.app |
+| API | Render Free | https://aperture-api-da3c.onrender.com |
+| Postgres | Supabase Free | (connection string in Render env only) |
+
+- Merge to `main` auto-deploys FE (Vercel) and BE (Render).
+- API container runs `alembic upgrade head` then uvicorn (`backend/docker/start.sh`) on **every** start, including Free-tier cold wakes.
+- Render Free may sleep after idle (~1 min wake + migrate). Supabase Free may pause after low activity — restore in the dashboard if readiness fails.
+- Blueprint: [`render.yaml`](render.yaml) (aligns with existing `aperture-api`; do not duplicate the service). Release notes: [`docs/releases/v0.1.0.md`](docs/releases/v0.1.0.md).
+
 Optional pre-commit hooks:
 
 ```bash

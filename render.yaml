@@ -1,0 +1,32 @@
+# Render Blueprint (IaC-lite until Terraform in P12).
+# Dashboard env vars still hold secrets (DATABASE_URL). See ADR-0003.
+#
+# Existing service name aperture-api — importing this Blueprint updates that
+# service (does not create a second one). Keep DATABASE_URL only in the
+# dashboard (sync: false). Match region to the live service before first sync.
+
+services:
+  - type: web
+    name: aperture-api
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: main
+    dockerfilePath: backend/docker/Dockerfile
+    dockerContext: backend
+    healthCheckPath: /health/ready
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: APP_NAME
+        value: Aperture
+      - key: APP_VERSION
+        value: 0.1.0
+      - key: LOG_LEVEL
+        value: INFO
+      - key: API_V1_PREFIX
+        value: /api/v1
+      # Set in the Render dashboard (Supabase session pooler + asyncpg):
+      # postgresql+asyncpg://...@...pooler.supabase.com:5432/postgres
+      - key: DATABASE_URL
+        sync: false

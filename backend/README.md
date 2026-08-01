@@ -43,4 +43,15 @@ uv run alembic upgrade head
 uv run alembic downgrade base
 ```
 
+Production (Render) runs migrations on container start via `docker/start.sh` before uvicorn.
+
+## Docker image
+
+```bash
+# from repo root
+make docker-build
+# or:
+docker build -f backend/docker/Dockerfile -t aperture-api:local backend
+```
+
 Formatting/lint uses **Ruff** (lint + format) rather than Black; see root README.

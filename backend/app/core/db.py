@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.core.config import Settings, get_settings
+from app.core.db_ssl import asyncpg_connect_args
 
 _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
@@ -27,6 +28,7 @@ def init_db(settings: Settings | None = None) -> AsyncEngine:
     _engine = create_async_engine(
         resolved.database_url,
         pool_pre_ping=True,
+        connect_args=asyncpg_connect_args(resolved.database_url),
     )
     _session_factory = async_sessionmaker(
         _engine,

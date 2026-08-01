@@ -50,7 +50,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 10s
+      # Migrate-on-start (Dockerfile CMD) needs a little headroom before ready probes.
+      start_period: 40s
 
   web:
     build:
