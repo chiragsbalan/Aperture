@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-01
-- **Related:** Domain Model PDF; Database Design PDFs; Metadata LLD; PLAN.md P2.1+
+- **Related:** Domain Model PDF; Database Design PDFs; Metadata LLD; PLAN.md P2.1+; [ADR-0008](ADR-0008-personal-library-lists.md) (list content-ref typing)
 - **Implements in:** P2 (canonical catalog + detail UX); later domains reference these ids
 
 ## Context
@@ -26,7 +26,7 @@ Database Design also models seasons, episodes, and people as first-class tablesâ
 | Credits | Unified cast/crew modeling across movie/TV (shared credit semantics; concrete join tables per Database Design) |
 | Cross-domain refs | Other domains store Aperture ids (or typed refs), never raw TMDb ids as FKs |
 
-**Public API:** REST under `/api/v1/movies|tv|people`. Opaque references use `{"type","id"}` where a polymorphic pointer is required (lists, activity, etc.).
+**Public API:** REST under `/api/v1/movies|tv|people`. Opaque references use `{"type","id"}` where a polymorphic pointer is required (lists, activity, etc.). For **personal library lists**, public types are `movie` | `tv` (input may accept `tv_show`); persistence uses `content_items` types â€” see [ADR-0008](ADR-0008-personal-library-lists.md).
 
 **Ingest:** Normalize TMDb (and later providers) into the canonical schema; dedupe via `external_ids` uniqueness before creating a new `content_items` row.
 
@@ -52,3 +52,4 @@ Database Design also models seasons, episodes, and people as first-class tablesâ
 - Additional `source` values (IMDb, manual admin, etc.) without changing the unique key shape.
 - OpenSearch documents (P6) and embeddings (P8+) reference the same canonical ids.
 - If a true merge of two canonical items is ever required, prefer an explicit merge/redirect procedure over silently changing PKsâ€”document in a superseding ADR if needed.
+- Broader alignment of detail DTO `tv_show` with public `tv` across all surfaces may land later; list APIs already normalize per ADR-0008.
