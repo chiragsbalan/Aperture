@@ -112,8 +112,7 @@ docker-compose.yml
 - [docs/](docs/) — PRD, roadmap, architecture, design, engineering, ADRs
 - Local-only (gitignored): `PLAN.md`, `CONTRIBUTING.md`, `phases/` — shipping plan and git workflow notes on this machine
 - CI / branch protection: [`.github/README.md`](.github/README.md)
-- Hosting decision: [docs/decisions/ADR-0003-hosting-and-bff.md](docs/decisions/ADR-0003-hosting-and-bff.md)
-- Phase authority: [docs/decisions/ADR-0001-phase-authority.md](docs/decisions/ADR-0001-phase-authority.md)
+- ADRs (0001–0006): [docs/decisions/](docs/decisions/decisions_README.md) — phase authority, ORM/schema, hosting/BFF, content identity, auth, Redis/search staging
 
 ## License
 

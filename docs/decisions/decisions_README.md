@@ -34,9 +34,23 @@ Examples:
 ADR-0001-phase-authority.md
 ADR-0002-orm-schema.md
 ADR-0003-hosting-and-bff.md
+ADR-0004-content-identity.md
+ADR-0005-auth.md
+ADR-0006-redis-search-staging.md
 ```
 
-Zero-padded four-digit ids match PLAN.md. Accepted ADRs in this folder include [ADR-0001](ADR-0001-phase-authority.md) (phase authority), [ADR-0002](ADR-0002-orm-schema.md) (ORM/schema), and [ADR-0003](ADR-0003-hosting-and-bff.md) (early hosting).
+Zero-padded four-digit ids match PLAN.md. The six accepted foundation ADRs:
+
+| ADR | Decision |
+|---|---|
+| [ADR-0001](ADR-0001-phase-authority.md) | Phase authority (Roadmap over Playbook ordering) |
+| [ADR-0002](ADR-0002-orm-schema.md) | ORM / schema foundation (UUIDv7, mixins, Alembic) |
+| [ADR-0003](ADR-0003-hosting-and-bff.md) | Early hosting (Vercel + Render Free + Supabase Free) and BFF |
+| [ADR-0004](ADR-0004-content-identity.md) | Canonical content identity (`content_items` / `external_ids`) |
+| [ADR-0005](ADR-0005-auth.md) | Auth / sessions (BFF cookies, JWT, Argon2id, OAuth link rules) |
+| [ADR-0006](ADR-0006-redis-search-staging.md) | Redis at P2; PG FTS → OpenSearch staging |
+
+Follow-on (not yet written): **ADR-0007** — OpenSearch hosting (due at P5 exit per PLAN).
 
 ## Template
 

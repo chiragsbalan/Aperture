@@ -1,5 +1,5 @@
 /**
- * Reserved auth cookie names (ADR-0003 / PLAN).
+ * Reserved auth cookie names (ADR-0003 transport · ADR-0005 auth).
  *
  * Same-origin BFF will set these in P1. Do not set or read them in P0.5.
  * `__Host-` prefix requires Secure, Path=/, no Domain attribute.

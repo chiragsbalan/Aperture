@@ -1,0 +1,52 @@
+# ADR-0004 — Content identity (canonical catalog)
+
+- **Status:** Accepted
+- **Date:** 2026-08-01
+- **Related:** Domain Model PDF; Database Design PDFs; Metadata LLD; PLAN.md P2.1+
+- **Implements in:** P2 (canonical catalog + detail UX); later domains reference these ids
+
+## Context
+
+Aperture is a social film/TV product, not a TMDb proxy. Lists, reviews, watch history, streaming badges, and search must point at stable internal identifiers. If every feature stored raw TMDb (or other provider) ids, merges, remaps, and multi-source ingest would break referential integrity across domains.
+
+Database Design also models seasons, episodes, and people as first-class tables—not nested blobs inside a single “title” row—so foreign keys and public URLs need a clear ownership story.
+
+## Decision
+
+**Canonical content lives in PostgreSQL under Aperture-owned ids (UUIDv7 per ADR-0002).** External providers are sources, not the source of truth.
+
+**Core shape:**
+
+| Concept | Rule |
+|---|---|
+| Titles | `content_items` holds the canonical movie/TV-show row (type + Aperture id) |
+| Provider keys | `external_ids` maps provider keys → canonical item; **UNIQUE** `(source, source_namespace, external_id)` |
+| Child hierarchy | Seasons and episodes are **outside** `content_items` (own tables keyed to the show) |
+| People | People are **outside** `content_items` (own tables + their own `external_ids` where needed) |
+| Credits | Unified cast/crew modeling across movie/TV (shared credit semantics; concrete join tables per Database Design) |
+| Cross-domain refs | Other domains store Aperture ids (or typed refs), never raw TMDb ids as FKs |
+
+**Public API:** REST under `/api/v1/movies|tv|people`. Opaque references use `{"type","id"}` where a polymorphic pointer is required (lists, activity, etc.).
+
+**Ingest:** Normalize TMDb (and later providers) into the canonical schema; dedupe via `external_ids` uniqueness before creating a new `content_items` row.
+
+## Alternatives considered
+
+1. **Proxy TMDb ids everywhere** — rejected; couples product data to one vendor and breaks multi-source merges.
+2. **Single polymorphic “entity” table for titles, seasons, episodes, people** — rejected; seasons/episodes/people have different lifecycles and query patterns; keep them outside `content_items`.
+3. **Separate cast/crew models per media type with incompatible semantics** — rejected; prefer unified credit semantics for discovery and “people who worked on…” queries.
+4. **Natural keys from providers as PKs** — rejected; conflicts with ADR-0002 (UUIDv7) and multi-source identity.
+
+## Consequences
+
+- P2.1 must land `content_items` / `external_ids` (and related metadata tables) before lists/reviews can safely FK titles.
+- Ingest jobs are idempotent on `(source, source_namespace, external_id)`.
+- Remapping a provider id updates `external_ids`; canonical UUID stays stable for user-generated data.
+- Search indexes and caches key off Aperture ids; provider ids are lookup aids only.
+- Architecture/Metadata PDFs that stress “canonical model” remain valid; **this ADR is authoritative for the `content_items` + `external_ids` uniqueness rule**.
+
+## Future evolution
+
+- Additional `source` values (IMDb, manual admin, etc.) without changing the unique key shape.
+- OpenSearch documents (P6) and embeddings (P8+) reference the same canonical ids.
+- If a true merge of two canonical items is ever required, prefer an explicit merge/redirect procedure over silently changing PKs—document in a superseding ADR if needed.

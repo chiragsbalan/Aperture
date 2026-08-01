@@ -23,7 +23,10 @@ Architecture Decision Records (ADRs) and the Design System evolve during develop
 - **Phase order:** Development Roadmap + [PLAN.md](../PLAN.md) (see [ADR-0001](decisions/ADR-0001-phase-authority.md)).
 - **ORM / schema foundation:** [ADR-0002](decisions/ADR-0002-orm-schema.md) — naming convention, UUIDv7, mixins, Alembic async.
 - **Early cloud hosting:** [ADR-0003](decisions/ADR-0003-hosting-and-bff.md) — **Vercel** (FE/BFF) + **Render Free** (FastAPI) + **Supabase Free** (Postgres only). This supersedes PDF passages that assume paid always-on Render for API+Postgres or unnamed “managed Postgres” without Supabase.
-- Architecture/engineering **PDFs** are not rewritten for every hosting tweak; new ADRs + PLAN carry the current decision until PDFs are revised.
+- **Content identity:** [ADR-0004](decisions/ADR-0004-content-identity.md) — canonical `content_items` + `external_ids` uniqueness; not raw provider ids as FKs.
+- **Auth / sessions:** [ADR-0005](decisions/ADR-0005-auth.md) — BFF `__Host-` cookies, 15m JWT, opaque refresh + 10s reuse grace, Argon2id, no OAuth auto-link.
+- **Redis / search staging:** [ADR-0006](decisions/ADR-0006-redis-search-staging.md) — Redis intro at P2 (Roadmap P11 = harden); PG FTS then OpenSearch+FTS fallback; OpenSearch host is ADR-0007 at P5 exit.
+- Architecture/engineering **PDFs** are not rewritten for every decision tweak; ADRs + PLAN carry the current decision until PDFs are revised.
 
 ## Structure
 
@@ -90,8 +93,8 @@ Stores reusable diagrams, screenshots, branding assets, and other documentation 
 
 1. Read the PRD, [PLAN.md](../PLAN.md), and [CONTRIBUTING.md](../CONTRIBUTING.md) before implementing features.
 2. Use the Development Roadmap + PLAN to determine the current phase/slice; create `feature/<slice-id>-<slug>` from `main` (see CONTRIBUTING).
-3. Check `decisions/` for ADRs that supersede PDF details (especially **ADR-0003** for hosting).
-4. Update the appropriate architecture/design document when structural changes occur; for provider/hosting changes, prefer a new or updated ADR over editing PDFs.
-5. Create ADRs only after significant engineering decisions.
+3. Check `decisions/` for ADRs that supersede PDF details (hosting **ADR-0003**, content **ADR-0004**, auth **ADR-0005**, Redis/search **ADR-0006**).
+4. Update the appropriate architecture/design document when structural changes occur; for provider/hosting/auth/search staging changes, prefer a new or updated ADR over editing PDFs.
+5. Create ADRs only after significant engineering decisions (next planned: **ADR-0007** OpenSearch host at P5 exit).
 6. Update the Design System only when reusable UI patterns have stabilized.
 7. If documentation conflicts with implementation, treat the implementation as the source of truth, update PLAN/ADRs (and docs as needed), and create an ADR if the architectural decision has changed.
