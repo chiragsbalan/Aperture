@@ -37,3 +37,7 @@ services:
       # Strong random secret for access JWTs (generate once; never commit).
       - key: JWT_SECRET
         sync: false
+      # Optional later: live TMDb ingest (not needed for fixture seed).
+      # Set in the Render dashboard when using --source tmdb; leave unset otherwise.
+      # - key: TMDB_API_KEY
+      #   sync: false

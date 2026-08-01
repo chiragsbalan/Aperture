@@ -1,0 +1,240 @@
+[
+  {
+    "id": 1396,
+    "name": "Breaking Bad",
+    "original_name": "Breaking Bad",
+    "overview": "A chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine.",
+    "poster_path": "/ggFHVNu6YYI5L9pCfOacjizRGt.jpg",
+    "backdrop_path": "/tsRy63Mu5cu8etL1X7ZLyf7UP1F.jpg",
+    "popularity": 200.0,
+    "first_air_date": "2008-01-20",
+    "last_air_date": "2013-09-29",
+    "status": "Ended",
+    "number_of_seasons": 5,
+    "number_of_episodes": 62,
+    "credits": {
+      "cast": [
+        {
+          "id": 17419,
+          "name": "Bryan Cranston",
+          "character": "Walter White",
+          "order": 0
+        },
+        {
+          "id": 84427,
+          "name": "Aaron Paul",
+          "character": "Jesse Pinkman",
+          "order": 1
+        }
+      ],
+      "crew": [
+        {
+          "id": 66646,
+          "name": "Vince Gilligan",
+          "job": "Creator",
+          "department": "Writing"
+        }
+      ]
+    },
+    "seasons": [
+      {
+        "season_number": 1,
+        "name": "Season 1",
+        "overview": "High school chemistry teacher Walter White is diagnosed with lung cancer.",
+        "air_date": "2008-01-20",
+        "episode_count": 7,
+        "poster_path": "/1BP4Hxyt9omprRMYuA8Ytg.jpg",
+        "episodes": [
+          {
+            "episode_number": 1,
+            "name": "Pilot",
+            "overview": "Walter White, a downtrodden chemistry teacher, finds himself facing a life-altering crisis.",
+            "air_date": "2008-01-20",
+            "runtime": 58,
+            "still_path": "/ydlY3iUeHLz0mA.jpg"
+          },
+          {
+            "episode_number": 2,
+            "name": "Cat's in the Bag...",
+            "overview": "Walt and Jesse attempt to dispose of two bodies.",
+            "air_date": "2008-01-27",
+            "runtime": 48,
+            "still_path": "/cats.jpg"
+          }
+        ]
+      },
+      {
+        "season_number": 2,
+        "name": "Season 2",
+        "overview": "Walt and Jesse's operation grows more complicated.",
+        "air_date": "2009-03-08",
+        "episode_count": 13,
+        "poster_path": "/s2.jpg",
+        "episodes": [
+          {
+            "episode_number": 1,
+            "name": "Seven Thirty-Seven",
+            "overview": "Walt and Jesse clean up after the failed drug deal.",
+            "air_date": "2009-03-08",
+            "runtime": 47,
+            "still_path": "/s2e1.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 1398,
+    "name": "The Sopranos",
+    "original_name": "The Sopranos",
+    "overview": "New Jersey mob boss Tony Soprano deals with personal and professional issues in his home and business life.",
+    "poster_path": "/vX2o.jpg",
+    "backdrop_path": "/sopranos_bd.jpg",
+    "popularity": 150.0,
+    "first_air_date": "1999-01-10",
+    "last_air_date": "2007-06-10",
+    "status": "Ended",
+    "number_of_seasons": 6,
+    "number_of_episodes": 86,
+    "credits": {
+      "cast": [
+        {
+          "id": 11287,
+          "name": "James Gandolfini",
+          "character": "Tony Soprano",
+          "order": 0
+        },
+        {
+          "id": 11355,
+          "name": "Lorraine Bracco",
+          "character": "Dr. Jennifer Melfi",
+          "order": 1
+        }
+      ],
+      "crew": [
+        {
+          "id": 17288,
+          "name": "David Chase",
+          "job": "Creator",
+          "department": "Writing"
+        }
+      ]
+    },
+    "seasons": []
+  },
+  {
+    "id": 1399,
+    "name": "Game of Thrones",
+    "original_name": "Game of Thrones",
+    "overview": "Nine noble families fight for control over the lands of Westeros, while an ancient enemy returns.",
+    "poster_path": "/u3bZgnGQ9T01sWNhyveQz0wH0Hl.jpg",
+    "backdrop_path": "/2OMB0ynKjUY.jpg",
+    "popularity": 180.0,
+    "first_air_date": "2011-04-17",
+    "last_air_date": "2019-05-19",
+    "status": "Ended",
+    "number_of_seasons": 8,
+    "number_of_episodes": 73,
+    "credits": {
+      "cast": [
+        {
+          "id": 239019,
+          "name": "Emilia Clarke",
+          "character": "Daenerys Targaryen",
+          "order": 0
+        },
+        {
+          "id": 239020,
+          "name": "Kit Harington",
+          "character": "Jon Snow",
+          "order": 1
+        }
+      ],
+      "crew": []
+    },
+    "seasons": []
+  },
+  {
+    "id": 2316,
+    "name": "The Office",
+    "original_name": "The Office",
+    "overview": "A mockumentary on a group of typical office workers, where the workday consists of ego clashes and inappropriate behavior.",
+    "poster_path": "/qWnJzyZhyy74gjpSjIXWmuk0ifX.jpg",
+    "backdrop_path": "/office_bd.jpg",
+    "popularity": 160.0,
+    "first_air_date": "2005-03-24",
+    "last_air_date": "2013-05-16",
+    "status": "Ended",
+    "number_of_seasons": 9,
+    "number_of_episodes": 201,
+    "credits": {
+      "cast": [
+        {
+          "id": 4495,
+          "name": "Steve Carell",
+          "character": "Michael Scott",
+          "order": 0
+        },
+        {
+          "id": 17697,
+          "name": "John Krasinski",
+          "character": "Jim Halpert",
+          "order": 1
+        }
+      ],
+      "crew": []
+    },
+    "seasons": [
+      {
+        "season_number": 1,
+        "name": "Season 1",
+        "overview": "A documentary crew arrives at the Scranton branch of Dunder Mifflin.",
+        "air_date": "2005-03-24",
+        "episode_count": 6,
+        "poster_path": "/office_s1.jpg",
+        "episodes": [
+          {
+            "episode_number": 1,
+            "name": "Pilot",
+            "overview": "The documentary begins as the Scranton branch learns about possible downsizing.",
+            "air_date": "2005-03-24",
+            "runtime": 23,
+            "still_path": "/office_s1e1.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 66732,
+    "name": "Stranger Things",
+    "original_name": "Stranger Things",
+    "overview": "When a young boy vanishes, a small town uncovers a mystery involving secret experiments, terrifying supernatural forces, and one strange little girl.",
+    "poster_path": "/49WJfeN0moxb9IPfGn8AIqMGskD.jpg",
+    "backdrop_path": "/56v2KjBlm8OB4Q.jpg",
+    "popularity": 190.0,
+    "first_air_date": "2016-07-15",
+    "last_air_date": "2025-01-01",
+    "status": "Ended",
+    "number_of_seasons": 5,
+    "number_of_episodes": 42,
+    "credits": {
+      "cast": [
+        {
+          "id": 135621,
+          "name": "Millie Bobby Brown",
+          "character": "Eleven",
+          "order": 0
+        },
+        {
+          "id": 135651,
+          "name": "Finn Wolfhard",
+          "character": "Mike Wheeler",
+          "order": 1
+        }
+      ],
+      "crew": []
+    },
+    "seasons": []
+  }
+]

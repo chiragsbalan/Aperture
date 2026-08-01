@@ -45,6 +45,29 @@ uv run alembic downgrade base
 
 Production (Render) runs migrations on container start via `docker/start.sh` before uvicorn.
 
+## Metadata catalog (P2.1 / P2.2)
+
+Canonical movies / TV / people live in Postgres (ADR-0004). Public detail APIs:
+
+| Path | Meaning |
+|---|---|
+| `GET /api/v1/movies/{id}` | Movie detail (Cache-Control: public, max-age=300) |
+| `GET /api/v1/tv/{id}` | TV-show detail |
+| `GET /api/v1/people/{id}` | Person detail |
+
+Seed from offline fixtures (no TMDb key):
+
+```bash
+make migrate
+make seed-metadata   # python -m app.metadata.cli seed --source fixtures
+```
+
+The CLI prints sample UUIDs for `/movies/{id}`, `/tv/{id}`, and `/people/{id}` on the frontend. Re-running seed is idempotent via `external_ids`.
+
+Live TMDb seed (`--source tmdb`) requires `TMDB_API_KEY` in the environment and fails clearly when empty. For production, run fixture seed against the prod `DATABASE_URL` as a ship step until a curated live ingest list is wired.
+
+TMDb image CDN URLs are built server-side from relative `poster_path` / `profile_path` values; the API key is never required for images and must never be exposed to the browser.
+
 ## Docker image
 
 ```bash

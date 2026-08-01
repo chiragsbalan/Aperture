@@ -17,6 +17,7 @@ from app.auth import models as _auth_models  # noqa: F401
 from app.core.base import Base
 from app.core.config import get_settings
 from app.core.db_ssl import asyncpg_connect_args
+from app.metadata import models as _metadata_models  # noqa: F401
 from app.users import models as _users_models  # noqa: F401
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection

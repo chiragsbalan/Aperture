@@ -44,6 +44,8 @@ Database Design also models seasons, episodes, and people as first-class tables�
 - Remapping a provider id updates `external_ids`; canonical UUID stays stable for user-generated data.
 - Search indexes and caches key off Aperture ids; provider ids are lookup aids only.
 - Architecture/Metadata PDFs that stress “canonical model” remain valid; **this ADR is authoritative for the `content_items` + `external_ids` uniqueness rule**.
+- **TMDb is server-only:** the API key stays in backend env; browsers receive Aperture UUIDs and CDN image URLs built from relative paths.
+- **Fixture seed is a first-class ship path:** offline JSON under `backend/app/metadata/fixtures/` can populate prod via `make seed-metadata` (or equivalent) against `DATABASE_URL` without a TMDb key; live TMDb ingest remains optional.
 
 ## Future evolution
 
