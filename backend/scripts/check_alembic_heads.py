@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Fail CI when Alembic has multiple heads.
 
-Until P0.4 wires Alembic, this exits 0 (skipped). Once ``alembic.ini`` and at
-least one revision exist, exactly one head is required.
+Requires ``alembic.ini`` and at least one revision under ``migrations/versions``.
+Exactly one head is required (P0.4+).
 """
 
 from __future__ import annotations
@@ -30,10 +30,7 @@ def check_alembic_heads(backend_dir: Path | None = None) -> int:
     versions_dir = root / 'migrations' / 'versions'
 
     if not alembic_ini.is_file() or not has_revisions(versions_dir):
-        print(
-            'Alembic single-head check: skipped '
-            '(not configured yet; expected until P0.4).'
-        )
+        print('Alembic single-head check: skipped (alembic.ini or revisions missing).')
         return 0
 
     try:
