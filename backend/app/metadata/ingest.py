@@ -10,7 +10,13 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import get_cache
 from app.metadata import repository as metadata_repository
+from app.metadata.cache_keys import (
+    movie_detail_key,
+    person_detail_key,
+    tv_detail_key,
+)
 from app.metadata.tmdb.dto import (
     TmdbMovie,
     TmdbPerson,
@@ -234,8 +240,52 @@ async def seed_from_fixtures(
         await upsert_person_payload(session, person)
 
     await session.commit()
+    await _invalidate_detail_cache(
+        session,
+        movies=movies,
+        shows=shows,
+        people=people,
+    )
     return {
         'people': len(people),
         'movies': len(movies),
         'tv_shows': len(shows),
     }
+
+
+async def _invalidate_detail_cache(
+    session: AsyncSession,
+    *,
+    movies: list[TmdbMovie],
+    shows: list[TmdbTvShow],
+    people: list[TmdbPerson],
+) -> None:
+    """Drop cached detail payloads for re-ingested entities."""
+    cache = get_cache()
+    for movie in movies:
+        ext = await metadata_repository.get_external_id(
+            session,
+            source=SOURCE_TMDB,
+            source_namespace='movie',
+            external_id=str(movie.id),
+        )
+        if ext is not None and ext.content_item_id is not None:
+            await cache.delete(movie_detail_key(ext.content_item_id))
+    for show in shows:
+        ext = await metadata_repository.get_external_id(
+            session,
+            source=SOURCE_TMDB,
+            source_namespace='tv',
+            external_id=str(show.id),
+        )
+        if ext is not None and ext.content_item_id is not None:
+            await cache.delete(tv_detail_key(ext.content_item_id))
+    for person in people:
+        ext = await metadata_repository.get_external_id(
+            session,
+            source=SOURCE_TMDB,
+            source_namespace='person',
+            external_id=str(person.id),
+        )
+        if ext is not None and ext.person_id is not None:
+            await cache.delete(person_detail_key(ext.person_id))

@@ -6,7 +6,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -462,3 +462,126 @@ async def list_sample_content_ids(
     rows.extend(('tv', row[0], row[1]) for row in shows.all())
     rows.extend(('person', row[0], row[1]) for row in people.all())
     return rows
+
+
+async def search_content_items(
+    session: AsyncSession,
+    *,
+    query: str,
+    content_types: frozenset[str],
+    limit: int,
+    offset: int,
+) -> tuple[list[tuple[ContentItem, float, int | None]], int]:
+    """FTS search movies/TV. ``content_types`` uses DB values ``movie``/``tv_show``.
+
+    Returns ``(rows, total)`` where each row is
+    ``(ContentItem, rank, year)``.
+    """
+    if not content_types:
+        return [], 0
+
+    types = sorted(content_types)
+    count_stmt = text(
+        """
+        SELECT count(*)::int
+        FROM content_items
+        WHERE search_vector @@ plainto_tsquery('english', :q)
+          AND content_type IN :types
+        """
+    ).bindparams(bindparam('types', expanding=True))
+    total = int(
+        (
+            await session.execute(
+                count_stmt,
+                {'q': query, 'types': types},
+            )
+        ).scalar_one()
+    )
+
+    list_stmt = text(
+        """
+        SELECT
+            c.id,
+            ts_rank(
+                c.search_vector,
+                plainto_tsquery('english', :q)
+            ) AS rank,
+            COALESCE(
+                EXTRACT(YEAR FROM m.release_date),
+                EXTRACT(YEAR FROM t.first_air_date)
+            )::int AS year
+        FROM content_items c
+        LEFT JOIN movies m ON m.content_item_id = c.id
+        LEFT JOIN tv_shows t ON t.content_item_id = c.id
+        WHERE c.search_vector @@ plainto_tsquery('english', :q)
+          AND c.content_type IN :types
+        ORDER BY rank DESC, c.title ASC
+        LIMIT :limit OFFSET :offset
+        """
+    ).bindparams(bindparam('types', expanding=True))
+    result = await session.execute(
+        list_stmt,
+        {
+            'q': query,
+            'types': types,
+            'limit': limit,
+            'offset': offset,
+        },
+    )
+    hit_rows = result.all()
+    items: list[tuple[ContentItem, float, int | None]] = []
+    for row in hit_rows:
+        item = await session.get(ContentItem, row.id)
+        if item is None:
+            continue
+        year = int(row.year) if row.year is not None else None
+        items.append((item, float(row.rank or 0.0), year))
+    return items, total
+
+
+async def search_people(
+    session: AsyncSession,
+    *,
+    query: str,
+    limit: int,
+    offset: int,
+) -> tuple[list[tuple[Person, float]], int]:
+    """FTS search people by name. Returns ``(rows, total)``."""
+    total = int(
+        (
+            await session.execute(
+                text(
+                    """
+                    SELECT count(*)::int
+                    FROM people
+                    WHERE search_vector @@ plainto_tsquery('english', :q)
+                    """
+                ),
+                {'q': query},
+            )
+        ).scalar_one()
+    )
+    result = await session.execute(
+        text(
+            """
+            SELECT
+                p.id,
+                ts_rank(
+                    p.search_vector,
+                    plainto_tsquery('english', :q)
+                ) AS rank
+            FROM people p
+            WHERE p.search_vector @@ plainto_tsquery('english', :q)
+            ORDER BY rank DESC, p.name ASC
+            LIMIT :limit OFFSET :offset
+            """
+        ),
+        {'q': query, 'limit': limit, 'offset': offset},
+    )
+    people: list[tuple[Person, float]] = []
+    for row in result.all():
+        person = await session.get(Person, row.id)
+        if person is None:
+            continue
+        people.append((person, float(row.rank or 0.0)))
+    return people, total

@@ -21,6 +21,17 @@ services:
       retries: 10
       start_period: 5s
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
   api:
     build:
       context: ./backend
@@ -36,12 +47,16 @@ services:
       # Always use the Compose service hostname (root .env DATABASE_URL is for host runs).
       # Keep POSTGRES_USER/PASSWORD URL-safe (no @ : / #) or encode them yourself.
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aperture}:${POSTGRES_PASSWORD:-aperture}@db:5432/${POSTGRES_DB:-aperture}
+      # Compose Redis (host/Upstash REDIS_URL in .env is for non-Compose runs).
+      REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:-local-dev-only-change-me-before-any-real-use}
       ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS:-900}
       REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS:-2592000}
       AUTH_BFF_SHARED_SECRET: ${AUTH_BFF_SHARED_SECRET:-local-dev-bff-shared-secret-change-me}
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test:

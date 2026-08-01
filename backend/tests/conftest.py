@@ -25,14 +25,20 @@ from fastapi.testclient import TestClient
 @pytest.fixture(autouse=True)
 def _clear_settings_cache() -> Iterator[None]:
     """Ensure settings re-read env between tests when needed."""
+    from app.auth.service import reset_refresh_grace_l1
     from app.core.cache import reset_cache
     from app.core.config import get_settings
+    from app.search.rate_limit import reset_search_rate_limit_fallback
 
     get_settings.cache_clear()
     reset_cache()
+    reset_refresh_grace_l1()
+    reset_search_rate_limit_fallback()
     yield
     get_settings.cache_clear()
     reset_cache()
+    reset_refresh_grace_l1()
+    reset_search_rate_limit_fallback()
 
 
 @pytest.fixture

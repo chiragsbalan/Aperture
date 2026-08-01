@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 from app.auth.security import hash_refresh_token
-from app.core.cache import reset_cache
+from app.auth.service import reset_refresh_grace_l1
 from app.core.db import session_scope
 from app.main import app
 from fastapi.testclient import TestClient
@@ -219,7 +219,7 @@ def test_refresh_grace_l1_miss_db_hit_returns_same_tokens(
         json={'refresh_token': refresh_token},
     )
     assert first.status_code == 200
-    reset_cache()
+    reset_refresh_grace_l1()
     second = api_client.post(
         '/api/v1/auth/refresh',
         json={'refresh_token': refresh_token},
@@ -317,7 +317,7 @@ async def test_refresh_reuse_outside_grace_revokes_family() -> None:
                     {'past': past, 'token_hash': token_hash},
                 )
                 await session.commit()
-            reset_cache()
+            reset_refresh_grace_l1()
 
             stolen = await client.post(
                 '/api/v1/auth/refresh',

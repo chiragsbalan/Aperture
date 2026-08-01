@@ -2,6 +2,8 @@
  * Pure helpers for the same-origin BFF proxy (`/api/proxy/...`).
  */
 
+import { type NextRequest } from 'next/server';
+
 export const UPSTREAM_FETCH_TIMEOUT_MS = 10_000;
 
 /** Headers allowed from the browser → upstream API. */
@@ -91,6 +93,43 @@ export function filterRequestHeaders(source: Headers): Headers {
   // Defense in depth — never forward browser cookies to the cookie-agnostic API.
   headers.delete('cookie');
   return headers;
+}
+
+/** First hop from `x-forwarded-for`, else null (max 64 chars). */
+export function clientIpFromRequest(request: NextRequest): string | null {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) {
+    const first = forwarded.split(',')[0]?.trim();
+    if (first) {
+      return first.slice(0, 64);
+    }
+  }
+  return null;
+}
+
+/**
+ * Overwrite trusted BFF client-IP headers on an upstream request.
+ *
+ * Call after {@link filterRequestHeaders} so browser-supplied copies never
+ * survive. Sets `X-Aperture-Client-IP` from the browser request IP and
+ * `X-Aperture-BFF-Secret` from `AUTH_BFF_SHARED_SECRET` when non-empty.
+ */
+export function injectTrustedClientIpHeaders(
+  request: NextRequest,
+  headers: Headers,
+): void {
+  const clientIp = clientIpFromRequest(request);
+  if (clientIp) {
+    headers.set('X-Aperture-Client-IP', clientIp);
+  } else {
+    headers.delete('X-Aperture-Client-IP');
+  }
+  const secret = process.env.AUTH_BFF_SHARED_SECRET ?? '';
+  if (secret) {
+    headers.set('X-Aperture-BFF-Secret', secret);
+  } else {
+    headers.delete('X-Aperture-BFF-Secret');
+  }
 }
 
 export function filterResponseHeaders(source: Headers): Headers {

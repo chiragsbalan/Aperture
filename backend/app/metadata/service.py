@@ -194,3 +194,82 @@ async def get_person_detail(
     if person is None:
         raise CatalogNotFoundError('person not found')
     return _person_detail(person)
+
+
+async def search_catalog(
+    session: AsyncSession,
+    *,
+    query: str,
+    types: frozenset[str],
+    page: int,
+    limit: int,
+) -> tuple[list[dict[str, object]], int]:
+    """Run PG FTS across requested catalog types.
+
+    ``types`` uses public API values: ``movie``, ``tv``, ``person``.
+    Returns ``(hit dicts, total)`` ordered by rank (mixed when multiple types).
+    """
+    offset = (page - 1) * limit
+    db_types: set[str] = set()
+    if 'movie' in types:
+        db_types.add('movie')
+    if 'tv' in types:
+        db_types.add('tv_show')
+
+    hits: list[tuple[float, dict[str, object]]] = []
+    total = 0
+
+    if db_types:
+        # Fetch a wider window so mixed ranking across people works at seed scale.
+        fetch_limit = offset + limit
+        content_rows, content_total = await metadata_repository.search_content_items(
+            session,
+            query=query,
+            content_types=frozenset(db_types),
+            limit=fetch_limit,
+            offset=0,
+        )
+        total += content_total
+        for item, rank, year in content_rows:
+            public_type = 'movie' if item.content_type == 'movie' else 'tv'
+            hits.append(
+                (
+                    rank,
+                    {
+                        'type': public_type,
+                        'id': item.id,
+                        'title': item.title,
+                        'year': year,
+                        'poster_url': _image_url(item.poster_path),
+                        'rank': rank,
+                    },
+                )
+            )
+
+    if 'person' in types:
+        fetch_limit = offset + limit
+        people_rows, people_total = await metadata_repository.search_people(
+            session,
+            query=query,
+            limit=fetch_limit,
+            offset=0,
+        )
+        total += people_total
+        for person, rank in people_rows:
+            hits.append(
+                (
+                    rank,
+                    {
+                        'type': 'person',
+                        'id': person.id,
+                        'title': person.name,
+                        'year': None,
+                        'poster_url': _image_url(person.profile_path, size='w185'),
+                        'rank': rank,
+                    },
+                )
+            )
+
+    hits.sort(key=lambda row: (-row[0], str(row[1]['title']).lower()))
+    page_hits = [row[1] for row in hits[offset : offset + limit]]
+    return page_hits, total

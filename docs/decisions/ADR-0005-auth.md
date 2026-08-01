@@ -47,7 +47,7 @@ Browsers must authenticate to FastAPI without exposing long-lived secrets to Jav
 
 ### P1.2 hardening (as implemented)
 
-- **Refresh reuse:** 10s grace after rotation returns the same successor token pair. L1 in-memory `CacheBackend` is read-through; durable `refresh_grace_payloads` is written in the same DB transaction as rotation (survives process restart within grace). Within grace + payload miss → 401 with **no** family revoke and **no** successor re-rotate. Reuse outside grace **revokes that refresh family only** (not all sessions for the identity). Logout without a successor is a plain 401 (no family revoke).
+- **Refresh reuse:** 10s grace after rotation returns the same successor token pair. L1 is a **process-local in-memory** cache only (never Redis / never the shared process `CacheBackend` when Redis-backed); durable `refresh_grace_payloads` is written in the same DB transaction as rotation (survives process restart and cross-instance L1 miss within grace). Within grace + payload miss → 401 with **no** family revoke and **no** successor re-rotate. Reuse outside grace **revokes that refresh family only** (not all sessions for the identity). Logout without a successor is a plain 401 (no family revoke).
 - **Login enumeration:** same `"Invalid credentials"` body for unknown identifier vs bad password; Argon2 verify always runs (dummy hash when no credential).
 - **Register:** may return 409 with distinct email/username conflict messages for UX; compensated by rate limits.
 - **Trusted client IP:** BFF sets `X-Aperture-Client-IP` + `X-Aperture-BFF-Secret` from the browser's forwarded IP and server env `AUTH_BFF_SHARED_SECRET`. API trusts the IP header only when the configured secret is non-empty and matches; otherwise uses the socket peer. Inbound `X-Forwarded-For` is ignored for rate limiting.
@@ -106,6 +106,6 @@ Cloud env is provisioned; secrets stay in host dashboards (never git). Local Com
 ## Future evolution
 
 - MFA, passkeys, device metadata, and login history extend Auth without moving profile fields into Auth.
-- When Redis lands, rate-limit counters move to the shared `CacheBackend` Redis implementation; DB counters may remain as durable audit/backup.
+- **P11 (deferred from P2.4):** migrate auth login/register/refresh rate-limit counters to the shared Redis `CacheBackend` (atomic `incr`); DB counters may remain as durable audit/backup. Until then Postgres counters stay authoritative (multi-instance-safe). Search IP RL already uses Redis in P2.4 (ADR-0006). Refresh-grace L1 stays process-local forever (tokens must not enter Redis).
 - Password reset / email verification await an email provider decision (out of scope here).
 - Genre/taste and richer profile onboarding ship with their own slices; Google users edit username/profile there like everyone else (after P1.3 name seeding).

@@ -5,6 +5,7 @@ import {
   buildUpstreamUrl,
   filterRequestHeaders,
   filterResponseHeaders,
+  injectTrustedClientIpHeaders,
   isDeniedProxyPath,
 } from '@/lib/bff-proxy';
 import { type NextRequest, NextResponse } from 'next/server';
@@ -35,6 +36,7 @@ async function proxyRequest(
   }
 
   const headers = filterRequestHeaders(request.headers);
+  injectTrustedClientIpHeaders(request, headers);
   // Inject Bearer from HttpOnly access cookie when the browser did not send one.
   if (!headers.has('authorization')) {
     const accessToken = request.cookies.get(accessCookieName())?.value;

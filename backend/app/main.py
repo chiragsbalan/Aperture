@@ -9,10 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.health import router as health_router
 from app.api.users import router as users_router
 from app.auth.api import router as auth_router
+from app.core.cache import init_cache, shutdown_cache
 from app.core.config import get_settings
 from app.core.db import dispose_db, init_db
 from app.core.logging import configure_logging
 from app.metadata.api import router as metadata_router
+from app.search.api import router as search_router
 
 
 @asynccontextmanager
@@ -20,9 +22,11 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan hook."""
     settings = get_settings()
     init_db(settings)
+    init_cache(settings.redis_url)
     try:
         yield
     finally:
+        await shutdown_cache()
         await dispose_db()
 
 
@@ -54,6 +58,7 @@ def create_app() -> FastAPI:
     api_v1.include_router(auth_router)
     api_v1.include_router(users_router)
     api_v1.include_router(metadata_router)
+    api_v1.include_router(search_router)
     app.include_router(api_v1)
 
     return app

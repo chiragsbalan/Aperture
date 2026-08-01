@@ -9,8 +9,13 @@ import {
   clearAuthCookieOptions,
   refreshCookieName,
 } from '@/lib/auth-cookies';
-import { UPSTREAM_FETCH_TIMEOUT_MS } from '@/lib/bff-proxy';
+import {
+  UPSTREAM_FETCH_TIMEOUT_MS,
+  injectTrustedClientIpHeaders,
+} from '@/lib/bff-proxy';
 import { type NextRequest, NextResponse } from 'next/server';
+
+export { clientIpFromRequest } from '@/lib/bff-proxy';
 
 export interface TokenPayload {
   access_token: string;
@@ -83,18 +88,6 @@ export function clearAuthCookiesIfRefreshUnchanged(
   return true;
 }
 
-/** First hop from `x-forwarded-for`, else null. */
-export function clientIpFromRequest(request: NextRequest): string | null {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) {
-    const first = forwarded.split(',')[0]?.trim();
-    if (first) {
-      return first.slice(0, 64);
-    }
-  }
-  return null;
-}
-
 /**
  * Forward JSON to the upstream auth API with trusted client-IP headers.
  *
@@ -107,14 +100,7 @@ export async function forwardAuthJson(
   init: RequestInit = {},
 ): Promise<Response> {
   const headers = new Headers(init.headers);
-  const clientIp = clientIpFromRequest(request);
-  if (clientIp) {
-    headers.set('X-Aperture-Client-IP', clientIp);
-  } else {
-    headers.delete('X-Aperture-Client-IP');
-  }
-  const secret = process.env.AUTH_BFF_SHARED_SECRET ?? '';
-  headers.set('X-Aperture-BFF-Secret', secret);
+  injectTrustedClientIpHeaders(request, headers);
 
   const base = upstreamApiBaseUrl();
   return fetch(`${base}${path}`, {

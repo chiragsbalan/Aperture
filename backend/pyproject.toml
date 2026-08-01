@@ -16,6 +16,7 @@ dependencies = [
   "pyjwt[crypto]>=2.13.0",
   "pydantic[email]>=2.13.4",
   "httpx>=0.28.0",
+  "redis>=8.1.0",
 ]
 
 [project.optional-dependencies]
@@ -83,9 +84,10 @@ containers = ["app"]
 # Higher may import lower. ``|`` marks independent siblings (no cross-imports).
 # Auth may call Users service; Users must not depend on Auth.
 # Users and Metadata are independent siblings.
+# Search sits with Auth (may import Metadata services; not Auth/Users).
 layers = [
   "api",
-  "auth",
+  "auth | search",
   "users | metadata",
   "common | core",
 ]
@@ -119,3 +121,19 @@ name = "Metadata must not import Auth"
 type = "forbidden"
 source_modules = ["app.metadata"]
 forbidden_modules = ["app.auth"]
+
+[[tool.importlinter.contracts]]
+name = "Search must not import Auth"
+type = "forbidden"
+source_modules = ["app.search"]
+forbidden_modules = ["app.auth"]
+
+# Search may import Metadata *services/schemas* only (not enforced transitively —
+# repository/models are pulled in by service). Keep Search → Metadata.service
+# as the public boundary in code review.
+
+[[tool.importlinter.contracts]]
+name = "Metadata must not import Search"
+type = "forbidden"
+source_modules = ["app.metadata"]
+forbidden_modules = ["app.search"]

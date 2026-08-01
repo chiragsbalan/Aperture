@@ -78,6 +78,15 @@ class Settings(BaseSettings):
     # Empty = fixture seed / image CDN only; live ``--source tmdb`` requires a key.
     tmdb_api_key: str = ''
 
+    # Search (P2.3). CacheBackend counters; Redis-backed in P2.4.
+    search_rate_limit_window_seconds: int = 60
+    search_rate_limit_max_per_ip: int = 60
+
+    # Redis (P2.4). Empty = in-memory CacheBackend (tests / local without Redis).
+    redis_url: str = ''
+    # Metadata detail cache TTL (seconds).
+    metadata_cache_ttl_seconds: int = 600
+
     @model_validator(mode='after')
     def validate_production_secrets(self) -> Self:
         """Require strong JWT + BFF secrets when ENVIRONMENT is production."""
