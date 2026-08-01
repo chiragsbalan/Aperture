@@ -1,0 +1,1 @@
+"""Aperture backend application package."""
