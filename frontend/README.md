@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Aperture frontend
 
-## Getting Started
+Next.js App Router shell (P0.5): design tokens, a11y baseline, and same-origin BFF proxy.
 
-First, run the development server:
+## Local
+
+Prefer Compose from the repo root (`make up`). Or:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## BFF proxy
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Browser and same-origin clients call:
 
-## Learn More
+```text
+/api/proxy/<fastapi-path>
+```
 
-To learn more about Next.js, take a look at the following resources:
+Examples: `/api/proxy/health/ready`, `/api/proxy/version`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The Route Handler forwards to FastAPI using server-only `API_URL` (falls back to `NEXT_PUBLIC_API_URL`). Browser cookies are not forwarded; the API stays cookie-agnostic.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Reserved auth cookie names (not set until P1): `__Host-ap_at`, `__Host-ap_rt` — see `src/lib/auth-cookies.ts`.
 
-## Deploy on Vercel
+## Design tokens
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+CSS variables live in `src/styles/tokens.css`. Dark theme is default (`data-theme="dark"` on `<html>`); light tokens are defined for a future toggle.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Accessibility
+
+```bash
+pnpm build
+pnpm exec playwright install chromium
+pnpm a11y
+```
+
+Scans the shell route with axe (WCAG 2 A/AA). Also runs in Frontend CI after build.
