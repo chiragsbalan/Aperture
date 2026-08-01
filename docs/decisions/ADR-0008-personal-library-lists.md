@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-08-02
 - **Related:** Lists LLD; Database Design (lists domain); [ADR-0004](ADR-0004-content-identity.md) (content refs); [ADR-0005](ADR-0005-auth.md) (AuthZ); PLAN.md P3; `phases/p3/work-breakdown.md`
-- **Implements in:** P3.1 (watchlist) and P3.2 (favorites); custom lists / reorder (P3.3) and diary / `watch_entries` (P3.4) build on this model without changing system-list rules
+- **Implements in:** P3.1 (watchlist), P3.2 (favorites), P3.3 (custom lists / reorder), P3.4 (diary / `watch_entries`)
 
 ## Context
 
@@ -54,14 +54,17 @@ Authenticated routes under `/api/v1/me/watchlist` and `/api/v1/me/favorites` (ge
 
 ## Consequences
 
-- Lists module sits beside Search/Auth in import-linter layers; may call Users + Metadata **services** only (not Metadata ingest/CLI/repository as a public boundary).
-- Caps for P3 MVP: ≤ **500** items per list; write rate limits keyed by identity via `CacheBackend`.
+- Lists module sits beside Search/Auth/`library` in import-linter layers; may call Users + Metadata **services** only (not Metadata ingest/CLI/repository as a public boundary).
+- Caps for P3 MVP: title ≤ 100; description ≤ 2000; ≤ **500** items per list; ≤ **50** custom lists per user; diary note ≤ 1000; write rate limits keyed by identity via `CacheBackend`.
 - Frontend detail actions send public `movie` | `tv` (map detail `tv_show` → `tv` before calling the API).
-- Custom lists (P3.3) reuse the same tables with `kind=custom`; system kinds remain undeletable via custom-list delete APIs.
+- Custom lists (P3.3) reuse the same tables with `kind=custom`; system kinds remain undeletable via custom-list APIs (mutate/contains/GET by id → **404**).
+- **Reorder (P3.3):** transaction + dense renumber to `0..n-1` under `lock_list` (not fractional indexing). Acceptable while lists stay capped at 500 items; documented in `lists` repository/service. Item delete compact-renumbers the same way.
+- **Diary (P3.4):** `watch_entries` lives in sibling package `backend/app/library/` (no lists↔library imports). Rewatches = additional rows; no unique on content. Optional `remove_from_watchlist` is orchestrated in the API layer as create-then-remove with a **single commit**.
+- Content-ref helpers live in `app.common.content_refs` (shared by lists + library).
 - OpenSearch hosting remains **ADR-0007** at P5 exit — this ADR does not consume that number.
 
 ## Future evolution
 
-- Fractional / sparse reorder positions (P3.3) — document approach in code or a short note if it diverges from Lists LLD §14.
+- Fractional / sparse reorder positions if renumber cost becomes measurable beyond the 500-item cap.
 - Optional FK from `list_items.content_id` → `content_items.id` if orphan cleanup becomes painful.
-- Public / unlisted list discovery is later; visibility enum exists early but private system lists are the P3.1/P3.2 default.
+- Public list discovery / trending shelves; visibility enum already supports `public` | `unlisted` | `private`.

@@ -6,8 +6,8 @@ import { usePathname } from 'next/navigation';
 const LINKS = [
   { href: '/library/watchlist', label: 'Watchlist' },
   { href: '/library/favorites', label: 'Favorites' },
-  { href: '/library/lists', label: 'Lists', disabled: true },
-  { href: '/library/diary', label: 'Diary', disabled: true },
+  { href: '/library/lists', label: 'Lists' },
+  { href: '/library/diary', label: 'Diary' },
 ] as const;
 
 export function LibraryNav() {
@@ -16,19 +16,9 @@ export function LibraryNav() {
   return (
     <nav aria-label="Library" className="mt-6 flex flex-wrap gap-4 text-sm">
       {LINKS.map((link) => {
-        if ('disabled' in link && link.disabled) {
-          return (
-            <span
-              key={link.href}
-              className="text-muted/70"
-              title="Coming soon"
-              aria-disabled="true"
-            >
-              {link.label}
-            </span>
-          );
-        }
-        const current = pathname === link.href;
+        const current =
+          pathname === link.href ||
+          (link.href === '/library/lists' && pathname.startsWith('/lists/'));
         return (
           <Link
             key={link.href}

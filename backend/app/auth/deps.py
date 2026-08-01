@@ -36,4 +36,26 @@ async def get_current_identity(
     )
 
 
+async def get_optional_identity(
+    settings: SettingsDep,
+    session: DbSessionDep,
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Depends(_bearer),
+    ],
+) -> Identity | None:
+    """Return identity when Authorization is present; None when missing.
+
+    Invalid or expired tokens still raise 401 (same as required auth).
+    """
+    if credentials is None or credentials.scheme.lower() != 'bearer':
+        return None
+    return await resolve_identity_from_access_token(
+        session,
+        settings=settings,
+        token=credentials.credentials,
+    )
+
+
 CurrentIdentityDep = Annotated[Identity, Depends(get_current_identity)]
+OptionalIdentityDep = Annotated[Identity | None, Depends(get_optional_identity)]

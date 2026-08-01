@@ -1,1 +1,1 @@
-"""Lists domain: watchlist, favorites, and (later) custom lists."""
+"""Lists domain: watchlist, favorites, and custom lists."""

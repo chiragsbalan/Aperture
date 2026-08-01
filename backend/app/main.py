@@ -7,6 +7,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.health import router as health_router
+from app.api.library import router as library_router
 from app.api.lists import router as lists_router
 from app.api.users import router as users_router
 from app.auth.api import router as auth_router
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     api_v1.include_router(auth_router)
     api_v1.include_router(users_router)
     api_v1.include_router(lists_router)
+    api_v1.include_router(library_router)
     api_v1.include_router(metadata_router)
     api_v1.include_router(search_router)
     app.include_router(api_v1)
