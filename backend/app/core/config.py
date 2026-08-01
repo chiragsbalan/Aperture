@@ -2,11 +2,26 @@
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Self
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_DIR = Path(__file__).resolve().parents[2]
 _REPO_ROOT = _BACKEND_DIR.parent
+
+# Exact matches (case-insensitive) rejected when ENVIRONMENT=production.
+_JWT_SECRET_PLACEHOLDERS = frozenset(
+    {
+        'change-me',
+        'secret',
+        'jwt-secret',
+        'your-secret-here',
+        'local-dev-only-change-me-before-any-real-use',
+        'test-jwt-secret-not-for-production-use-32b',
+        'unit-test-secret-at-least-32-bytes-long',
+    }
+)
 
 
 class Settings(BaseSettings):
@@ -31,6 +46,32 @@ class Settings(BaseSettings):
     # Comma-separated browser origins. Empty (default) = no CORS middleware;
     # browsers should use the Next.js BFF (`/api/proxy/...`), not the API directly.
     cors_origins: str = ''
+
+    # Auth (ADR-0005). Set a strong secret in production (Render dashboard).
+    jwt_secret: str
+    jwt_algorithm: str = 'HS256'
+    access_token_ttl_seconds: int = 900  # 15 minutes
+    refresh_token_ttl_seconds: int = 60 * 60 * 24 * 30  # 30 days
+
+    @model_validator(mode='after')
+    def validate_production_jwt_secret(self) -> Self:
+        """Require a strong JWT_SECRET when ENVIRONMENT is exactly production."""
+        if self.environment != 'production':
+            return self
+        secret = self.jwt_secret
+        if len(secret) < 32:
+            raise ValueError(
+                'JWT_SECRET must be at least 32 characters when ENVIRONMENT=production'
+            )
+        if secret.lower() in _JWT_SECRET_PLACEHOLDERS:
+            raise ValueError(
+                'JWT_SECRET must not be a known placeholder when ENVIRONMENT=production'
+            )
+        if 'change-me' in secret.lower():
+            raise ValueError(
+                'JWT_SECRET must not contain change-me when ENVIRONMENT=production'
+            )
+        return self
 
     def cors_origin_list(self) -> list[str]:
         """Parse ``cors_origins`` into a list of allowed origins.

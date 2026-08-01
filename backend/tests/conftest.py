@@ -10,6 +10,10 @@ os.environ.setdefault(
     'DATABASE_URL',
     'postgresql+asyncpg://aperture:aperture@localhost:5432/aperture',
 )
+os.environ.setdefault(
+    'JWT_SECRET',
+    'test-jwt-secret-not-for-production-use-32b',
+)
 
 import pytest
 from app.main import app

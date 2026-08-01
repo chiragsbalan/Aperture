@@ -12,6 +12,9 @@ dependencies = [
   "asyncpg>=0.30.0",
   "alembic>=1.18.5",
   "uuid-utils>=0.17.0",
+  "argon2-cffi>=25.1.0",
+  "pyjwt[crypto]>=2.13.0",
+  "pydantic[email]>=2.13.4",
 ]
 
 [project.optional-dependencies]
@@ -74,8 +77,23 @@ containers = ["app"]
 # Higher layers may import lower ones, not the reverse.
 # (domains) is optional until domain packages land; add forbidden/independence
 # contracts for cross-domain repository isolation when domains exist.
+# Higher may import lower. ``|`` marks independent siblings (no cross-imports).
+# Auth may call Users service; Users must not depend on Auth.
 layers = [
   "api",
-  "(domains)",
+  "auth",
+  "users",
   "common | core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Users must not import Auth"
+type = "forbidden"
+source_modules = ["app.users"]
+forbidden_modules = [
+  "app.auth",
+  "app.auth.repository",
+  "app.auth.service",
+  "app.auth.api",
+  "app.auth.models",
 ]

@@ -30,6 +30,19 @@ export function normalizeUpstreamBase(raw: string): string {
 }
 
 /**
+ * Paths the generic BFF proxy must not forward. Auth tokens are only minted
+ * via dedicated `/api/auth/*` routes.
+ */
+export function isDeniedProxyPath(pathParts: string[]): boolean {
+  return (
+    pathParts.length >= 3 &&
+    pathParts[0] === 'api' &&
+    pathParts[1] === 'v1' &&
+    pathParts[2] === 'auth'
+  );
+}
+
+/**
  * Build an upstream URL pinned to ``base``. Returns null when the path is
  * empty, traversal-like, or would escape the configured origin.
  */

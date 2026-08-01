@@ -4,7 +4,23 @@ import {
   buildUpstreamUrl,
   filterRequestHeaders,
   filterResponseHeaders,
+  isDeniedProxyPath,
 } from './bff-proxy';
+
+describe('isDeniedProxyPath', () => {
+  it('denies api/v1/auth and subpaths', () => {
+    expect(isDeniedProxyPath(['api', 'v1', 'auth'])).toBe(true);
+    expect(isDeniedProxyPath(['api', 'v1', 'auth', 'login'])).toBe(true);
+    expect(isDeniedProxyPath(['api', 'v1', 'auth', 'refresh'])).toBe(true);
+  });
+
+  it('allows health, version, and other api paths', () => {
+    expect(isDeniedProxyPath(['health', 'ready'])).toBe(false);
+    expect(isDeniedProxyPath(['version'])).toBe(false);
+    expect(isDeniedProxyPath(['api', 'v1', 'users'])).toBe(false);
+    expect(isDeniedProxyPath(['api', 'v1'])).toBe(false);
+  });
+});
 
 describe('buildUpstreamUrl', () => {
   const base = 'http://api:8000';

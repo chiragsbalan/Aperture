@@ -31,8 +31,11 @@ Browsers must authenticate to FastAPI without exposing long-lived secrets to Jav
 
 - Auth module owns **identity** + **refresh sessions**; Users module owns profile (username, bio, preferences).
 - Credentials and provider links live in **`identity_credentials`** (password hash and/or OAuth subject per provider).
+- **Password registration (P1.1):** email + **username** + password in one transaction (identity + credential + `users` row). Username is Users-owned, required at signup, unique, normalized lowercase, `[a-z0-9_]{3,32}`.
+- **Password login (P1.1):** a single **identifier** field accepts **email or username** plus password. Resolution: if the identifier contains `@`, treat as email (normalized); otherwise look up `users.username` → identity. Same generic error for unknown identifier vs bad password (enumeration polish in P1.2).
 - **OAuth (Google in P1.3): no auto-link** by email. First Google sign-in creates or uses an OAuth identity path per product rules; linking an existing password account requires an **explicit authenticated link** from settings.
 - Future providers (Apple, GitHub, passkeys) extend the same tables without collapsing into Supabase Auth.
+- **P1.4** adds username rename / bio / preferences UI; it does not invent the username concept (already set at register).
 
 ### Rate limiting before Redis
 
@@ -55,7 +58,7 @@ Browsers must authenticate to FastAPI without exposing long-lived secrets to Jav
 
 ## Consequences
 
-- P1.1 ships register/login/logout/refresh on the public URL using the BFF cookie names already reserved in `frontend/src/lib/auth-cookies.ts`.
+- P1.1 ships register (email + username + password) / login (email **or** username + password) / logout / refresh on the public URL using the BFF cookie names already reserved in `frontend/src/lib/auth-cookies.ts`.
 - Refresh rotation tests must cover the 10s grace window and reuse-outside-grace behavior.
 - Google OAuth needs app credentials (user-supplied) and explicit link UX in settings.
 - Multi-instance deploy waits on Redis (ADR-0006); until then sticky single-instance rate limits are acceptable.

@@ -1,9 +1,11 @@
 import { upstreamApiBaseUrl } from '@/lib/api';
+import { accessCookieName } from '@/lib/auth-cookies';
 import {
   UPSTREAM_FETCH_TIMEOUT_MS,
   buildUpstreamUrl,
   filterRequestHeaders,
   filterResponseHeaders,
+  isDeniedProxyPath,
 } from '@/lib/bff-proxy';
 import { type NextRequest, NextResponse } from 'next/server';
 
@@ -13,6 +15,10 @@ async function proxyRequest(
   request: NextRequest,
   pathParts: string[],
 ): Promise<NextResponse> {
+  if (isDeniedProxyPath(pathParts)) {
+    return NextResponse.json({ detail: 'Not found' }, { status: 404 });
+  }
+
   let base: string;
   try {
     base = upstreamApiBaseUrl();
@@ -29,6 +35,13 @@ async function proxyRequest(
   }
 
   const headers = filterRequestHeaders(request.headers);
+  // Inject Bearer from HttpOnly access cookie when the browser did not send one.
+  if (!headers.has('authorization')) {
+    const accessToken = request.cookies.get(accessCookieName())?.value;
+    if (accessToken) {
+      headers.set('authorization', `Bearer ${accessToken}`);
+    }
+  }
 
   const init: RequestInit = {
     method: request.method,

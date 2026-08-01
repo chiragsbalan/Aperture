@@ -26,7 +26,14 @@ services:
         value: INFO
       - key: API_V1_PREFIX
         value: /api/v1
+      - key: ACCESS_TOKEN_TTL_SECONDS
+        value: '900'
+      - key: REFRESH_TOKEN_TTL_SECONDS
+        value: '2592000'
       # Set in the Render dashboard (Supabase session pooler + asyncpg):
       # postgresql+asyncpg://...@...pooler.supabase.com:5432/postgres
       - key: DATABASE_URL
+        sync: false
+      # Strong random secret for access JWTs (generate once; never commit).
+      - key: JWT_SECRET
         sync: false

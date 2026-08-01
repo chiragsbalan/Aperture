@@ -36,6 +36,9 @@ services:
       # Always use the Compose service hostname (root .env DATABASE_URL is for host runs).
       # Keep POSTGRES_USER/PASSWORD URL-safe (no @ : / #) or encode them yourself.
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aperture}:${POSTGRES_PASSWORD:-aperture}@db:5432/${POSTGRES_DB:-aperture}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-only-change-me-before-any-real-use}
+      ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS:-900}
+      REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS:-2592000}
     depends_on:
       db:
         condition: service_healthy

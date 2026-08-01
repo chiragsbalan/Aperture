@@ -11,15 +11,16 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
+
+# Import models here so ``Base.metadata`` is complete for autogenerate.
+from app.auth import models as _auth_models  # noqa: F401
 from app.core.base import Base
 from app.core.config import get_settings
 from app.core.db_ssl import asyncpg_connect_args
+from app.users import models as _users_models  # noqa: F401
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
-# Import models here so ``Base.metadata`` is complete for autogenerate.
-# Domain models arrive in later phases; keep this list growing with them.
 
 config = context.config
 
