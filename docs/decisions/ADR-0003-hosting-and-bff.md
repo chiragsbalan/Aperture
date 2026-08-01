@@ -45,6 +45,7 @@ Browser auth remains same-origin Next.js BFF with `__Host-` cookies (backend coo
 
 ## Future evolution
 
-- Document `DATABASE_URL` vs migrate URL (pooler modes) in `.env.example` at P0.6.
+- `.env.example` documents Supabase session-pooler `DATABASE_URL` shape and Vercel `API_URL` (P0.6).
+- Render migrate-on-deploy uses the same `DATABASE_URL` (session pooler) via `backend/docker/start.sh`.
 - When upgrading off free tiers, supersede this ADR (or add ADR-0003a) with the new provider mix.
 - Redis (P2) hosting choice is out of scope here.
