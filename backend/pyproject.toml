@@ -87,7 +87,7 @@ containers = ["app"]
 # Search sits with Auth (may import Metadata services; not Auth/Users).
 layers = [
   "api",
-  "auth | search",
+  "auth | search | lists",
   "users | metadata",
   "common | core",
 ]
@@ -137,3 +137,38 @@ name = "Metadata must not import Search"
 type = "forbidden"
 source_modules = ["app.metadata"]
 forbidden_modules = ["app.search"]
+
+[[tool.importlinter.contracts]]
+name = "Lists must not import Auth"
+type = "forbidden"
+source_modules = ["app.lists"]
+forbidden_modules = ["app.auth"]
+
+[[tool.importlinter.contracts]]
+name = "Lists must not import Search"
+type = "forbidden"
+source_modules = ["app.lists"]
+forbidden_modules = ["app.search"]
+
+# Lists may import Metadata *service* only (repository is pulled in transitively
+# by service — same as Search). Keep Lists → Metadata.service as the boundary.
+[[tool.importlinter.contracts]]
+name = "Lists must not import Metadata ingest or CLI"
+type = "forbidden"
+source_modules = ["app.lists"]
+forbidden_modules = [
+  "app.metadata.ingest",
+  "app.metadata.cli",
+]
+
+[[tool.importlinter.contracts]]
+name = "Metadata must not import Lists"
+type = "forbidden"
+source_modules = ["app.metadata"]
+forbidden_modules = ["app.lists"]
+
+[[tool.importlinter.contracts]]
+name = "Users must not import Lists"
+type = "forbidden"
+source_modules = ["app.users"]
+forbidden_modules = ["app.lists"]

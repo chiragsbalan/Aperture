@@ -101,6 +101,15 @@ export function SiteHeader() {
         {authState === 'signed_in' ? (
           <>
             <Link
+              href="/library/watchlist"
+              aria-current={
+                pathname.startsWith('/library') ? 'page' : undefined
+              }
+              className="text-muted transition hover:text-foreground"
+            >
+              Library
+            </Link>
+            <Link
               href="/account"
               aria-current={pathname === '/account' ? 'page' : undefined}
               className="text-muted transition hover:text-foreground"

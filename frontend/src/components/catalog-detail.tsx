@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { LibraryActions } from '@/components/library-actions';
 import type {
   CreditPersonRef,
   MovieDetail,
@@ -211,6 +212,7 @@ export function MovieDetailView({ movie }: { movie: MovieDetail }) {
             ) : null}
             {movie.status ? <MetaLine>{movie.status}</MetaLine> : null}
           </div>
+          <LibraryActions contentType={movie.type} contentId={movie.id} />
           {movie.overview ? (
             <p className="mt-6 whitespace-pre-wrap text-foreground">
               {movie.overview}
@@ -254,6 +256,7 @@ export function TvDetailView({ show }: { show: TvDetail }) {
             ) : null}
             {show.status ? <MetaLine>{show.status}</MetaLine> : null}
           </div>
+          <LibraryActions contentType={show.type} contentId={show.id} />
           {show.overview ? (
             <p className="mt-6 whitespace-pre-wrap text-foreground">
               {show.overview}

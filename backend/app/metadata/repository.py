@@ -435,6 +435,50 @@ async def upsert_credit(
     return credit
 
 
+async def get_content_items_by_refs(
+    session: AsyncSession,
+    *,
+    refs: list[tuple[str, uuid.UUID]],
+) -> list[ContentItem]:
+    """Load content items matching ``(content_type, id)`` pairs.
+
+    Loads movie/TV subtype rows for year extraction; no credits.
+    """
+    if not refs:
+        return []
+    content_ids = [content_id for _, content_id in refs]
+    result = await session.execute(
+        select(ContentItem)
+        .where(ContentItem.id.in_(content_ids))
+        .options(
+            selectinload(ContentItem.movie),
+            selectinload(ContentItem.tv_show),
+        )
+    )
+    wanted = set(refs)
+    return [
+        item
+        for item in result.scalars().all()
+        if (item.content_type, item.id) in wanted
+    ]
+
+
+async def content_item_exists(
+    session: AsyncSession,
+    *,
+    content_type: str,
+    content_id: uuid.UUID,
+) -> bool:
+    """Return True when a content item exists with the given type + id."""
+    result = await session.execute(
+        select(ContentItem.id).where(
+            ContentItem.id == content_id,
+            ContentItem.content_type == content_type,
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
 async def list_sample_content_ids(
     session: AsyncSession,
     *,

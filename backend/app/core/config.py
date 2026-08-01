@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     search_rate_limit_window_seconds: int = 60
     search_rate_limit_max_per_ip: int = 60
 
+    # Lists writes (P3). CacheBackend counters; Redis-backed when available.
+    lists_rate_limit_window_seconds: int = 60
+    lists_rate_limit_max_writes: int = 60
+
     # Redis (P2.4). Empty = in-memory CacheBackend (tests / local without Redis).
     redis_url: str = ''
     # Metadata detail cache TTL (seconds).
