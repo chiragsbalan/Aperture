@@ -48,11 +48,14 @@ Useful checks:
 ```bash
 make lint
 make typecheck
-make import-lint          # modular-monolith import contracts
+make import-lint          # minimal layering contracts (expand when domains land)
 make alembic-heads        # single Alembic head (stub until P0.4)
 make test                 # unit tests (DB mocked for readiness)
 make test-integration     # needs Postgres (e.g. docker compose up -d db)
-make ci                   # lint + types + import-lint + alembic-heads + unit tests
+make frontend-build
+make docker-build         # needs Docker
+# Full local parity with required GitHub checks (needs Postgres + Docker):
+docker compose up -d db && make ci
 ```
 
 Optional pre-commit hooks:
@@ -67,11 +70,11 @@ Optional Dev Container: open the repo in a VS Code/Cursor Dev Container (`.devco
 
 Every PR and push to `main` runs GitHub Actions (`.github/workflows/ci.yml`):
 
-- **Backend** — Ruff, mypy, import-linter, Alembic single-head gate, unit + integration tests (CI Postgres)
+- **Backend** — Ruff, mypy, import-linter, Alembic single-head gate, unit + integration tests (ephemeral CI Postgres; throwaway creds only)
 - **Frontend** — ESLint, Prettier, `tsc`, Next.js build
-- **Docker** — backend image build
+- **Docker** — backend image build (cache write on push only)
 
-Required check names and branch-protection settings: [`.github/README.md`](.github/README.md).
+Required check names and branch-protection settings: [`.github/README.md`](.github/README.md). Local mirror: `make ci`.
 
 ## Layout
 

@@ -10,23 +10,26 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-BACKEND_DIR = Path(__file__).resolve().parents[1]
-ALEMBIC_INI = BACKEND_DIR / 'alembic.ini'
-VERSIONS_DIR = BACKEND_DIR / 'migrations' / 'versions'
+DEFAULT_BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 
-def _has_revisions() -> bool:
-    if not VERSIONS_DIR.is_dir():
+def has_revisions(versions_dir: Path) -> bool:
+    """Return True when migration revision modules exist under versions_dir."""
+    if not versions_dir.is_dir():
         return False
     return any(
         path.is_file() and path.name != '__init__.py' and path.suffix == '.py'
-        for path in VERSIONS_DIR.iterdir()
+        for path in versions_dir.iterdir()
     )
 
 
-def main() -> int:
+def check_alembic_heads(backend_dir: Path | None = None) -> int:
     """Return 0 when a single head exists or Alembic is not configured yet."""
-    if not ALEMBIC_INI.is_file() or not _has_revisions():
+    root = backend_dir if backend_dir is not None else DEFAULT_BACKEND_DIR
+    alembic_ini = root / 'alembic.ini'
+    versions_dir = root / 'migrations' / 'versions'
+
+    if not alembic_ini.is_file() or not has_revisions(versions_dir):
         print(
             'Alembic single-head check: skipped '
             '(not configured yet; expected until P0.4).'
@@ -43,7 +46,7 @@ def main() -> int:
         )
         return 1
 
-    config = Config(str(ALEMBIC_INI))
+    config = Config(str(alembic_ini))
     script = ScriptDirectory.from_config(config)
     heads = script.get_heads()
     if len(heads) != 1:
@@ -55,6 +58,11 @@ def main() -> int:
 
     print(f'Alembic single head OK: {heads[0]}')
     return 0
+
+
+def main() -> int:
+    """CLI entrypoint."""
+    return check_alembic_heads()
 
 
 if __name__ == '__main__':
