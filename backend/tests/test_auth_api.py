@@ -629,6 +629,7 @@ async def test_concurrent_failed_attempt_upsert_is_safe(
     init_db(settings)
     subject = f'ip:concurrent-{uuid.uuid4().hex}'
     try:
+
         async def _bump() -> None:
             async with session_scope() as session:
                 await auth_repository.upsert_failed_attempt(
