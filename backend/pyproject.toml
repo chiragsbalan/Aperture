@@ -68,8 +68,10 @@ root_package = "app"
 name = "Layered modular monolith"
 type = "layers"
 containers = ["app"]
+# Minimal P0 contract — not full modular-monolith enforcement yet.
 # Higher layers may import lower ones, not the reverse.
-# (domains) is optional until domain packages land in later phases.
+# (domains) is optional until domain packages land; add forbidden/independence
+# contracts for cross-domain repository isolation when domains exist.
 layers = [
   "api",
   "(domains)",

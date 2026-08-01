@@ -1,4 +1,4 @@
-.PHONY: help install lint typecheck import-lint alembic-heads test test-integration ci up down logs migrate dev-api dev-web
+.PHONY: help install lint typecheck import-lint alembic-heads test test-integration frontend-build docker-build ci up down logs migrate dev-api dev-web
 
 help:
 	@echo "Aperture targets:"
@@ -9,7 +9,9 @@ help:
 	@echo "  make alembic-heads     - single Alembic head gate (stub until P0.4)"
 	@echo "  make test              - unit tests (no Postgres required)"
 	@echo "  make test-integration  - readiness vs Postgres (docker compose up -d db)"
-	@echo "  make ci                - lint + types + import-lint + alembic-heads + unit tests"
+	@echo "  make frontend-build    - Next.js production build"
+	@echo "  make docker-build      - build backend Docker image"
+	@echo "  make ci                - full local parity with GitHub CI jobs"
 	@echo "  make up                - docker compose up --build -d"
 	@echo "  make down              - docker compose down"
 	@echo "  make logs              - docker compose logs -f"
@@ -43,7 +45,14 @@ test:
 test-integration:
 	cd backend && uv run pytest -m integration
 
-ci: lint typecheck import-lint alembic-heads test
+frontend-build:
+	cd frontend && NEXT_PUBLIC_API_URL=http://localhost:8000 pnpm build
+
+docker-build:
+	docker build -f backend/docker/Dockerfile -t aperture-api:local backend
+
+# Mirrors required GitHub checks: Backend + Frontend + Docker (integration needs Postgres).
+ci: lint typecheck import-lint alembic-heads test test-integration frontend-build docker-build
 
 dev-api:
 	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
