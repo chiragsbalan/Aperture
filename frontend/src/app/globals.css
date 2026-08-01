@@ -30,10 +30,6 @@
 }
 
 @layer utilities {
-  .font-display {
-    font-family: var(--font-display);
-  }
-
   .shell-atmosphere {
     background:
       radial-gradient(120% 80% at 50% -10%, var(--bg-glow-1), transparent 55%),

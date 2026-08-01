@@ -10,15 +10,26 @@ export interface ApiHealth {
   error: string | null;
 }
 
+const CLIENT_FETCH_TIMEOUT_MS = 12_000;
+
 /**
  * Upstream FastAPI base URL for server-side BFF proxying only.
- * Browser code should call same-origin `/api/proxy/...` instead.
+ *
+ * Requires server-only ``API_URL``. In non-production, falls back to
+ * ``NEXT_PUBLIC_API_URL`` for local DX only — never rely on the public var in
+ * production Compose/cloud.
  */
 export function upstreamApiBaseUrl(): string {
   const raw =
-    process.env.API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    'http://localhost:8000';
+    process.env.API_URL?.trim() ||
+    (process.env.NODE_ENV !== 'production'
+      ? process.env.NEXT_PUBLIC_API_URL?.trim()
+      : undefined);
+
+  if (!raw) {
+    throw new Error('API_URL is not configured');
+  }
+
   return raw.replace(/\/$/, '');
 }
 
@@ -38,10 +49,12 @@ async function readJson<T>(res: Response): Promise<T | null> {
 export async function fetchApiHealthViaBff(
   fetchImpl: typeof fetch = fetch,
 ): Promise<ApiHealth> {
+  const signal = AbortSignal.timeout(CLIENT_FETCH_TIMEOUT_MS);
+
   try {
     const [readyRes, versionRes] = await Promise.all([
-      fetchImpl('/api/proxy/health/ready', { cache: 'no-store' }),
-      fetchImpl('/api/proxy/version', { cache: 'no-store' }),
+      fetchImpl('/api/proxy/health/ready', { cache: 'no-store', signal }),
+      fetchImpl('/api/proxy/version', { cache: 'no-store', signal }),
     ]);
 
     const version = await readJson<ApiVersion>(versionRes);

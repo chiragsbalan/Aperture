@@ -47,6 +47,37 @@ async function waitForServer(url, attempts = 60) {
   throw new Error(`Server did not become ready at ${url}`);
 }
 
+function stopProcessTree(child) {
+  if (!child.pid) {
+    return;
+  }
+  try {
+    // Spawned with detached:true so pid is the process-group leader.
+    process.kill(-child.pid, 'SIGTERM');
+  } catch {
+    try {
+      child.kill('SIGTERM');
+    } catch {
+      // already gone
+    }
+  }
+}
+
+async function forceKillProcessTree(child) {
+  if (!child.pid) {
+    return;
+  }
+  try {
+    process.kill(-child.pid, 'SIGKILL');
+  } catch {
+    try {
+      child.kill('SIGKILL');
+    } catch {
+      // already gone
+    }
+  }
+}
+
 async function main() {
   if (!(await portFree(PORT))) {
     throw new Error(`Port ${PORT} is already in use`);
@@ -65,6 +96,7 @@ async function main() {
         API_URL: process.env.API_URL ?? 'http://127.0.0.1:9',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
     },
   );
 
@@ -73,6 +105,7 @@ async function main() {
     stderr += String(chunk);
   });
 
+  let failed = false;
   try {
     await waitForServer(BASE_URL);
 
@@ -89,6 +122,7 @@ async function main() {
     await browser.close();
 
     if (results.violations.length > 0) {
+      failed = true;
       console.error('Accessibility violations:');
       for (const violation of results.violations) {
         console.error(`\n[${violation.id}] ${violation.help}`);
@@ -100,17 +134,18 @@ async function main() {
         }
       }
       process.exitCode = 1;
-      return;
+    } else {
+      console.log('a11y: no axe violations on shell route');
     }
-
-    console.log('a11y: no axe violations on shell route');
+  } catch (err) {
+    failed = true;
+    process.exitCode = 1;
+    throw err;
   } finally {
-    child.kill('SIGTERM');
-    await delay(300);
-    if (!child.killed) {
-      child.kill('SIGKILL');
-    }
-    if (process.exitCode && process.exitCode !== 0 && stderr) {
+    stopProcessTree(child);
+    await delay(400);
+    await forceKillProcessTree(child);
+    if (failed && stderr) {
       console.error(stderr);
     }
   }

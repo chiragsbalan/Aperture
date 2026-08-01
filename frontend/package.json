@@ -13,6 +13,7 @@
     "lint": "next lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "test": "vitest run",
     "a11y": "node scripts/a11y.mjs"
   },
   "dependencies": {
@@ -34,6 +35,7 @@
     "postcss": "^8",
     "prettier": "^3.9.6",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

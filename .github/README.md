@@ -7,7 +7,7 @@ Workflow: [`.github/workflows/ci.yml`](workflows/ci.yml)
 | Check name | Job |
 |---|---|
 | `Backend` | lint, types, import-linter, Alembic head gate, unit + integration tests |
-| `Frontend` | ESLint, Prettier, `tsc`, Next.js build, axe shell a11y |
+| `Frontend` | ESLint, Prettier, `tsc`, unit tests, Next.js build, axe shell a11y |
 | `Docker` | backend image build |
 
 These exact names must be listed as **required status checks** on `main`.

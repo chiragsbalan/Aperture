@@ -26,7 +26,7 @@ export function ShellHealth() {
 
   if (state === 'loading' || health === null) {
     return (
-      <p className="motion-fade-in text-[var(--color-fg-muted)]" role="status">
+      <p className="motion-fade-in text-muted" role="status" aria-live="polite">
         Checking API…
       </p>
     );
@@ -38,12 +38,15 @@ export function ShellHealth() {
   const statusLabel = health.ready ? 'API ready' : 'API not ready';
 
   return (
-    <div className="motion-fade-in flex flex-col items-center gap-2 text-sm">
+    <div
+      className="motion-fade-in flex flex-col items-center gap-2 text-sm"
+      aria-live="polite"
+    >
       <p className={`status-pulse ${statusClass}`} role="status">
         {statusLabel}
       </p>
       {health.version ? (
-        <p className="text-[var(--color-fg-muted)]">
+        <p className="text-muted">
           {health.version.name} {health.version.version}
           <span aria-hidden="true"> · </span>
           <span className="sr-only">Environment: </span>

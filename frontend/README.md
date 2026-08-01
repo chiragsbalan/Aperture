@@ -31,12 +31,13 @@ Reserved auth cookie names (not set until P1): `__Host-ap_at`, `__Host-ap_rt` â€
 
 CSS variables live in `src/styles/tokens.css`. Dark theme is default (`data-theme="dark"` on `<html>`); light tokens are defined for a future toggle.
 
-## Accessibility
+## Tests & accessibility
 
 ```bash
+pnpm test                 # vitest (BFF helpers + health client)
 pnpm build
 pnpm exec playwright install chromium
-pnpm a11y
+pnpm a11y                 # axe scan of the shell route
 ```
 
-Scans the shell route with axe (WCAG 2 A/AA). Also runs in Frontend CI after build.
+Both `pnpm test` and `pnpm a11y` run in Frontend CI.
