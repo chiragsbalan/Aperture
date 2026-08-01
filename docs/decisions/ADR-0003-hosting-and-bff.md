@@ -26,6 +26,8 @@ Browser auth remains same-origin Next.js BFF with `__Host-` cookies (backend coo
 
 **Migrations:** run against Supabase (`DATABASE_URL`; prefer pooler/session settings documented in `.env.example`). Account for Free API sleep and possible Free project pause when automating migrate-on-deploy.
 
+**Supabase TLS (asyncpg):** remote hosts enable TLS with Postgres **`sslmode=require` semantics** — encrypt, do not verify the CA chain (`app/core/db_ssl.py`). Full verify (`ssl=True` / verify-full) fails against the Supabase pooler chain (`CERTIFICATE_VERIFY_FAILED: self-signed certificate in certificate chain`) and breaks Render migrate-on-start. Prefer the **session pooler** URI (port **5432**), not the transaction pooler (6543), for Alembic DDL. Do not rely on `?ssl=require` query params with `postgresql+asyncpg`.
+
 ## Alternatives considered
 
 1. **Paid Render API + Paid Render Postgres** — always-on + managed backups; rejected for early phases to keep cost at $0.
@@ -46,6 +48,7 @@ Browser auth remains same-origin Next.js BFF with `__Host-` cookies (backend coo
 ## Future evolution
 
 - `.env.example` documents Supabase session-pooler `DATABASE_URL` shape and Vercel `API_URL` (P0.6).
-- Render migrate-on-deploy uses the same `DATABASE_URL` (session pooler) via `backend/docker/start.sh`.
+- Render migrate-on-deploy uses the same `DATABASE_URL` (session pooler) via `backend/docker/start.sh`; API Settings also require `JWT_SECRET` (and production `AUTH_BFF_SHARED_SECRET` once Google/BFF IP trust is enabled — see [ADR-0005](ADR-0005-auth.md)).
 - When upgrading off free tiers, supersede this ADR (or add ADR-0003a) with the new provider mix.
 - Redis intro timing and search staging are in [ADR-0006](ADR-0006-redis-search-staging.md); Redis cloud provider/tier chosen at P2.4 implementation.
+- Optional later: pin Supabase CA and move to verify-full if the pooler chain becomes reliably verifiable in the API image.
