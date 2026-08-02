@@ -472,7 +472,7 @@ export function AuthForm({ mode, initialError = null }: AuthFormProps) {
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-[var(--radius-md)] bg-[var(--color-accent)] px-4 py-2.5 text-base font-medium text-[#1a140c] transition hover:brightness-110 disabled:opacity-60 sm:text-[0.9375rem]"
+          className="w-full rounded-[var(--radius-md)] bg-[var(--color-accent)] px-4 py-2.5 text-base font-medium text-[var(--color-accent-contrast)] transition hover:brightness-110 disabled:opacity-60 sm:text-[0.9375rem]"
         >
           {pending ? 'Please wait…' : submitLabel}
         </button>

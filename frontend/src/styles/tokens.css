@@ -7,20 +7,27 @@
 [data-theme='dark'] {
   color-scheme: dark;
 
-  /* Brand / surfaces — cinematic charcoal, warm amber accent */
+  /* Brand / surfaces — cinematic charcoal, leaf-green accent */
   --color-bg: #0c0b09;
   --color-bg-elevated: #161411;
   --color-fg: #f3efe6;
   --color-fg-muted: #a39e93;
-  --color-accent: #e0a45c;
-  --color-accent-soft: rgba(224, 164, 92, 0.16);
+  --color-accent: #6aae6a;
+  --color-accent-soft: rgba(106, 174, 106, 0.16);
+  --color-accent-contrast: #0c0b09;
   --color-border: rgba(243, 239, 230, 0.12);
-  --color-focus: #f0c48a;
-  --color-danger: #f07178;
+  --color-focus: #9fd49f;
+  --color-danger: #e07a8a;
   --color-ok: #8fbf9f;
 
-  /* Atmosphere */
-  --bg-glow-1: rgba(224, 164, 92, 0.14);
+  /* Library action semantics (seed the brand system) */
+  --color-action-watchlist: #c9b07a;
+  --color-action-favorites: #e07a8a;
+  --color-action-lists: #6a9ec9;
+  --color-action-log: #6aae6a;
+
+  /* Atmosphere — cool/neutral wash only; green stays on UI accents */
+  --bg-glow-1: rgba(120, 132, 148, 0.12);
   --bg-glow-2: rgba(80, 110, 140, 0.1);
   --bg-vignette: rgba(0, 0, 0, 0.55);
 
@@ -62,14 +69,20 @@
   --color-bg-elevated: #fffdf8;
   --color-fg: #1a1712;
   --color-fg-muted: #5c564c;
-  --color-accent: #b56b1e;
-  --color-accent-soft: rgba(181, 107, 30, 0.12);
+  --color-accent: #3d7a45;
+  --color-accent-soft: rgba(61, 122, 69, 0.12);
+  --color-accent-contrast: #f6f1e8;
   --color-border: rgba(26, 23, 18, 0.12);
-  --color-focus: #8a4f10;
+  --color-focus: #2f6f3e;
   --color-danger: #b42318;
   --color-ok: #2f6f4e;
 
-  --bg-glow-1: rgba(181, 107, 30, 0.12);
+  --color-action-watchlist: #9a7a3a;
+  --color-action-favorites: #c45c6a;
+  --color-action-lists: #3d6f94;
+  --color-action-log: #3d7a45;
+
+  --bg-glow-1: rgba(100, 112, 128, 0.1);
   --bg-glow-2: rgba(90, 120, 150, 0.08);
   --bg-vignette: rgba(26, 23, 18, 0.08);
 }

@@ -3,7 +3,7 @@
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { oauthErrorMessage } from '@/lib/google-oauth-errors';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 interface MeResponse {
@@ -27,9 +27,31 @@ function providerLabel(provider: 'password' | 'google'): string {
 }
 
 export function AccountPanel() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryError = oauthErrorMessage(searchParams.get('error'));
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    setLogoutError(null);
+    try {
+      const res = await fetch('/api/auth/logout', { method: 'POST' });
+      if (!res.ok) {
+        setLogoutError(`Could not log out (HTTP ${res.status}).`);
+        return;
+      }
+      router.push('/login');
+      router.refresh();
+    } catch {
+      setLogoutError('Could not log out. Please try again.');
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -153,22 +175,41 @@ export function AccountPanel() {
         </div>
       </dl>
 
-      <p className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted">
+      <nav aria-label="Account" className="space-y-1">
+        <Link
+          href="/library/watchlist"
+          aria-current={pathname.startsWith('/library') ? 'page' : undefined}
+          className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3 text-foreground transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
+        >
+          Library
+          <span className="text-sm text-muted">Watchlist & lists</span>
+        </Link>
+        <Link
+          href="/account"
+          aria-current={pathname === '/account' ? 'page' : undefined}
+          className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-accent-soft)] px-4 py-3 text-foreground"
+        >
+          Account
+          <span className="text-sm text-muted">This page</span>
+        </Link>
         <Link
           href="/settings"
-          className="text-foreground underline-offset-2 hover:underline"
+          aria-current={pathname === '/settings' ? 'page' : undefined}
+          className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3 text-foreground transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
         >
           Settings
+          <span className="text-sm text-muted">Profile & preferences</span>
         </Link>
         {username ? (
           <Link
             href={`/u/${encodeURIComponent(username)}`}
-            className="text-foreground underline-offset-2 hover:underline"
+            className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3 text-foreground transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
           >
             Public profile
+            <span className="text-sm text-muted">@{username}</span>
           </Link>
         ) : null}
-      </p>
+      </nav>
 
       {!hasGoogle ? (
         <p className="text-sm text-muted">
@@ -182,6 +223,23 @@ export function AccountPanel() {
       ) : (
         <p className="text-sm text-muted">Google is linked to this account.</p>
       )}
+
+      {logoutError ? (
+        <p role="alert" className="text-sm text-[var(--color-danger)]">
+          {logoutError}
+        </p>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={() => {
+          void handleLogout();
+        }}
+        disabled={loggingOut}
+        className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-2.5 text-foreground transition hover:border-[var(--color-accent)] disabled:opacity-60"
+      >
+        {loggingOut ? 'Logging out…' : 'Log out'}
+      </button>
     </div>
   );
 }

@@ -1,7 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 
 import {
   addCustomListItem,
@@ -25,6 +32,167 @@ function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function BookmarkIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className="h-7 w-7 sm:h-8 sm:w-8"
+    >
+      <path d="M7 4.5h10A1.5 1.5 0 0 1 18.5 6v14.25L12 16.5l-6.5 3.75V6A1.5 1.5 0 0 1 7 4.5z" />
+    </svg>
+  );
+}
+
+function HeartIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className="h-7 w-7 sm:h-8 sm:w-8"
+    >
+      <path d="M12 20.25S3.75 15 3.75 9.75A4.5 4.5 0 0 1 12 7.5a4.5 4.5 0 0 1 8.25 2.25C20.25 15 12 20.25 12 20.25z" />
+    </svg>
+  );
+}
+
+function ListIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className="h-7 w-7 sm:h-8 sm:w-8"
+    >
+      <path d="M9 7h11M9 12h11M9 17h11" />
+      <rect
+        x="3.5"
+        y="5.5"
+        width="3"
+        height="3"
+        rx="0.6"
+        fill={filled ? 'currentColor' : 'none'}
+      />
+      <rect
+        x="3.5"
+        y="10.5"
+        width="3"
+        height="3"
+        rx="0.6"
+        fill={filled ? 'currentColor' : 'none'}
+      />
+      <rect
+        x="3.5"
+        y="15.5"
+        width="3"
+        height="3"
+        rx="0.6"
+        fill={filled ? 'currentColor' : 'none'}
+      />
+    </svg>
+  );
+}
+
+function LoggedIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className="h-7 w-7 sm:h-8 sm:w-8"
+    >
+      <circle cx="12" cy="12" r="8.25" />
+      <path
+        d="M8.5 12.25l2.4 2.4 4.6-4.9"
+        fill="none"
+        stroke={filled ? 'var(--color-accent-contrast)' : 'currentColor'}
+      />
+    </svg>
+  );
+}
+
+type ActionTone = 'watchlist' | 'favorites' | 'lists' | 'log';
+
+const ACTION_TONE_CLASS: Record<ActionTone, string> = {
+  watchlist: 'library-action-watchlist',
+  favorites: 'library-action-favorites',
+  lists: 'library-action-lists',
+  log: 'library-action-log',
+};
+
+function ActionIconButton({
+  label,
+  tone,
+  active,
+  pressed,
+  hasPopup,
+  expanded,
+  disabled,
+  busy,
+  onClick,
+  children,
+}: {
+  label: string;
+  tone: ActionTone;
+  active: boolean;
+  pressed?: boolean;
+  hasPopup?: 'dialog';
+  expanded?: boolean;
+  disabled?: boolean;
+  busy?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={pressed !== undefined ? pressed : undefined}
+      aria-haspopup={hasPopup}
+      aria-expanded={hasPopup != null ? expanded : undefined}
+      aria-busy={busy || undefined}
+      disabled={disabled}
+      onClick={onClick}
+      className={`library-action-icon ${ACTION_TONE_CLASS[tone]} inline-flex h-11 w-11 items-center justify-center disabled:opacity-50 sm:h-12 sm:w-12 ${
+        active ? 'is-active' : ''
+      }`}
+    >
+      <span className="library-action-icon-glyph inline-flex">{children}</span>
+    </button>
+  );
+}
+
+/**
+ * Title-page library controls: icon toggles for watchlist / favorites /
+ * custom lists, plus a Log watch dialog that creates a diary entry.
+ */
 export function LibraryActions({
   contentType,
   contentId,
@@ -41,6 +209,9 @@ export function LibraryActions({
     useState<MembershipState>('loading');
   const [inWatchlist, setInWatchlist] = useState(false);
   const [inFavorites, setInFavorites] = useState(false);
+  const [inAnyList, setInAnyList] = useState(false);
+  const [listsDialogOpen, setListsDialogOpen] = useState(false);
+  const [logDialogOpen, setLogDialogOpen] = useState(false);
   const [pending, setPending] = useState<
     'watchlist' | 'favorites' | 'lists' | 'diary' | null
   >(null);
@@ -77,9 +248,10 @@ export function LibraryActions({
         setAuthState('signed_in');
         setMembershipState('loading');
         const type = libraryType as LibraryContentType;
-        const [watch, fav] = await Promise.all([
+        const [watch, fav, listMembershipResult] = await Promise.all([
           fetchLibraryContains('watchlist', [{ type, id: contentId }]),
           fetchLibraryContains('favorites', [{ type, id: contentId }]),
+          fetchCustomListsMembership(type, contentId),
         ]);
         if (cancelled || generation !== loadGeneration.current) {
           return;
@@ -92,6 +264,15 @@ export function LibraryActions({
         const key = membershipKey(type, contentId);
         setInWatchlist(Boolean(watch.membership[key]));
         setInFavorites(Boolean(fav.membership[key]));
+        if (listMembershipResult.ok) {
+          setListMembership(listMembershipResult.membership);
+          setListItemIds(listMembershipResult.itemIds);
+          setInAnyList(
+            Object.values(listMembershipResult.membership).some(Boolean),
+          );
+        } else {
+          setInAnyList(false);
+        }
         setMembershipState('ready');
         setError(null);
       } catch {
@@ -108,21 +289,55 @@ export function LibraryActions({
     };
   }, [contentId, libraryType]);
 
+  useEffect(() => {
+    const listDialog = addListDialogRef.current;
+    const logDialog = logWatchDialogRef.current;
+
+    function onListClose() {
+      setListsDialogOpen(false);
+    }
+    function onLogClose() {
+      setLogDialogOpen(false);
+    }
+
+    listDialog?.addEventListener('close', onListClose);
+    listDialog?.addEventListener('cancel', onListClose);
+    logDialog?.addEventListener('close', onLogClose);
+    logDialog?.addEventListener('cancel', onLogClose);
+    return () => {
+      listDialog?.removeEventListener('close', onListClose);
+      listDialog?.removeEventListener('cancel', onListClose);
+      logDialog?.removeEventListener('close', onLogClose);
+      logDialog?.removeEventListener('cancel', onLogClose);
+    };
+  }, [authState, membershipState]);
+
   if (libraryType == null) {
     return null;
   }
 
   if (authState === 'loading' || membershipState === 'loading') {
     return (
-      <div className="mt-5 text-sm text-muted" role="status">
-        Loading library actions…
+      <div
+        className="mt-4 flex w-full items-center justify-evenly sm:mt-5"
+        role="status"
+        aria-live="polite"
+      >
+        <span className="sr-only">Loading library actions…</span>
+        {Array.from({ length: 4 }, (_, index) => (
+          <span
+            key={index}
+            aria-hidden
+            className="h-11 w-11 rounded-[var(--radius-sm)] bg-[var(--color-bg-elevated)]/50 sm:h-12 sm:w-12"
+          />
+        ))}
       </div>
     );
   }
 
   if (authState === 'signed_out') {
     return (
-      <p className="mt-5 text-sm text-muted">
+      <p className="mt-4 text-xs text-muted sm:mt-5 sm:text-sm">
         <Link href="/login" className="text-foreground underline">
           Log in
         </Link>{' '}
@@ -171,7 +386,9 @@ export function LibraryActions({
     setLists(listsResult.lists);
     setListMembership(membershipResult.membership);
     setListItemIds(membershipResult.itemIds);
+    setInAnyList(Object.values(membershipResult.membership).some(Boolean));
     addListDialogRef.current?.showModal();
+    setListsDialogOpen(true);
   }
 
   async function toggleListMembership(list: CustomListSummary) {
@@ -194,7 +411,11 @@ export function LibraryActions({
         setError(result.error);
         return;
       }
-      setListMembership((current) => ({ ...current, [list.id]: false }));
+      setListMembership((current) => {
+        const next = { ...current, [list.id]: false };
+        setInAnyList(Object.values(next).some(Boolean));
+        return next;
+      });
       setListItemIds((current) => {
         const next = { ...current };
         delete next[list.id];
@@ -212,8 +433,13 @@ export function LibraryActions({
     if (refreshed.ok) {
       setListMembership(refreshed.membership);
       setListItemIds(refreshed.itemIds);
+      setInAnyList(Object.values(refreshed.membership).some(Boolean));
     } else {
-      setListMembership((current) => ({ ...current, [list.id]: true }));
+      setListMembership((current) => {
+        const next = { ...current, [list.id]: true };
+        setInAnyList(true);
+        return next;
+      });
     }
   }
 
@@ -244,61 +470,73 @@ export function LibraryActions({
     setNote('');
     setRemoveFromWatchlist(false);
     logWatchDialogRef.current?.close();
+    setLogDialogOpen(false);
   }
 
   const controlsDisabled = membershipState !== 'ready' || pending != null;
+  const watchLogged = diaryMessage != null;
 
   return (
-    <div className="mt-5 space-y-3">
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          aria-pressed={inWatchlist}
-          aria-busy={pending === 'watchlist'}
-          disabled={controlsDisabled && pending !== 'favorites'}
+    <div className="mt-4 space-y-2 sm:mt-5 sm:space-y-3">
+      <div className="flex w-full items-center justify-evenly sm:justify-evenly">
+        <ActionIconButton
+          label={inWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
+          tone="watchlist"
+          active={inWatchlist}
+          pressed={inWatchlist}
+          busy={pending === 'watchlist'}
+          disabled={controlsDisabled}
           onClick={() => {
             void toggle('watchlist', inWatchlist, setInWatchlist);
           }}
-          className="border border-[var(--color-border)] bg-[var(--color-accent-soft)] px-3 py-2 text-sm text-foreground transition hover:border-foreground disabled:opacity-60"
         >
-          {inWatchlist ? 'In watchlist' : 'Add to watchlist'}
-        </button>
-        <button
-          type="button"
-          aria-pressed={inFavorites}
-          aria-busy={pending === 'favorites'}
-          disabled={controlsDisabled && pending !== 'watchlist'}
+          <BookmarkIcon filled={inWatchlist} />
+        </ActionIconButton>
+        <ActionIconButton
+          label={inFavorites ? 'Remove from favorites' : 'Add to favorites'}
+          tone="favorites"
+          active={inFavorites}
+          pressed={inFavorites}
+          busy={pending === 'favorites'}
+          disabled={controlsDisabled}
           onClick={() => {
             void toggle('favorites', inFavorites, setInFavorites);
           }}
-          className="border border-[var(--color-border)] px-3 py-2 text-sm text-foreground transition hover:border-foreground disabled:opacity-60"
         >
-          {inFavorites ? 'Favorited' : 'Add to favorites'}
-        </button>
-        <button
-          type="button"
-          aria-busy={pending === 'lists'}
+          <HeartIcon filled={inFavorites} />
+        </ActionIconButton>
+        <ActionIconButton
+          label={inAnyList ? 'Manage lists' : 'Add to list'}
+          tone="lists"
+          active={inAnyList}
+          hasPopup="dialog"
+          expanded={listsDialogOpen}
+          busy={pending === 'lists'}
           disabled={controlsDisabled}
           onClick={() => {
             void openAddToList();
           }}
-          className="border border-[var(--color-border)] px-3 py-2 text-sm text-foreground transition hover:border-foreground disabled:opacity-60"
         >
-          Add to list
-        </button>
-        <button
-          type="button"
-          aria-busy={pending === 'diary'}
+          <ListIcon filled={inAnyList} />
+        </ActionIconButton>
+        <ActionIconButton
+          label="Log watch"
+          tone="log"
+          active={watchLogged}
+          hasPopup="dialog"
+          expanded={logDialogOpen}
+          busy={pending === 'diary'}
           disabled={controlsDisabled}
           onClick={() => {
             setWatchedAt(todayIsoDate());
             setDiaryMessage(null);
+            setError(null);
             logWatchDialogRef.current?.showModal();
+            setLogDialogOpen(true);
           }}
-          className="border border-[var(--color-border)] px-3 py-2 text-sm text-foreground transition hover:border-foreground disabled:opacity-60"
         >
-          Log watch
-        </button>
+          <LoggedIcon filled={watchLogged} />
+        </ActionIconButton>
       </div>
       {diaryMessage ? (
         <p className="text-sm text-muted" role="status">
@@ -357,6 +595,7 @@ export function LibraryActions({
           className="mt-6 border border-[var(--color-border)] px-3 py-2 text-sm"
           onClick={() => {
             addListDialogRef.current?.close();
+            setListsDialogOpen(false);
           }}
         >
           Done
@@ -439,6 +678,7 @@ export function LibraryActions({
               className="border border-[var(--color-border)] px-3 py-2 text-sm"
               onClick={() => {
                 logWatchDialogRef.current?.close();
+                setLogDialogOpen(false);
               }}
             >
               Cancel
