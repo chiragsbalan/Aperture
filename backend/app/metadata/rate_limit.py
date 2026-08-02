@@ -1,11 +1,12 @@
-"""Metadata resolve / ingest rate limits via CacheBackend.
+"""Metadata resolve / ingest / landing rate limits via CacheBackend.
 
 Uses atomic ``incr`` with a fixed window (TTL set only on first hit).
 When Redis ``incr`` fails, falls back to a process-local counter so limits
 are not silently disabled (per-instance only while Redis is down).
 
-Keys are ``metadata:rl:resolve:ip:{sha256}`` and
-``metadata:rl:ingest:ip:{sha256}``. Missing/empty client IPs use the shared
+Keys are ``metadata:rl:resolve:ip:{sha256}``,
+``metadata:rl:ingest:ip:{sha256}``, and
+``metadata:rl:landing:ip:{sha256}``. Missing/empty client IPs use the shared
 ``unknown`` subject so limits still apply.
 
 Client IP should come from ``resolve_client_ip`` (trusted
@@ -47,22 +48,21 @@ def reset_metadata_rate_limit_fallback() -> None:
 async def _enforce(
     cache: CacheBackend,
     *,
-    settings: Settings,
     client_ip: str | None,
     bucket: str,
     max_per_ip: int,
+    window_seconds: int,
     detail: str,
 ) -> None:
     key = _rl_key(bucket, client_ip)
-    window = settings.metadata_resolve_rate_limit_window_seconds
     try:
-        count = await cache.incr(key, ttl_seconds=window)
+        count = await cache.incr(key, ttl_seconds=window_seconds)
     except CacheBackendError:
         logger.warning(
             'metadata %s rate limit falling back to process-local counter',
             bucket,
         )
-        count = await _local_rl_fallback.incr(key, ttl_seconds=window)
+        count = await _local_rl_fallback.incr(key, ttl_seconds=window_seconds)
     if count > max_per_ip:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -79,10 +79,10 @@ async def enforce_resolve_rate_limit(
     """Raise 429 when an IP exceeds the resolve request window."""
     await _enforce(
         cache,
-        settings=settings,
         client_ip=client_ip,
         bucket='resolve',
         max_per_ip=settings.metadata_resolve_rate_limit_max_per_ip,
+        window_seconds=settings.metadata_resolve_rate_limit_window_seconds,
         detail='Too many resolve requests. Try again later.',
     )
 
@@ -96,9 +96,26 @@ async def enforce_resolve_ingest_rate_limit(
     """Raise 429 when an IP exceeds the resolve-ingest (TMDb miss) window."""
     await _enforce(
         cache,
-        settings=settings,
         client_ip=client_ip,
         bucket='ingest',
         max_per_ip=settings.metadata_resolve_ingest_rate_limit_max_per_ip,
+        window_seconds=settings.metadata_resolve_rate_limit_window_seconds,
         detail='Too many catalog ingest requests. Try again later.',
+    )
+
+
+async def enforce_landing_posters_rate_limit(
+    cache: CacheBackend,
+    *,
+    settings: Settings,
+    client_ip: str | None,
+) -> None:
+    """Raise 429 when an IP exceeds the landing posters request window."""
+    await _enforce(
+        cache,
+        client_ip=client_ip,
+        bucket='landing',
+        max_per_ip=settings.landing_posters_rate_limit_max_per_ip,
+        window_seconds=settings.landing_posters_rate_limit_window_seconds,
+        detail='Too many landing poster requests. Try again later.',
     )

@@ -15,3 +15,8 @@ def tv_detail_key(content_id: uuid.UUID) -> str:
 
 def person_detail_key(person_id: uuid.UUID) -> str:
     return f'meta:person:{person_id}'
+
+
+def landing_top_posters_key(*, count: int) -> str:
+    """Shared cache key for the anonymous landing poster mosaic."""
+    return f'meta:landing:top-posters:{count}'

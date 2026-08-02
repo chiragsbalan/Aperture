@@ -38,6 +38,44 @@
       var(--color-bg);
   }
 
+  /* Dense small-poster mosaic; tile size drives “top 200” coverage. */
+  .poster-mosaic-layer {
+    display: grid;
+    min-height: 100%;
+    width: 100%;
+    gap: 2px;
+    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  }
+
+  .poster-mosaic-tile {
+    aspect-ratio: 2 / 3;
+    transform-origin: center center;
+  }
+
+  @media (min-width: 768px) {
+    .poster-mosaic-layer {
+      grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .poster-mosaic-tile {
+      transform: none !important;
+    }
+  }
+
+  /* Soft amber wash so the landing poster mosaic stays atmospheric. */
+  .poster-mosaic-veil {
+    background:
+      radial-gradient(120% 80% at 50% -10%, var(--bg-glow-1), transparent 55%),
+      linear-gradient(
+        180deg,
+        rgba(12, 11, 9, 0.35) 0%,
+        rgba(12, 11, 9, 0.55) 55%,
+        rgba(12, 11, 9, 0.78) 100%
+      );
+  }
+
   /* Soft wash so a full-page TMDB backdrop keeps text readable. */
   .catalog-backdrop-veil {
     background:
