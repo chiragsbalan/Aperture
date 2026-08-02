@@ -183,9 +183,7 @@ async def get_landing_posters(
 
 def _filter_top_movies(detail: TopMoviesResponse) -> TopMoviesResponse:
     filtered = [
-        movie
-        for movie in detail.movies
-        if _is_valid_tmdb_poster_url(movie.poster_url)
+        movie for movie in detail.movies if _is_valid_tmdb_poster_url(movie.poster_url)
     ]
     if len(filtered) == len(detail.movies):
         return detail
@@ -299,9 +297,7 @@ async def get_top_movies(
         settings=settings,
         client_ip=client_ip,
     )
-    display_limit = (
-        limit if limit is not None else settings.top_movies_default_limit
-    )
+    display_limit = limit if limit is not None else settings.top_movies_default_limit
     pool = await _load_top_movies_pool(settings, response)
     response.headers['Cache-Control'] = _TOP_MOVIES_CACHE_CONTROL
     return _shuffle_top_movies(pool, limit=display_limit)
