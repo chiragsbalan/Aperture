@@ -106,6 +106,14 @@ class Settings(BaseSettings):
     landing_posters_rate_limit_window_seconds: int = 60
     landing_posters_rate_limit_max_per_ip: int = 60
 
+    # Signed-in home “Top movies” rail (TMDb top_rated pool, shuffled on serve).
+    top_movies_cache_ttl_seconds: int = 60 * 60 * 24
+    top_movies_pool_count: int = Field(default=100, ge=1, le=100)
+    top_movies_default_limit: int = Field(default=12, ge=1, le=100)
+    top_movies_negative_cache_ttl_seconds: int = 60
+    top_movies_rate_limit_window_seconds: int = 60
+    top_movies_rate_limit_max_per_ip: int = 60
+
     @model_validator(mode='after')
     def validate_production_secrets(self) -> Self:
         """Require strong JWT + BFF secrets when ENVIRONMENT is production."""

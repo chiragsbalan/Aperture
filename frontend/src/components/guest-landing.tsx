@@ -2,7 +2,10 @@ import Link from 'next/link';
 
 import { ShellHealth } from '@/components/shell-health';
 
-export default function Home() {
+/**
+ * Marketing hero for signed-out visitors on `/`.
+ */
+export function GuestLanding() {
   return (
     <div className="flex flex-col items-center px-1 text-center">
       <h1 className="motion-fade-rise font-display [font-size:var(--text-brand)] font-semibold leading-none tracking-[var(--tracking-brand)] text-foreground">

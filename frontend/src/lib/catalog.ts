@@ -245,7 +245,34 @@ export interface LandingPostersResponse {
   posters: LandingPoster[];
 }
 
+export interface TopMovie {
+  tmdb_id: number;
+  title: string;
+  poster_url: string;
+  year: number | null;
+}
+
+export interface TopMoviesResponse {
+  movies: TopMovie[];
+}
+
 const TMDB_POSTER_URL_RE = /^https:\/\/image\.tmdb\.org\/t\/p\//;
+
+/** Accept + trusted BFF client-IP headers for SSR → API catalog fetches. */
+async function catalogUpstreamHeaders(
+  extra?: Record<string, string>,
+): Promise<Headers> {
+  const requestHeaders = new Headers({
+    Accept: 'application/json',
+    ...extra,
+  });
+  const incoming = await headers();
+  applyTrustedClientIpHeaders(
+    requestHeaders,
+    clientIpFromForwardedFor(incoming.get('x-forwarded-for')),
+  );
+  return requestHeaders;
+}
 
 /** Shared TMDb top-rated posters for landing / auth atmosphere. */
 export async function fetchLandingPosterUrls(): Promise<string[]> {
@@ -263,7 +290,7 @@ export async function fetchLandingPosterUrls(): Promise<string[]> {
       ...(process.env.NODE_ENV === 'development'
         ? { cache: 'no-store' as const }
         : { next: { revalidate: 60 } }),
-      headers: { Accept: 'application/json' },
+      headers: await catalogUpstreamHeaders(),
       signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
@@ -274,6 +301,47 @@ export async function fetchLandingPosterUrls(): Promise<string[]> {
     return (data.posters ?? [])
       .map((poster) => poster.poster_url)
       .filter((url) => TMDB_POSTER_URL_RE.test(url));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Shuffled sample from the TMDb top-rated pool for the signed-in home rail.
+ * Always no-store so each navigation can reshuffle via the API.
+ */
+export async function fetchTopMovies(limit = 12): Promise<TopMovie[]> {
+  let base: string;
+  try {
+    base = upstreamApiBaseUrl();
+  } catch {
+    return [];
+  }
+
+  const capped = Math.min(100, Math.max(1, limit));
+  try {
+    const res = await fetch(
+      `${base}/api/v1/catalog/top-movies?limit=${capped}`,
+      {
+        cache: 'no-store',
+        headers: await catalogUpstreamHeaders(),
+        signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS),
+      },
+    );
+    if (!res.ok) {
+      await res.text().catch(() => undefined);
+      return [];
+    }
+    const data = (await res.json()) as TopMoviesResponse;
+    return (data.movies ?? []).filter(
+      (movie) =>
+        typeof movie.tmdb_id === 'number' &&
+        movie.tmdb_id > 0 &&
+        typeof movie.title === 'string' &&
+        movie.title.length > 0 &&
+        typeof movie.poster_url === 'string' &&
+        TMDB_POSTER_URL_RE.test(movie.poster_url),
+    );
   } catch {
     return [];
   }
@@ -318,20 +386,12 @@ async function resolveByTmdb(
   }
 
   try {
-    const requestHeaders = new Headers({
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    });
-    const incoming = await headers();
-    applyTrustedClientIpHeaders(
-      requestHeaders,
-      clientIpFromForwardedFor(incoming.get('x-forwarded-for')),
-    );
-
     const res = await fetch(`${base}${path}`, {
       method: 'POST',
       cache: 'no-store',
-      headers: requestHeaders,
+      headers: await catalogUpstreamHeaders({
+        'Content-Type': 'application/json',
+      }),
       body: JSON.stringify({ tmdb_id: tmdbId }),
       signal: AbortSignal.timeout(RESOLVE_TIMEOUT_MS),
     });

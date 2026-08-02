@@ -5,8 +5,9 @@ When Redis ``incr`` fails, falls back to a process-local counter so limits
 are not silently disabled (per-instance only while Redis is down).
 
 Keys are ``metadata:rl:resolve:ip:{sha256}``,
-``metadata:rl:ingest:ip:{sha256}``, and
-``metadata:rl:landing:ip:{sha256}``. Missing/empty client IPs use the shared
+``metadata:rl:ingest:ip:{sha256}``,
+``metadata:rl:landing:ip:{sha256}``, and
+``metadata:rl:top-movies:ip:{sha256}``. Missing/empty client IPs use the shared
 ``unknown`` subject so limits still apply.
 
 Client IP should come from ``resolve_client_ip`` (trusted
@@ -118,4 +119,21 @@ async def enforce_landing_posters_rate_limit(
         max_per_ip=settings.landing_posters_rate_limit_max_per_ip,
         window_seconds=settings.landing_posters_rate_limit_window_seconds,
         detail='Too many landing poster requests. Try again later.',
+    )
+
+
+async def enforce_top_movies_rate_limit(
+    cache: CacheBackend,
+    *,
+    settings: Settings,
+    client_ip: str | None,
+) -> None:
+    """Raise 429 when an IP exceeds the top-movies request window."""
+    await _enforce(
+        cache,
+        client_ip=client_ip,
+        bucket='top-movies',
+        max_per_ip=settings.top_movies_rate_limit_max_per_ip,
+        window_seconds=settings.top_movies_rate_limit_window_seconds,
+        detail='Too many top movies requests. Try again later.',
     )

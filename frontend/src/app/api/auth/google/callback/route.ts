@@ -121,7 +121,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return redirectWithError(request, 'oauth_failed', intent);
   }
 
-  const response = NextResponse.redirect(absoluteUrl(request, '/account'));
+  const successPath = intent === 'link' ? '/account' : '/';
+  const response = NextResponse.redirect(absoluteUrl(request, successPath));
   applyAuthCookies(response, tokens);
   clearOauthCookies(response);
   return response;

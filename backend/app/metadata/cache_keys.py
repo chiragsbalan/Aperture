@@ -20,3 +20,8 @@ def person_detail_key(person_id: uuid.UUID) -> str:
 def landing_top_posters_key(*, count: int) -> str:
     """Shared cache key for the anonymous landing poster mosaic."""
     return f'meta:landing:top-posters:{count}'
+
+
+def top_movies_key(*, count: int) -> str:
+    """Shared cache key for the signed-in home top-movies set."""
+    return f'meta:top-movies:{count}'

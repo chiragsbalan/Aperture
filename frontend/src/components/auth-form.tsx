@@ -226,7 +226,7 @@ export function AuthForm({ mode, initialError = null }: AuthFormProps) {
         }
         return;
       }
-      router.push('/account');
+      router.push('/');
       router.refresh();
     } catch {
       setFormError('Network error — try again');
