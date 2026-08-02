@@ -3,8 +3,9 @@ import { SiteHeader } from '@/components/site-header';
 import { fetchLandingPosterUrls } from '@/lib/catalog';
 
 /**
- * Shared shell for the public landing / login / signup routes.
+ * Shared shell for login / signup (and any other guest auth routes).
  * Keeps the poster mosaic mounted across client navigations between them.
+ * Signed-out `/` uses the same mosaic pattern in `app/page.tsx`.
  */
 export default async function GuestShellLayout({
   children,

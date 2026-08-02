@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import random
 import uuid
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from pydantic import ValidationError
 
 from app.core.cache import CacheBackend, get_cache
@@ -17,11 +18,13 @@ from app.metadata.cache_keys import (
     landing_top_posters_key,
     movie_detail_key,
     person_detail_key,
+    top_movies_key,
     tv_detail_key,
 )
 from app.metadata.rate_limit import (
     enforce_landing_posters_rate_limit,
     enforce_resolve_rate_limit,
+    enforce_top_movies_rate_limit,
 )
 from app.metadata.schemas import (
     LandingPoster,
@@ -30,6 +33,7 @@ from app.metadata.schemas import (
     PersonDetail,
     ResolveByTmdbRequest,
     ResolveByTmdbResponse,
+    TopMoviesResponse,
     TvDetail,
 )
 
@@ -38,10 +42,12 @@ router = APIRouter(tags=['metadata'])
 _CACHE_CONTROL = 'public, max-age=300'
 _LANDING_CACHE_CONTROL = 'public, max-age=3600'
 _LANDING_EMPTY_CACHE_CONTROL = 'public, max-age=60'
+_TOP_MOVIES_CACHE_CONTROL = 'private, no-store'
 _TMDB_POSTER_URL_PREFIX = 'https://image.tmdb.org/t/p/'
 
 # Single-flight fill so concurrent cold misses share one TMDb fetch.
 _landing_singleflight = asyncio.Lock()
+_top_movies_singleflight = asyncio.Lock()
 
 
 def _not_found(detail: str) -> HTTPException:
@@ -173,6 +179,128 @@ async def get_landing_posters(
         response.headers['X-Cache'] = 'MISS'
         _apply_landing_cache_control(response, filtered.posters)
         return filtered
+
+
+def _filter_top_movies(detail: TopMoviesResponse) -> TopMoviesResponse:
+    filtered = [
+        movie for movie in detail.movies if _is_valid_tmdb_poster_url(movie.poster_url)
+    ]
+    if len(filtered) == len(detail.movies):
+        return detail
+    return TopMoviesResponse(movies=filtered)
+
+
+def _shuffle_top_movies(
+    pool: TopMoviesResponse,
+    *,
+    limit: int,
+) -> TopMoviesResponse:
+    """Return a shuffled sample of up to ``limit`` movies from the pool."""
+    movies = list(pool.movies)
+    random.shuffle(movies)
+    return TopMoviesResponse(movies=movies[:limit])
+
+
+async def _read_cached_top_movies(
+    cache: CacheBackend,
+    key: str,
+) -> TopMoviesResponse | None:
+    """Return a validated, URL-filtered cache hit, or ``None`` to fall through."""
+    cached = await cache.get(key)
+    if cached is None:
+        return None
+    try:
+        detail = TopMoviesResponse.model_validate_json(cached)
+    except ValidationError:
+        await cache.delete(key)
+        return None
+    filtered = _filter_top_movies(detail)
+    if detail.movies and not filtered.movies:
+        await cache.delete(key)
+        return None
+    return filtered
+
+
+async def _load_top_movies_pool(
+    settings: SettingsDep,
+    response: Response,
+) -> TopMoviesResponse:
+    """Load the cached TMDb top-movies pool (fill on miss).
+
+    Request-level rate limiting is enforced in ``get_top_movies`` before this
+    runs (HIT / BYPASS / MISS). This loader does not charge a separate bucket.
+    """
+    cache = get_cache()
+    key = top_movies_key(count=settings.top_movies_pool_count)
+
+    hit = await _read_cached_top_movies(cache, key)
+    if hit is not None:
+        response.headers['X-Cache'] = 'HIT'
+        return hit
+
+    async with _top_movies_singleflight:
+        hit = await _read_cached_top_movies(cache, key)
+        if hit is not None:
+            response.headers['X-Cache'] = 'HIT'
+            return hit
+
+        if not settings.tmdb_api_key.strip():
+            response.headers['X-Cache'] = 'BYPASS'
+            return TopMoviesResponse(movies=[])
+
+        try:
+            detail = await metadata_service.fetch_top_movies_pool(settings)
+        except metadata_service.TopMoviesUnavailableError:
+            detail = TopMoviesResponse(movies=[])
+
+        filtered = _filter_top_movies(detail)
+        if not filtered.movies:
+            existing = await _read_cached_top_movies(cache, key)
+            if existing is not None and existing.movies:
+                response.headers['X-Cache'] = 'HIT'
+                return existing
+            await cache.set(
+                key,
+                TopMoviesResponse(movies=[]).model_dump_json(),
+                ttl_seconds=settings.top_movies_negative_cache_ttl_seconds,
+            )
+            response.headers['X-Cache'] = 'MISS'
+            return TopMoviesResponse(movies=[])
+
+        await cache.set(
+            key,
+            filtered.model_dump_json(),
+            ttl_seconds=settings.top_movies_cache_ttl_seconds,
+        )
+        response.headers['X-Cache'] = 'MISS'
+        return filtered
+
+
+@router.get('/catalog/top-movies', response_model=TopMoviesResponse)
+async def get_top_movies(
+    request: Request,
+    settings: SettingsDep,
+    response: Response,
+    limit: int | None = Query(default=None, ge=1, le=100),
+) -> TopMoviesResponse:
+    """Return a shuffled sample from TMDb's all-time top-rated movies.
+
+    Public (unauthenticated), like ``/landing/posters``. Every request is
+    subject to a per-IP rate limit (HIT / BYPASS / MISS). The full pool
+    (default 100) is Redis-cached; each response reshuffles and truncates to
+    ``limit``. Degrades to an empty list when TMDb is unavailable so the home
+    rail can show an empty state.
+    """
+    client_ip = resolve_client_ip(request, settings)
+    await enforce_top_movies_rate_limit(
+        get_cache(),
+        settings=settings,
+        client_ip=client_ip,
+    )
+    display_limit = limit if limit is not None else settings.top_movies_default_limit
+    pool = await _load_top_movies_pool(settings, response)
+    response.headers['Cache-Control'] = _TOP_MOVIES_CACHE_CONTROL
+    return _shuffle_top_movies(pool, limit=display_limit)
 
 
 @router.post('/movies/resolve', response_model=ResolveByTmdbResponse)

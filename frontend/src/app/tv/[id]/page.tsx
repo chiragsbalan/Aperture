@@ -1,5 +1,8 @@
-import { CatalogUnavailable, TvDetailView } from '@/components/catalog-detail';
-import { SiteHeader } from '@/components/site-header';
+import {
+  CatalogStatusShell,
+  CatalogUnavailable,
+  TvDetailView,
+} from '@/components/catalog-detail';
 import { fetchTv } from '@/lib/catalog';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
@@ -32,14 +35,13 @@ export default async function TvPage({ params }: TvPageProps) {
     notFound();
   }
 
+  if (result.ok) {
+    return <TvDetailView show={result.data} />;
+  }
+
   return (
-    <main className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
-      <SiteHeader />
-      {!result.ok ? (
-        <CatalogUnavailable message={result.error} />
-      ) : (
-        <TvDetailView show={result.data} />
-      )}
-    </main>
+    <CatalogStatusShell>
+      <CatalogUnavailable message={result.error} />
+    </CatalogStatusShell>
   );
 }

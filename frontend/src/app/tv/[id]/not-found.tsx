@@ -1,11 +1,12 @@
-import { CatalogNotFound } from '@/components/catalog-detail';
-import { SiteHeader } from '@/components/site-header';
+import {
+  CatalogNotFound,
+  CatalogStatusShell,
+} from '@/components/catalog-detail';
 
 export default function TvNotFound() {
   return (
-    <main className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
-      <SiteHeader />
+    <CatalogStatusShell>
       <CatalogNotFound label="TV show" />
-    </main>
+    </CatalogStatusShell>
   );
 }

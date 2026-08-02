@@ -1,8 +1,8 @@
 import {
+  CatalogStatusShell,
   CatalogUnavailable,
   MovieDetailView,
 } from '@/components/catalog-detail';
-import { SiteHeader } from '@/components/site-header';
 import { fetchMovie } from '@/lib/catalog';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
@@ -35,14 +35,13 @@ export default async function MoviePage({ params }: MoviePageProps) {
     notFound();
   }
 
+  if (result.ok) {
+    return <MovieDetailView movie={result.data} />;
+  }
+
   return (
-    <main className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
-      <SiteHeader />
-      {!result.ok ? (
-        <CatalogUnavailable message={result.error} />
-      ) : (
-        <MovieDetailView movie={result.data} />
-      )}
-    </main>
+    <CatalogStatusShell>
+      <CatalogUnavailable message={result.error} />
+    </CatalogStatusShell>
   );
 }

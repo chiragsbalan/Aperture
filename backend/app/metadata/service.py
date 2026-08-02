@@ -31,6 +31,8 @@ from app.metadata.schemas import (
     SimilarTitle,
     StudioRef,
     TitleExtras,
+    TopMovie,
+    TopMoviesResponse,
     TvDetail,
     VideoRef,
     WatchProvider,
@@ -45,6 +47,10 @@ class CatalogNotFoundError(Exception):
 
 class LandingPostersUnavailableError(Exception):
     """TMDb top-rated posters could not be fetched."""
+
+
+class TopMoviesUnavailableError(Exception):
+    """TMDb top-rated movie pool could not be fetched."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +128,82 @@ async def fetch_landing_top_posters(
         raise LandingPostersUnavailableError(str(exc)) from exc
 
     return LandingPostersResponse(posters=posters)
+
+
+def _year_from_release_date(value: object) -> int | None:
+    """Parse ``YYYY`` from a TMDb ``release_date`` string when present."""
+    if not isinstance(value, str) or len(value) < 4:
+        return None
+    year_text = value[:4]
+    if not year_text.isdigit():
+        return None
+    year = int(year_text)
+    if year < 1870 or year > 2100:
+        return None
+    return year
+
+
+async def fetch_top_movies_pool(
+    settings: Settings,
+    *,
+    count: int | None = None,
+    client: TmdbClient | None = None,
+) -> TopMoviesResponse:
+    """Return TMDb all-time top-rated movies for the home rail pool.
+
+    Does not touch Postgres — cards link via ``/movies/tmdb/{id}``. Raises
+    :class:`TopMoviesUnavailableError` when TMDb is misconfigured or down.
+    """
+    limit = count if count is not None else settings.top_movies_pool_count
+    if limit < 1:
+        return TopMoviesResponse(movies=[])
+
+    try:
+        tmdb = client or TmdbClient.from_settings(settings)
+    except TmdbConfigError as exc:
+        raise TopMoviesUnavailableError(str(exc)) from exc
+
+    movies: list[TopMovie] = []
+    page = 1
+    max_pages = max(1, (limit + 19) // 20)
+    try:
+        while len(movies) < limit and page <= max_pages:
+            payload = await tmdb.get_movie_top_rated(page=page)
+            results = payload.get('results')
+            if not isinstance(results, list) or not results:
+                break
+            for row in results:
+                if not isinstance(row, dict):
+                    continue
+                raw_id = row.get('id')
+                if not isinstance(raw_id, int) or raw_id <= 0:
+                    continue
+                title = row.get('title')
+                if not isinstance(title, str) or not title.strip():
+                    continue
+                url = _image_url(
+                    row.get('poster_path')
+                    if isinstance(row.get('poster_path'), str)
+                    else None,
+                    size='w500',
+                )
+                if url is None:
+                    continue
+                movies.append(
+                    TopMovie(
+                        tmdb_id=raw_id,
+                        title=title.strip(),
+                        poster_url=url,
+                        year=_year_from_release_date(row.get('release_date')),
+                    )
+                )
+                if len(movies) >= limit:
+                    break
+            page += 1
+    except TmdbUnavailableError as exc:
+        raise TopMoviesUnavailableError(str(exc)) from exc
+
+    return TopMoviesResponse(movies=movies)
 
 
 def _title_extras(raw: dict[str, Any] | None) -> TitleExtras:

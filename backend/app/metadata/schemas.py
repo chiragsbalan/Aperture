@@ -169,6 +169,21 @@ class LandingPostersResponse(BaseModel):
     posters: list[LandingPoster] = Field(default_factory=list)
 
 
+class TopMovie(BaseModel):
+    """Clickable TMDb top-rated movie card for the signed-in home rail."""
+
+    tmdb_id: int
+    title: str
+    poster_url: str
+    year: int | None = None
+
+
+class TopMoviesResponse(BaseModel):
+    """Shuffled sample from the cached TMDb top-100 set."""
+
+    movies: list[TopMovie] = Field(default_factory=list)
+
+
 class ResolveByTmdbRequest(BaseModel):
     """Resolve (and optionally ingest) a title by TMDb id."""
 

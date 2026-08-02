@@ -28,7 +28,7 @@ function CreditPill({ credit }: { credit: CreditPersonRef }) {
     >
       <span className="truncate">{credit.name}</span>
       {detail ? (
-        <span className="truncate text-xs text-muted group-hover:text-foreground/70">
+        <span className="truncate text-xs text-muted group-hover:text-foreground">
           {detail}
         </span>
       ) : null}
