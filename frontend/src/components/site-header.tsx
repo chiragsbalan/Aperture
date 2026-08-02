@@ -57,10 +57,10 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="absolute inset-x-0 top-0 z-10 flex items-center gap-3 px-6 py-5">
+    <header className="absolute inset-x-0 top-0 z-10 flex items-center gap-2 px-4 py-4 sm:gap-3 sm:px-6 sm:py-5">
       <Link
         href="/"
-        className="shrink-0 font-display text-lg font-semibold tracking-tight text-foreground"
+        className="shrink-0 font-display text-base font-semibold tracking-tight text-foreground sm:text-lg"
       >
         Aperture
       </Link>
@@ -70,71 +70,49 @@ export function SiteHeader() {
       >
         <HeaderSearch />
       </Suspense>
-      <nav
-        aria-label="Account"
-        className="flex shrink-0 items-center gap-4 text-sm"
-      >
-        {authState === 'loading' ? (
-          <span className="text-muted" aria-live="polite">
-            …
-          </span>
-        ) : null}
-
-        {authState === 'signed_out' ? (
-          <>
-            <Link
-              href="/signup"
-              className="text-muted transition hover:text-foreground"
-            >
-              Sign up
-            </Link>
-            <Link
-              href="/login"
-              className="text-muted transition hover:text-foreground"
-            >
-              Log in
-            </Link>
-          </>
-        ) : null}
-
-        {authState === 'signed_in' ? (
-          <>
-            <Link
-              href="/library/watchlist"
-              aria-current={
-                pathname.startsWith('/library') ? 'page' : undefined
-              }
-              className="text-muted transition hover:text-foreground"
-            >
-              Library
-            </Link>
-            <Link
-              href="/account"
-              aria-current={pathname === '/account' ? 'page' : undefined}
-              className="text-muted transition hover:text-foreground"
-            >
-              Account
-            </Link>
-            <Link
-              href="/settings"
-              aria-current={pathname === '/settings' ? 'page' : undefined}
-              className="text-muted transition hover:text-foreground"
-            >
-              Settings
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                void handleLogout();
-              }}
-              disabled={loggingOut}
-              className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-1.5 text-foreground transition hover:border-[var(--color-accent)] disabled:opacity-60"
-            >
-              {loggingOut ? 'Logging out…' : 'Log out'}
-            </button>
-          </>
-        ) : null}
-      </nav>
+      {authState === 'loading' ? (
+        <span className="text-sm text-muted" aria-live="polite">
+          Loading account…
+        </span>
+      ) : null}
+      {authState === 'signed_in' ? (
+        <nav
+          aria-label="Account"
+          className="flex shrink-0 items-center gap-3 text-sm sm:gap-4"
+        >
+          <Link
+            href="/library/watchlist"
+            aria-current={pathname.startsWith('/library') ? 'page' : undefined}
+            className="text-muted transition hover:text-foreground"
+          >
+            Library
+          </Link>
+          <Link
+            href="/account"
+            aria-current={pathname === '/account' ? 'page' : undefined}
+            className="text-muted transition hover:text-foreground"
+          >
+            Account
+          </Link>
+          <Link
+            href="/settings"
+            aria-current={pathname === '/settings' ? 'page' : undefined}
+            className="text-muted transition hover:text-foreground"
+          >
+            Settings
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              void handleLogout();
+            }}
+            disabled={loggingOut}
+            className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2.5 py-1.5 text-foreground transition hover:border-[var(--color-accent)] disabled:opacity-60 sm:px-3"
+          >
+            {loggingOut ? 'Logging out…' : 'Log out'}
+          </button>
+        </nav>
+      ) : null}
     </header>
   );
 }

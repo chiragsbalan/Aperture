@@ -15,9 +15,15 @@ export default async function GuestShellLayout({
 
   return (
     <div className="shell-atmosphere relative flex min-h-dvh flex-col overflow-hidden">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <PosterMosaic posters={posters} />
       <SiteHeader />
-      <main className="relative z-[1] flex flex-1 flex-col items-center justify-center px-6 py-16 sm:py-24">
+      <main
+        id="main-content"
+        className="relative z-[1] flex flex-1 flex-col items-center justify-center px-5 py-12 sm:px-6 sm:py-24"
+      >
         {children}
       </main>
     </div>

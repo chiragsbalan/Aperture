@@ -27,8 +27,8 @@
   /* Typography */
   --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-body: var(--font-source-sans), ui-sans-serif, system-ui, sans-serif;
-  --text-brand: clamp(3.5rem, 12vw, 7.5rem);
-  --text-headline: clamp(1.25rem, 2.5vw, 1.75rem);
+  --text-brand: clamp(2.75rem, 11vw, 7.5rem);
+  --text-headline: clamp(1.125rem, 2.5vw, 1.75rem);
   --text-body: 1.0625rem;
   --leading-body: 1.6;
   --tracking-brand: -0.03em;
@@ -51,6 +51,8 @@
   --duration-fast: 160ms;
   --duration-med: 480ms;
   --duration-slow: 900ms;
+  /* Keep in sync with FLIP_ANIM_MS in poster-mosaic.tsx */
+  --poster-flip-ms: 640ms;
 }
 
 [data-theme='light'] {
