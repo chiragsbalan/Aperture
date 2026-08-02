@@ -1,13 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 /**
  * Soft circular lens around the cursor.
@@ -239,17 +233,13 @@ export function PosterMosaic({
         return;
       }
       const estimated = tileCountForSize(width, height);
-      setTileCount((current) =>
-        estimated === current ? current : estimated,
-      );
+      setTileCount((current) => (estimated === current ? current : estimated));
       recomputeTileCenters(layerRef.current, centersRef);
     };
 
     if (!root || typeof ResizeObserver === 'undefined') {
       const syncFromWindow = () => {
-        setTileCount(
-          tileCountForSize(window.innerWidth, window.innerHeight),
-        );
+        setTileCount(tileCountForSize(window.innerWidth, window.innerHeight));
         recomputeTileCenters(layerRef.current, centersRef);
       };
       syncFromWindow();
@@ -371,11 +361,7 @@ export function PosterMosaic({
     };
 
     const startLoop = () => {
-      if (
-        loopRunningRef.current ||
-        document.hidden ||
-        isSearchOverlayOpen()
-      ) {
+      if (loopRunningRef.current || document.hidden || isSearchOverlayOpen()) {
         return;
       }
       loopRunningRef.current = true;

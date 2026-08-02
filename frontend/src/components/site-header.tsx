@@ -66,9 +66,7 @@ export function SiteHeader() {
       </Link>
       <div className="min-w-0 flex-1" aria-hidden="true" />
       <Suspense
-        fallback={
-          <div className="h-9 w-9 shrink-0" aria-hidden="true" />
-        }
+        fallback={<div className="h-9 w-9 shrink-0" aria-hidden="true" />}
       >
         <HeaderSearch />
       </Suspense>
