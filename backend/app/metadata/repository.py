@@ -188,18 +188,14 @@ async def ensure_person_shells(
     )
     mappings = list(result.scalars().all())
     person_ids = [
-        mapping.person_id
-        for mapping in mappings
-        if mapping.person_id is not None
+        mapping.person_id for mapping in mappings if mapping.person_id is not None
     ]
     people_by_id: dict[uuid.UUID, Person] = {}
     if person_ids:
         people_result = await session.execute(
             select(Person).where(Person.id.in_(person_ids))
         )
-        people_by_id = {
-            person.id: person for person in people_result.scalars().all()
-        }
+        people_by_id = {person.id: person for person in people_result.scalars().all()}
 
     out: dict[str, Person] = {}
     for mapping in mappings:

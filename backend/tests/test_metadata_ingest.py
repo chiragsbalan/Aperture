@@ -122,9 +122,7 @@ def test_trim_credits_retains_late_director() -> None:
     )
 
     credits = TmdbCredits(
-        cast=[
-            TmdbCastCredit(id=i, name=f'Actor {i}', order=i) for i in range(25)
-        ],
+        cast=[TmdbCastCredit(id=i, name=f'Actor {i}', order=i) for i in range(25)],
         crew=[
             *[
                 TmdbCrewCredit(

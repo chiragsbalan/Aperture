@@ -21,7 +21,10 @@ interface ResolveBody {
 export async function POST(request: Request): Promise<Response> {
   const bodyText = await readBodyLimited(request, MAX_BODY_BYTES);
   if (bodyText === null) {
-    return NextResponse.json({ error: 'Request body too large' }, { status: 413 });
+    return NextResponse.json(
+      { error: 'Request body too large' },
+      { status: 413 },
+    );
   }
 
   let body: ResolveBody;
@@ -37,15 +40,11 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const kind = body.type === 'tv' || body.type === 'tv_show' ? 'tv' : 'movie';
-  const path =
-    kind === 'tv' ? '/api/v1/tv/resolve' : '/api/v1/movies/resolve';
+  const path = kind === 'tv' ? '/api/v1/tv/resolve' : '/api/v1/movies/resolve';
 
   const clientIp = warmClientIp(request);
   if (clientIp == null) {
-    return NextResponse.json(
-      { error: 'Too many requests' },
-      { status: 429 },
-    );
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
 
   let base: string;
