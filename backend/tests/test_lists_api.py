@@ -36,7 +36,7 @@ def seeded_ids() -> dict[str, uuid.UUID]:
                 session,
                 source='tmdb',
                 source_namespace='person',
-                external_id='193',
+                external_id='192',
             )
             assert movie is not None and movie.content_item_id is not None
             assert tv is not None and tv.content_item_id is not None

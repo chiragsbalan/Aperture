@@ -4,6 +4,16 @@
 
 import { type NextRequest } from 'next/server';
 
+import {
+  applyTrustedClientIpHeaders,
+  clientIpFromForwardedFor,
+} from '@/lib/trusted-client-headers';
+
+export {
+  applyTrustedClientIpHeaders,
+  clientIpFromForwardedFor,
+} from '@/lib/trusted-client-headers';
+
 export const UPSTREAM_FETCH_TIMEOUT_MS = 10_000;
 
 /** Headers allowed from the browser → upstream API. */
@@ -33,15 +43,28 @@ export function normalizeUpstreamBase(raw: string): string {
 
 /**
  * Paths the generic BFF proxy must not forward. Auth tokens are only minted
- * via dedicated `/api/auth/*` routes.
+ * via dedicated `/api/auth/*` routes. Catalog resolve/ingest is server-only
+ * (RSC → API with trusted client-IP headers), not via the browser proxy.
  */
 export function isDeniedProxyPath(pathParts: string[]): boolean {
-  return (
+  if (
     pathParts.length >= 3 &&
     pathParts[0] === 'api' &&
     pathParts[1] === 'v1' &&
     pathParts[2] === 'auth'
-  );
+  ) {
+    return true;
+  }
+  if (
+    pathParts.length >= 4 &&
+    pathParts[0] === 'api' &&
+    pathParts[1] === 'v1' &&
+    pathParts[3] === 'resolve' &&
+    (pathParts[2] === 'movies' || pathParts[2] === 'tv')
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -97,14 +120,7 @@ export function filterRequestHeaders(source: Headers): Headers {
 
 /** First hop from `x-forwarded-for`, else null (max 64 chars). */
 export function clientIpFromRequest(request: NextRequest): string | null {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) {
-    const first = forwarded.split(',')[0]?.trim();
-    if (first) {
-      return first.slice(0, 64);
-    }
-  }
-  return null;
+  return clientIpFromForwardedFor(request.headers.get('x-forwarded-for'));
 }
 
 /**
@@ -118,18 +134,7 @@ export function injectTrustedClientIpHeaders(
   request: NextRequest,
   headers: Headers,
 ): void {
-  const clientIp = clientIpFromRequest(request);
-  if (clientIp) {
-    headers.set('X-Aperture-Client-IP', clientIp);
-  } else {
-    headers.delete('X-Aperture-Client-IP');
-  }
-  const secret = process.env.AUTH_BFF_SHARED_SECRET ?? '';
-  if (secret) {
-    headers.set('X-Aperture-BFF-Secret', secret);
-  } else {
-    headers.delete('X-Aperture-BFF-Secret');
-  }
+  applyTrustedClientIpHeaders(headers, clientIpFromRequest(request));
 }
 
 export function filterResponseHeaders(source: Headers): Headers {

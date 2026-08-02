@@ -8,7 +8,7 @@ const contentSecurityPolicy = [
   // next/font and Next.js runtime need these in practice for the shell.
   `script-src 'self' 'unsafe-inline'${isProd ? '' : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://image.tmdb.org",
+  "img-src 'self' data: blob: https://image.tmdb.org https://i.ytimg.com https://flagcdn.com",
   "font-src 'self' data:",
   "connect-src 'self'",
   "frame-ancestors 'none'",
@@ -26,6 +26,11 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'image.tmdb.org',
         pathname: '/t/p/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i.ytimg.com',
+        pathname: '/vi/**',
       },
     ],
   },

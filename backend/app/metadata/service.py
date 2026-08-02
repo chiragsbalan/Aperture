@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,13 +12,26 @@ from app.metadata import repository as metadata_repository
 from app.metadata.images import InvalidImagePathError, tmdb_image_url
 from app.metadata.models import ContentCredit, ContentItem, Person
 from app.metadata.schemas import (
+    AlternativeTitle,
+    CollectionRef,
+    CountryRef,
     CreditPersonRef,
     EpisodeDetail,
+    LanguageRef,
+    MediaGallery,
     MovieDetail,
+    NamedId,
     PersonCreditRef,
     PersonDetail,
+    ReleaseEvent,
     SeasonDetail,
+    SimilarTitle,
+    StudioRef,
+    TitleExtras,
     TvDetail,
+    VideoRef,
+    WatchProvider,
+    WatchProviderRegion,
 )
 
 
@@ -42,6 +56,185 @@ def _image_url(path: str | None, *, size: str = 'w500') -> str | None:
         return tmdb_image_url(path, size=size)
     except InvalidImagePathError:
         return None
+
+
+def _title_extras(raw: dict[str, Any] | None) -> TitleExtras:
+    """Map stored JSONB extras into API DTOs with resolved image URLs."""
+    doc: dict[str, Any] = raw if isinstance(raw, dict) else {}
+    images_raw: dict[str, Any] = (
+        doc['images'] if isinstance(doc.get('images'), dict) else {}
+    )
+    collection_raw = (
+        doc['collection'] if isinstance(doc.get('collection'), dict) else None
+    )
+    providers_raw: dict[str, Any] = (
+        doc['watch_providers'] if isinstance(doc.get('watch_providers'), dict) else {}
+    )
+    providers: dict[str, WatchProviderRegion] = {}
+    for region, block in providers_raw.items():
+        if not isinstance(block, dict):
+            continue
+
+        def map_providers(rows: object) -> list[WatchProvider]:
+            out: list[WatchProvider] = []
+            if not isinstance(rows, list):
+                return out
+            for row in rows:
+                if not isinstance(row, dict) or not row.get('provider_name'):
+                    continue
+                out.append(
+                    WatchProvider(
+                        provider_id=row.get('provider_id'),
+                        provider_name=str(row['provider_name']),
+                        logo_url=_image_url(row.get('logo_path'), size='w92'),
+                        display_priority=row.get('display_priority'),
+                    )
+                )
+            return out
+
+        providers[str(region)] = WatchProviderRegion(
+            link=block.get('link'),
+            flatrate=map_providers(block.get('flatrate')),
+            rent=map_providers(block.get('rent')),
+            buy=map_providers(block.get('buy')),
+            ads=map_providers(block.get('ads')),
+            free=map_providers(block.get('free')),
+        )
+
+    return TitleExtras(
+        tagline=doc.get('tagline'),
+        original_language=doc.get('original_language'),
+        budget=doc.get('budget'),
+        revenue=doc.get('revenue'),
+        collection=(
+            CollectionRef(
+                id=collection_raw.get('id'),
+                name=str(collection_raw['name']),
+                poster_url=_image_url(collection_raw.get('poster_path')),
+            )
+            if collection_raw and collection_raw.get('name')
+            else None
+        ),
+        genres=[
+            NamedId(id=g.get('id'), name=str(g['name']))
+            for g in doc.get('genres', [])
+            if isinstance(g, dict) and g.get('name')
+        ],
+        keywords=[
+            NamedId(id=k.get('id'), name=str(k['name']))
+            for k in doc.get('keywords', [])
+            if isinstance(k, dict) and k.get('name')
+        ],
+        studios=[
+            StudioRef(
+                id=s.get('id'),
+                name=str(s['name']),
+                origin_country=s.get('origin_country'),
+            )
+            for s in doc.get('studios', [])
+            if isinstance(s, dict) and s.get('name')
+        ],
+        countries=[
+            CountryRef(
+                iso_3166_1=str(c['iso_3166_1']),
+                name=c.get('name'),
+            )
+            for c in doc.get('countries', [])
+            if isinstance(c, dict) and c.get('iso_3166_1')
+        ],
+        spoken_languages=[
+            LanguageRef(
+                iso_639_1=lang.get('iso_639_1'),
+                english_name=lang.get('english_name'),
+                name=lang.get('name'),
+            )
+            for lang in doc.get('spoken_languages', [])
+            if isinstance(lang, dict)
+        ],
+        alternative_titles=[
+            AlternativeTitle(
+                iso_3166_1=t.get('iso_3166_1'),
+                title=str(t['title']),
+                type=t.get('type'),
+            )
+            for t in doc.get('alternative_titles', [])
+            if isinstance(t, dict) and t.get('title')
+        ],
+        releases=[
+            ReleaseEvent(
+                country=r.get('country'),
+                release_date=r.get('release_date'),
+                type=r.get('type'),
+                certification=r.get('certification'),
+                note=r.get('note'),
+            )
+            for r in doc.get('releases', [])
+            if isinstance(r, dict)
+        ],
+        videos=[
+            VideoRef(
+                key=str(v['key']),
+                name=v.get('name'),
+                site=str(v.get('site') or 'YouTube'),
+                type=v.get('type'),
+                official=bool(v.get('official')),
+            )
+            for v in doc.get('videos', [])
+            if isinstance(v, dict) and v.get('key')
+        ],
+        images=MediaGallery(
+            backdrops=[
+                url
+                for path in images_raw.get('backdrops', [])
+                if isinstance(path, str)
+                for url in [_image_url(path, size='w780')]
+                if url
+            ],
+            posters=[
+                url
+                for path in images_raw.get('posters', [])
+                if isinstance(path, str)
+                for url in [_image_url(path, size='w500')]
+                if url
+            ],
+        ),
+        watch_providers=providers,
+        similar=[
+            SimilarTitle(
+                tmdb_id=int(row['tmdb_id']),
+                title=str(row['title']),
+                year=row.get('year'),
+                poster_url=_image_url(
+                    row['poster_path']
+                    if isinstance(row.get('poster_path'), str)
+                    else None,
+                    size='w342',
+                ),
+            )
+            for row in doc.get('similar', [])
+            if isinstance(row, dict) and row.get('tmdb_id') and row.get('title')
+        ],
+    )
+
+
+async def _resolve_similar_catalog_ids(
+    session: AsyncSession,
+    extras: TitleExtras,
+    *,
+    source_namespace: str,
+) -> None:
+    """Attach Aperture content ids when recommended titles exist in-catalog."""
+    content_type = 'movie' if source_namespace == 'movie' else 'tv_show'
+    for item in extras.similar:
+        mapping = await metadata_repository.get_external_id(
+            session,
+            source='tmdb',
+            source_namespace=source_namespace,
+            external_id=str(item.tmdb_id),
+        )
+        if mapping is not None and mapping.content_item_id is not None:
+            item.content_id = mapping.content_item_id
+            item.content_type = content_type
 
 
 def _credit_refs(
@@ -86,13 +279,14 @@ def _movie_detail(item: ContentItem) -> MovieDetail:
         original_title=item.original_title,
         overview=item.overview,
         poster_url=_image_url(item.poster_path),
-        backdrop_url=_image_url(item.backdrop_path, size='w780'),
+        backdrop_url=_image_url(item.backdrop_path, size='original'),
         popularity=item.popularity,
         release_date=item.movie.release_date,
         runtime_minutes=item.movie.runtime_minutes,
         status=item.movie.status,
         cast=cast_refs,
         crew=crew_refs,
+        extras=_title_extras(item.extras),
     )
 
 
@@ -133,7 +327,7 @@ def _tv_detail(item: ContentItem) -> TvDetail:
         original_title=item.original_title,
         overview=item.overview,
         poster_url=_image_url(item.poster_path),
-        backdrop_url=_image_url(item.backdrop_path, size='w780'),
+        backdrop_url=_image_url(item.backdrop_path, size='original'),
         popularity=item.popularity,
         first_air_date=item.tv_show.first_air_date,
         last_air_date=item.tv_show.last_air_date,
@@ -143,6 +337,7 @@ def _tv_detail(item: ContentItem) -> TvDetail:
         seasons=season_details,
         cast=cast_refs,
         crew=crew_refs,
+        extras=_title_extras(item.extras),
     )
 
 
@@ -227,7 +422,13 @@ async def get_movie_detail(
     item = await metadata_repository.get_movie_by_id(session, content_item_id)
     if item is None or item.movie is None:
         raise CatalogNotFoundError('movie not found')
-    return _movie_detail(item)
+    detail = _movie_detail(item)
+    await _resolve_similar_catalog_ids(
+        session,
+        detail.extras,
+        source_namespace='movie',
+    )
+    return detail
 
 
 async def get_tv_detail(
@@ -238,7 +439,13 @@ async def get_tv_detail(
     item = await metadata_repository.get_tv_by_id(session, content_item_id)
     if item is None or item.tv_show is None:
         raise CatalogNotFoundError('tv show not found')
-    return _tv_detail(item)
+    detail = _tv_detail(item)
+    await _resolve_similar_catalog_ids(
+        session,
+        detail.extras,
+        source_namespace='tv',
+    )
+    return detail
 
 
 async def get_person_detail(

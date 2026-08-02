@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -170,8 +171,10 @@ async def upsert_movie(
     release_date: date | None = None,
     runtime_minutes: int | None = None,
     status: str | None = None,
+    extras: dict[str, Any] | None = None,
 ) -> ContentItem:
     """Create or update a movie + content_item by TMDb (or fixture) id."""
+    extras_doc = extras if extras is not None else {}
     mapping = await get_external_id(
         session,
         source=source,
@@ -191,6 +194,7 @@ async def upsert_movie(
         item.poster_path = poster_path
         item.backdrop_path = backdrop_path
         item.popularity = popularity
+        item.extras = extras_doc
         assert item.movie is not None
         item.movie.release_date = release_date
         item.movie.runtime_minutes = runtime_minutes
@@ -206,6 +210,7 @@ async def upsert_movie(
         poster_path=poster_path,
         backdrop_path=backdrop_path,
         popularity=popularity,
+        extras=extras_doc,
     )
     session.add(item)
     await session.flush()
@@ -247,8 +252,10 @@ async def upsert_tv_show(
     status: str | None = None,
     number_of_seasons: int | None = None,
     number_of_episodes: int | None = None,
+    extras: dict[str, Any] | None = None,
 ) -> ContentItem:
     """Create or update a TV show + content_item by provider id."""
+    extras_doc = extras if extras is not None else {}
     mapping = await get_external_id(
         session,
         source=source,
@@ -268,6 +275,7 @@ async def upsert_tv_show(
         item.poster_path = poster_path
         item.backdrop_path = backdrop_path
         item.popularity = popularity
+        item.extras = extras_doc
         assert item.tv_show is not None
         item.tv_show.first_air_date = first_air_date
         item.tv_show.last_air_date = last_air_date
@@ -285,6 +293,7 @@ async def upsert_tv_show(
         poster_path=poster_path,
         backdrop_path=backdrop_path,
         popularity=popularity,
+        extras=extras_doc,
     )
     session.add(item)
     await session.flush()

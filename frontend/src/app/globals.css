@@ -38,6 +38,83 @@
       var(--color-bg);
   }
 
+  /* Soft wash so a full-page TMDB backdrop keeps text readable. */
+  .catalog-backdrop-veil {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(12, 11, 9, 0.25) 0%,
+        rgba(12, 11, 9, 0.45) 45%,
+        rgba(12, 11, 9, 0.72) 100%
+      ),
+      linear-gradient(
+        90deg,
+        rgba(12, 11, 9, 0.5) 0%,
+        transparent 24%,
+        transparent 76%,
+        rgba(12, 11, 9, 0.5) 100%
+      );
+  }
+
+  /* Client-sampled backdrop luminance flips detail-page text tokens. */
+  [data-title-contrast='on-light'] {
+    --color-fg: #1a1712;
+    --color-fg-muted: #4d473e;
+    --color-accent: #8a4f10;
+    --color-accent-soft: rgba(138, 79, 16, 0.14);
+    --color-border: rgba(26, 23, 18, 0.16);
+    --color-focus: #8a4f10;
+    --color-bg-elevated: rgba(255, 253, 248, 0.78);
+  }
+
+  [data-title-contrast='on-light'] .catalog-backdrop-veil {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(246, 241, 232, 0.2) 0%,
+        rgba(246, 241, 232, 0.42) 50%,
+        rgba(246, 241, 232, 0.72) 100%
+      ),
+      linear-gradient(
+        90deg,
+        rgba(246, 241, 232, 0.35) 0%,
+        transparent 24%,
+        transparent 76%,
+        rgba(246, 241, 232, 0.35) 100%
+      );
+  }
+
+  /* Releases list: thumb only, no track/gutter. */
+  .catalog-thumb-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(243, 239, 230, 0.35) transparent;
+  }
+
+  .catalog-thumb-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .catalog-thumb-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .catalog-thumb-scroll::-webkit-scrollbar-thumb {
+    background: rgba(243, 239, 230, 0.35);
+    border-radius: 999px;
+  }
+
+  .catalog-thumb-scroll::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  /* Clip TMDB provider logos (square PNGs with squircle art + black corners). */
+  .provider-logo-mask {
+    border-radius: 28%;
+    background: transparent;
+  }
+
   .motion-fade-rise {
     animation: fade-rise var(--duration-slow) var(--ease-out) both;
   }

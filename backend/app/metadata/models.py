@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
@@ -23,6 +24,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.base import Base
@@ -43,6 +45,12 @@ class ContentItem(UuidPrimaryKeyMixin, TimestampMixin, Base):
     popularity: Mapped[Decimal | None] = mapped_column(
         Numeric(12, 3),
         nullable=True,
+    )
+    extras: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=dict,
+        server_default='{}',
     )
 
     __table_args__ = (

@@ -60,7 +60,7 @@ def test_fixture_seed_is_idempotent() -> None:
                 session,
                 source='tmdb',
                 source_namespace='person',
-                external_id='193',
+                external_id='192',
             )
             assert person_map is not None and person_map.person_id is not None
             person = await metadata_repository.get_person_by_id(

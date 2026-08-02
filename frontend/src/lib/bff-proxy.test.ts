@@ -17,10 +17,16 @@ describe('isDeniedProxyPath', () => {
     expect(isDeniedProxyPath(['api', 'v1', 'auth', 'refresh'])).toBe(true);
   });
 
+  it('denies catalog resolve paths', () => {
+    expect(isDeniedProxyPath(['api', 'v1', 'movies', 'resolve'])).toBe(true);
+    expect(isDeniedProxyPath(['api', 'v1', 'tv', 'resolve'])).toBe(true);
+  });
+
   it('allows health, version, and other api paths', () => {
     expect(isDeniedProxyPath(['health', 'ready'])).toBe(false);
     expect(isDeniedProxyPath(['version'])).toBe(false);
     expect(isDeniedProxyPath(['api', 'v1', 'users'])).toBe(false);
+    expect(isDeniedProxyPath(['api', 'v1', 'movies', 'abc'])).toBe(false);
     expect(isDeniedProxyPath(['api', 'v1'])).toBe(false);
   });
 });
