@@ -1,5 +1,7 @@
-import { CatalogUnavailable } from '@/components/catalog-detail';
-import { SiteHeader } from '@/components/site-header';
+import {
+  CatalogStatusShell,
+  CatalogUnavailable,
+} from '@/components/catalog-detail';
 import { resolveTvByTmdb } from '@/lib/catalog';
 import { notFound, redirect } from 'next/navigation';
 
@@ -22,10 +24,9 @@ export default async function TvTmdbResolvePage({
   }
   if (!result.ok) {
     return (
-      <main className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
-        <SiteHeader />
+      <CatalogStatusShell>
         <CatalogUnavailable message={result.error} />
-      </main>
+      </CatalogStatusShell>
     );
   }
 

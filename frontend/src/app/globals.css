@@ -168,20 +168,78 @@
     background:
       linear-gradient(
         180deg,
-        rgba(12, 11, 9, 0.25) 0%,
-        rgba(12, 11, 9, 0.45) 45%,
-        rgba(12, 11, 9, 0.72) 100%
+        rgba(12, 11, 9, 0.38) 0%,
+        rgba(12, 11, 9, 0.58) 42%,
+        rgba(12, 11, 9, 0.86) 100%
       ),
       linear-gradient(
         90deg,
-        rgba(12, 11, 9, 0.5) 0%,
-        transparent 24%,
-        transparent 76%,
-        rgba(12, 11, 9, 0.5) 100%
+        rgba(12, 11, 9, 0.62) 0%,
+        transparent 28%,
+        transparent 72%,
+        rgba(12, 11, 9, 0.62) 100%
       );
   }
 
-  /* Client-sampled backdrop luminance flips detail-page text tokens. */
+  /*
+   * Slow drifting color wash over the veil — presence without competing
+   * with title content. Disabled under prefers-reduced-motion.
+   */
+  .catalog-backdrop-drift {
+    background:
+      radial-gradient(
+        48% 42% at 22% 28%,
+        rgba(224, 164, 92, 0.28),
+        transparent 72%
+      ),
+      radial-gradient(
+        42% 38% at 78% 68%,
+        rgba(90, 120, 150, 0.2),
+        transparent 70%
+      ),
+      radial-gradient(
+        55% 48% at 50% 100%,
+        rgba(12, 11, 9, 0.35),
+        transparent 65%
+      );
+    background-size: 160% 160%, 150% 150%, 120% 120%;
+    background-position: 0% 20%, 100% 80%, 50% 100%;
+    animation: catalog-atmosphere-drift 32s ease-in-out infinite alternate;
+    will-change: background-position, transform;
+  }
+
+  /*
+   * Client-sampled backdrop luminance flips detail-page text tokens.
+   * These win over the global app theme (light/dark) so secondary copy
+   * stays readable on warm/dark or bright poster atmospheres.
+   */
+  [data-title-contrast='on-dark'] {
+    --color-fg: #f3efe6;
+    --color-fg-muted: #c4bdb0;
+    --color-accent: #e0a45c;
+    --color-accent-soft: rgba(224, 164, 92, 0.16);
+    --color-border: rgba(243, 239, 230, 0.18);
+    --color-focus: #f0c48a;
+    --color-bg-elevated: rgba(22, 20, 17, 0.82);
+  }
+
+  [data-title-contrast='on-dark'] .catalog-backdrop-veil {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(12, 11, 9, 0.38) 0%,
+        rgba(12, 11, 9, 0.58) 42%,
+        rgba(12, 11, 9, 0.86) 100%
+      ),
+      linear-gradient(
+        90deg,
+        rgba(12, 11, 9, 0.62) 0%,
+        transparent 28%,
+        transparent 72%,
+        rgba(12, 11, 9, 0.62) 100%
+      );
+  }
+
   [data-title-contrast='on-light'] {
     --color-fg: #1a1712;
     --color-fg-muted: #4d473e;
@@ -196,16 +254,35 @@
     background:
       linear-gradient(
         180deg,
-        rgba(246, 241, 232, 0.2) 0%,
-        rgba(246, 241, 232, 0.42) 50%,
-        rgba(246, 241, 232, 0.72) 100%
+        rgba(246, 241, 232, 0.32) 0%,
+        rgba(246, 241, 232, 0.55) 48%,
+        rgba(246, 241, 232, 0.84) 100%
       ),
       linear-gradient(
         90deg,
-        rgba(246, 241, 232, 0.35) 0%,
-        transparent 24%,
-        transparent 76%,
-        rgba(246, 241, 232, 0.35) 100%
+        rgba(246, 241, 232, 0.48) 0%,
+        transparent 28%,
+        transparent 72%,
+        rgba(246, 241, 232, 0.48) 100%
+      );
+  }
+
+  [data-title-contrast='on-light'] .catalog-backdrop-drift {
+    background:
+      radial-gradient(
+        48% 42% at 22% 28%,
+        rgba(224, 164, 92, 0.22),
+        transparent 72%
+      ),
+      radial-gradient(
+        42% 38% at 78% 68%,
+        rgba(180, 150, 120, 0.18),
+        transparent 70%
+      ),
+      radial-gradient(
+        55% 48% at 50% 100%,
+        rgba(246, 241, 232, 0.4),
+        transparent 65%
       );
   }
 
@@ -340,6 +417,18 @@
   }
 }
 
+@keyframes catalog-atmosphere-drift {
+  from {
+    background-position: 0% 18%, 100% 78%, 48% 100%;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+
+  to {
+    background-position: 72% 62%, 8% 28%, 52% 92%;
+    transform: scale(1.12) translate3d(-1.5%, 1%, 0);
+  }
+}
+
 @keyframes search-backdrop-in {
   from {
     opacity: 0;
@@ -388,11 +477,17 @@
   .motion-fade-rise,
   .motion-fade-rise-delay,
   .motion-fade-in,
+  .catalog-backdrop-drift,
   .search-overlay-backdrop,
   .search-overlay-panel,
   .search-overlay-backdrop.is-leaving,
   .search-overlay-panel.is-leaving,
   .status-pulse::before {
     animation: none !important;
+  }
+
+  .catalog-backdrop-drift {
+    will-change: auto;
+    transform: none;
   }
 }

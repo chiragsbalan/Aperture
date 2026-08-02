@@ -332,44 +332,18 @@ def test_top_movies_settings_bounds_via_env(
         get_settings()
 
 
-def test_top_movies_rate_limit_on_fill_returns_429(
+def test_top_movies_rate_limit_returns_429(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """RL charges only on the TMDb fill path (forced cache miss each time)."""
+    """Request-level RL charges every call (HIT / BYPASS / MISS), like landing."""
     secret = 'test-bff-shared-secret'
     unique_ip = f'203.0.113.{uuid.uuid4().int % 200 + 10}'
     monkeypatch.setenv('AUTH_BFF_SHARED_SECRET', secret)
-    monkeypatch.setenv('TMDB_API_KEY', 'test-tmdb-key')
+    monkeypatch.setenv('TMDB_API_KEY', '')
     monkeypatch.setenv('TOP_MOVIES_RATE_LIMIT_MAX_PER_IP', '2')
     get_settings.cache_clear()
     init_cache('')
-
-    settings = get_settings()
-    key = top_movies_key(count=settings.top_movies_pool_count)
-    cache = get_cache()
-    original_get = cache.get
-
-    async def always_miss_pool(cache_key: str) -> str | None:
-        if cache_key == key:
-            return None
-        return await original_get(cache_key)
-
-    async def fake_fetch(
-        settings_arg: Settings,
-        *,
-        count: int | None = None,
-        client: TmdbClient | None = None,
-    ) -> TopMoviesResponse:
-        del settings_arg, count, client
-        return _sample_pool(size=5)
-
-    monkeypatch.setattr(cache, 'get', always_miss_pool)
-    monkeypatch.setattr(
-        metadata_service,
-        'fetch_top_movies_pool',
-        fake_fetch,
-    )
 
     headers = {
         'X-Aperture-Client-IP': unique_ip,
@@ -379,6 +353,7 @@ def test_top_movies_rate_limit_on_fill_returns_429(
     second = client.get('/api/v1/catalog/top-movies', headers=headers)
     third = client.get('/api/v1/catalog/top-movies', headers=headers)
     assert first.status_code == 200, first.text
+    assert first.headers.get('x-cache') == 'BYPASS'
     assert second.status_code == 200, second.text
     assert third.status_code == 429, third.text
     assert 'top movies' in third.json()['detail'].lower()
@@ -387,19 +362,18 @@ def test_top_movies_rate_limit_on_fill_returns_429(
     assert run_coro_sync(get_cache().get(rl_key)) is not None
 
 
-def test_top_movies_rate_limit_not_charged_on_hit(
+def test_top_movies_rate_limit_charges_warm_hit(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Warm HIT traffic still charges the request-level bucket."""
     secret = 'test-bff-shared-secret'
     unique_ip = f'203.0.113.{uuid.uuid4().int % 200 + 10}'
     monkeypatch.setenv('AUTH_BFF_SHARED_SECRET', secret)
     monkeypatch.setenv('TMDB_API_KEY', 'test-tmdb-key')
-    monkeypatch.setenv('TOP_MOVIES_RATE_LIMIT_MAX_PER_IP', '1')
+    monkeypatch.setenv('TOP_MOVIES_RATE_LIMIT_MAX_PER_IP', '2')
     get_settings.cache_clear()
     init_cache('')
-
-    calls = {'n': 0}
 
     async def fake_fetch(
         settings: Settings,
@@ -408,7 +382,6 @@ def test_top_movies_rate_limit_not_charged_on_hit(
         client: TmdbClient | None = None,
     ) -> TopMoviesResponse:
         del settings, count, client
-        calls['n'] += 1
         return _sample_pool(size=5)
 
     monkeypatch.setattr(
@@ -424,36 +397,14 @@ def test_top_movies_rate_limit_not_charged_on_hit(
     first = client.get('/api/v1/catalog/top-movies', headers=headers)
     assert first.status_code == 200, first.text
     assert first.headers.get('x-cache') == 'MISS'
-    assert calls['n'] == 1
 
-    # Warm HIT traffic must not charge the fill-path rate limit.
-    for _ in range(5):
-        hit = client.get('/api/v1/catalog/top-movies', headers=headers)
-        assert hit.status_code == 200, hit.text
-        assert hit.headers.get('x-cache') == 'HIT'
-    assert calls['n'] == 1
+    second = client.get('/api/v1/catalog/top-movies', headers=headers)
+    assert second.status_code == 200, second.text
+    assert second.headers.get('x-cache') == 'HIT'
 
-
-def test_top_movies_bypass_does_not_charge_rate_limit(
-    client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    secret = 'test-bff-shared-secret'
-    unique_ip = f'203.0.113.{uuid.uuid4().int % 200 + 10}'
-    monkeypatch.setenv('AUTH_BFF_SHARED_SECRET', secret)
-    monkeypatch.setenv('TMDB_API_KEY', '')
-    monkeypatch.setenv('TOP_MOVIES_RATE_LIMIT_MAX_PER_IP', '1')
-    get_settings.cache_clear()
-    init_cache('')
-
-    headers = {
-        'X-Aperture-Client-IP': unique_ip,
-        'X-Aperture-BFF-Secret': secret,
-    }
-    for _ in range(5):
-        res = client.get('/api/v1/catalog/top-movies', headers=headers)
-        assert res.status_code == 200, res.text
-        assert res.headers.get('x-cache') == 'BYPASS'
+    third = client.get('/api/v1/catalog/top-movies', headers=headers)
+    assert third.status_code == 429, third.text
+    assert 'top movies' in third.json()['detail'].lower()
 
     rl_key = f'metadata:rl:top-movies:ip:{hash_rate_limit_subject(unique_ip)}'
-    assert run_coro_sync(get_cache().get(rl_key)) is None
+    assert run_coro_sync(get_cache().get(rl_key)) is not None

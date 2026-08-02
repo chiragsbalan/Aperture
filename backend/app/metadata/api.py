@@ -224,14 +224,13 @@ async def _read_cached_top_movies(
 
 
 async def _load_top_movies_pool(
-    request: Request,
     settings: SettingsDep,
     response: Response,
 ) -> TopMoviesResponse:
     """Load the cached TMDb top-movies pool (fill on miss).
 
-    Rate-limit only when about to call TMDb after a confirmed cache miss.
-    Warm HIT paths (including singleflight second readers) are uncharged.
+    Request-level rate limiting is enforced in ``get_top_movies`` before this
+    runs (HIT / BYPASS / MISS). This loader does not charge a separate bucket.
     """
     cache = get_cache()
     key = top_movies_key(count=settings.top_movies_pool_count)
@@ -250,13 +249,6 @@ async def _load_top_movies_pool(
         if not settings.tmdb_api_key.strip():
             response.headers['X-Cache'] = 'BYPASS'
             return TopMoviesResponse(movies=[])
-
-        client_ip = resolve_client_ip(request, settings)
-        await enforce_top_movies_rate_limit(
-            cache,
-            settings=settings,
-            client_ip=client_ip,
-        )
 
         try:
             detail = await metadata_service.fetch_top_movies_pool(settings)
@@ -295,15 +287,22 @@ async def get_top_movies(
 ) -> TopMoviesResponse:
     """Return a shuffled sample from TMDb's all-time top-rated movies.
 
-    Public (unauthenticated), like ``/landing/posters``. The full pool
+    Public (unauthenticated), like ``/landing/posters``. Every request is
+    subject to a per-IP rate limit (HIT / BYPASS / MISS). The full pool
     (default 100) is Redis-cached; each response reshuffles and truncates to
     ``limit``. Degrades to an empty list when TMDb is unavailable so the home
-    rail can hide itself.
+    rail can show an empty state.
     """
+    client_ip = resolve_client_ip(request, settings)
+    await enforce_top_movies_rate_limit(
+        get_cache(),
+        settings=settings,
+        client_ip=client_ip,
+    )
     display_limit = (
         limit if limit is not None else settings.top_movies_default_limit
     )
-    pool = await _load_top_movies_pool(request, settings, response)
+    pool = await _load_top_movies_pool(settings, response)
     response.headers['Cache-Control'] = _TOP_MOVIES_CACHE_CONTROL
     return _shuffle_top_movies(pool, limit=display_limit)
 

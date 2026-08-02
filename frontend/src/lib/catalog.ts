@@ -308,7 +308,8 @@ export async function fetchLandingPosterUrls(): Promise<string[]> {
 
 /**
  * Shuffled sample from the TMDb top-rated pool for the signed-in home rail.
- * Always no-store so each navigation can reshuffle via the API.
+ * Public/unauthenticated upstream (request-level rate limited); always
+ * no-store so each navigation can reshuffle via the API.
  */
 export async function fetchTopMovies(limit = 12): Promise<TopMovie[]> {
   let base: string;

@@ -24,6 +24,15 @@ export const metadata: Metadata = {
  *
  * Never calls refresh from RSC (Next cannot persist rotated cookies here).
  * SiteHeader refreshes via `/api/auth/me` on the client.
+ *
+ * Matrix:
+ * - no cookies → guest
+ * - refresh-only → signed-in (intentional RSC optimism; SiteHeader recovers)
+ * - /auth/me ok → signed-in
+ * - 401 + refresh → signed-in; 401 without refresh → guest
+ * - 5xx / timeout / network + refresh → signed-in; access-only → guest
+ * - 429 + any auth cookie → signed-in; else guest
+ * - config / baseUrl failure → signed-in only if refresh; access-only → guest
  */
 async function shouldShowSignedInHome(): Promise<boolean> {
   const jar = await cookies();
@@ -43,8 +52,8 @@ async function shouldShowSignedInHome(): Promise<boolean> {
   try {
     base = upstreamApiBaseUrl();
   } catch {
-    // Misconfigured API — keep signed-in shell when any auth cookie exists.
-    return true;
+    // Misconfigured API — keep signed-in shell only when refresh can recover.
+    return Boolean(refresh);
   }
 
   try {
@@ -70,11 +79,15 @@ async function shouldShowSignedInHome(): Promise<boolean> {
     if (res.status === 401) {
       return Boolean(refresh);
     }
-    // 429 / 5xx — fail open to signed-in home.
-    return true;
+    if (res.status === 429) {
+      // Avoid demoting the shell solely because /me is rate-limited.
+      return Boolean(access || refresh);
+    }
+    // 5xx (and other non-ok) — optimistic only when refresh can recover.
+    return Boolean(refresh);
   } catch {
-    // Network / timeout — fail open when any auth cookie is present.
-    return true;
+    // Network / timeout — optimistic only when refresh can recover.
+    return Boolean(refresh);
   }
 }
 
@@ -91,13 +104,6 @@ export default async function HomePage() {
           id="main-content"
           className="motion-fade-rise relative z-[1] w-full max-w-5xl text-left"
         >
-          <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            Home
-          </h1>
-          <p className="mt-2 max-w-xl text-sm text-muted sm:text-base">
-            Pick something from the top of the catalog — or search from the
-            header.
-          </p>
           <TopMoviesRail movies={movies} />
         </main>
       </div>

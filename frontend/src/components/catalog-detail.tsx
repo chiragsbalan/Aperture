@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { CatalogPoster } from '@/components/catalog-poster';
 import { LibraryActions } from '@/components/library-actions';
 import { MoreLikeThis } from '@/components/more-like-this';
+import { SiteHeader } from '@/components/site-header';
 import { TitleAtmosphere } from '@/components/title-atmosphere';
 import { TitleMetaTabs } from '@/components/title-meta-tabs';
 import { WhereToWatch } from '@/components/where-to-watch';
@@ -110,7 +111,7 @@ function TitleMetaRow({ children }: { children: ReactNode }) {
 
 function MetaDot() {
   return (
-    <span aria-hidden className="text-muted/50">
+    <span aria-hidden className="text-muted opacity-50">
       ·
     </span>
   );
@@ -118,7 +119,7 @@ function MetaDot() {
 
 export function CatalogNotFound({ label }: { label: string }) {
   return (
-    <div className="motion-fade-rise relative z-[1] mx-auto mt-8 max-w-3xl space-y-4 px-6 text-center">
+    <div className="motion-fade-rise mx-auto mt-8 max-w-3xl space-y-4 px-6 text-center">
       <h1 className="font-display text-2xl font-semibold text-foreground">
         {label} not found
       </h1>
@@ -132,7 +133,7 @@ export function CatalogNotFound({ label }: { label: string }) {
 
 export function CatalogUnavailable({ message }: { message?: string }) {
   return (
-    <div className="motion-fade-rise relative z-[1] mx-auto mt-8 max-w-3xl space-y-4 px-6 text-center">
+    <div className="motion-fade-rise mx-auto mt-8 max-w-3xl space-y-4 px-6 text-center">
       <h1 className="font-display text-2xl font-semibold text-foreground">
         Catalog unavailable
       </h1>
@@ -140,6 +141,24 @@ export function CatalogUnavailable({ message }: { message?: string }) {
         {message?.trim() || 'We could not load this title right now.'}
       </p>
       <HomeLink />
+    </div>
+  );
+}
+
+/**
+ * Shared chrome for title unavailable / not-found paths:
+ * skip-link → SiteHeader → single ``<main id="main-content">``.
+ */
+export function CatalogStatusShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+      <SiteHeader />
+      <main id="main-content" className="relative z-[1]">
+        {children}
+      </main>
     </div>
   );
 }
@@ -208,42 +227,48 @@ function TitleDetailShell({
 }) {
   return (
     <TitleAtmosphere backdropUrl={backdropUrl}>
-      <article className="motion-fade-rise mx-auto w-full max-w-5xl px-6 pb-24 pt-28 text-left">
-        <div className="flex flex-col gap-10 sm:flex-row sm:items-start sm:gap-12">
-          <div className="min-w-0 flex-1">
-            {heading}
-            {meta}
-            <LibraryActions contentType={contentType} contentId={contentId} />
-            {tagline ? (
-              <p className="mt-6 text-sm font-semibold tracking-[0.14em] text-muted uppercase">
-                {tagline}
-              </p>
-            ) : null}
-            {overview ? (
-              <p className="mt-4 max-w-2xl whitespace-pre-wrap text-[1.05rem] leading-relaxed text-foreground/90">
-                {overview}
-              </p>
-            ) : (
-              <p className="mt-7 text-sm text-muted">No overview yet.</p>
-            )}
-            <TitleMetaTabs
-              cast={cast}
-              crew={crew}
-              extras={extras}
-              seasons={seasons}
-            />
-            <MoreLikeThis
-              items={extras.similar ?? []}
-              kind={contentType === 'tv_show' ? 'tv_show' : 'movie'}
-              contentId={contentId}
-            />
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+      <SiteHeader />
+      <main id="main-content" className="relative">
+        <article className="motion-fade-rise mx-auto w-full max-w-5xl px-6 pb-24 pt-28 text-left">
+          <div className="flex flex-col gap-10 sm:flex-row sm:items-start sm:gap-12">
+            <div className="min-w-0 flex-1">
+              {heading}
+              {meta}
+              <LibraryActions contentType={contentType} contentId={contentId} />
+              {tagline ? (
+                <p className="mt-6 text-sm font-semibold tracking-[0.14em] text-muted uppercase">
+                  {tagline}
+                </p>
+              ) : null}
+              {overview ? (
+                <p className="mt-4 max-w-2xl whitespace-pre-wrap text-[1.05rem] leading-relaxed text-foreground">
+                  {overview}
+                </p>
+              ) : (
+                <p className="mt-7 text-sm text-muted">No overview yet.</p>
+              )}
+              <TitleMetaTabs
+                cast={cast}
+                crew={crew}
+                extras={extras}
+                seasons={seasons}
+              />
+              <MoreLikeThis
+                items={extras.similar ?? []}
+                kind={contentType === 'tv_show' ? 'tv_show' : 'movie'}
+                contentId={contentId}
+              />
+            </div>
+            <div className="mx-auto w-full max-w-[18rem] shrink-0 sm:mx-0 sm:mt-12 sm:w-[18rem]">
+              <CatalogPoster url={posterUrl} alt={posterAlt} priority />
+              <WhereToWatch providers={extras.watch_providers} title={title} />
+            </div>
           </div>
-          <div className="mx-auto w-full max-w-[18rem] shrink-0 sm:mx-0 sm:mt-12 sm:w-[18rem]">
-            <CatalogPoster url={posterUrl} alt={posterAlt} priority />
-            <WhereToWatch providers={extras.watch_providers} title={title} />
-          </div>
-        </div>
-      </article>
+        </article>
+      </main>
     </TitleAtmosphere>
   );
 }
