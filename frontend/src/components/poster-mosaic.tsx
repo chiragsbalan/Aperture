@@ -186,21 +186,51 @@ function isSearchOverlayOpen(): boolean {
   return document.body.hasAttribute('data-search-open');
 }
 
+function columnCountFromLayer(
+  layer: HTMLUListElement,
+  fallback: number,
+): number {
+  const fromStyle = getComputedStyle(layer)
+    .gridTemplateColumns.split(/\s+/)
+    .filter(Boolean).length;
+  return fromStyle > 0 ? fromStyle : Math.max(1, fallback);
+}
+
+/**
+ * Lens hit-testing centers in layer-local coordinates.
+ * Derived from the live CSS grid (not offsetTop/Height) so absolute flip
+ * faces / transforms cannot collapse measurements to the top rows only.
+ */
 function recomputeTileCenters(
   layer: HTMLUListElement | null,
+  colsFallback: number,
   centersRef: { current: Float32Array | null },
 ) {
   if (!layer) {
     centersRef.current = null;
     return;
   }
-  const items = layer.children;
-  const count = items.length;
+  const cols = columnCountFromLayer(layer, colsFallback);
+  const count = layer.children.length;
+  const width = layer.clientWidth;
+  if (count < 1 || width < 1 || cols < 1) {
+    centersRef.current = null;
+    return;
+  }
+  const tileWidth = (width - TILE_GAP_PX * (cols - 1)) / cols;
+  if (tileWidth < 1) {
+    centersRef.current = null;
+    return;
+  }
+  const tileHeight = tileWidth * (3 / 2);
+  const strideX = tileWidth + TILE_GAP_PX;
+  const strideY = tileHeight + TILE_GAP_PX;
   const centers = new Float32Array(count * 2);
   for (let i = 0; i < count; i++) {
-    const item = items[i] as HTMLElement;
-    centers[i * 2] = item.offsetLeft + item.offsetWidth / 2;
-    centers[i * 2 + 1] = item.offsetTop + item.offsetHeight / 2;
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    centers[i * 2] = col * strideX + tileWidth / 2;
+    centers[i * 2 + 1] = row * strideY + tileHeight / 2;
   }
   centersRef.current = centers;
 }
@@ -411,7 +441,7 @@ export function PosterMosaic({
       const estimated = tileCountForSize(width, height);
       setCols((current) => (nextCols === current ? current : nextCols));
       setTileCount((current) => (estimated === current ? current : estimated));
-      recomputeTileCenters(layerRef.current, centersRef);
+      recomputeTileCenters(layerRef.current, nextCols, centersRef);
     };
 
     if (!root || typeof ResizeObserver === 'undefined') {
@@ -419,7 +449,7 @@ export function PosterMosaic({
         const nextCols = columnCountForWidth(window.innerWidth);
         setCols(nextCols);
         setTileCount(tileCountForSize(window.innerWidth, window.innerHeight));
-        recomputeTileCenters(layerRef.current, centersRef);
+        recomputeTileCenters(layerRef.current, nextCols, centersRef);
       };
       syncFromWindow();
       window.addEventListener('resize', syncFromWindow);
@@ -466,14 +496,14 @@ export function PosterMosaic({
     }
 
     // Layout may not be final until after paint.
-    recomputeTileCenters(layerRef.current, centersRef);
+    recomputeTileCenters(layerRef.current, colsRef.current, centersRef);
     const rafId = window.requestAnimationFrame(() => {
-      recomputeTileCenters(layerRef.current, centersRef);
+      recomputeTileCenters(layerRef.current, colsRef.current, centersRef);
     });
     return () => {
       window.cancelAnimationFrame(rafId);
     };
-  }, [posters.length, tiles.length]);
+  }, [posters.length, tiles.length, cols]);
 
   // Staggered multi-tile poster flips (paused when hidden / search / reduced motion / user).
   useEffect(() => {
@@ -668,14 +698,24 @@ export function PosterMosaic({
       }
 
       const layer = layerRef.current;
-      const centers = centersRef.current;
-      if (!layer || !centers) {
+      if (!layer) {
         rafRef.current = window.requestAnimationFrame(tick);
         return;
       }
 
       const items = layer.children;
       const count = items.length;
+      const cols = Math.max(1, colsRef.current);
+      let centers = centersRef.current;
+      if (!centers || centers.length !== count * 2) {
+        recomputeTileCenters(layer, cols, centersRef);
+        centers = centersRef.current;
+      }
+      if (!centers) {
+        rafRef.current = window.requestAnimationFrame(tick);
+        return;
+      }
+
       if (!scalesRef.current || scalesRef.current.length !== count) {
         scalesRef.current = new Float32Array(count);
         scalesRef.current.fill(1);

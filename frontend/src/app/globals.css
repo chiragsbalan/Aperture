@@ -83,8 +83,10 @@
   }
 
   .poster-mosaic-tile {
+    position: relative;
     aspect-ratio: 2 / 3;
     width: 100%;
+    overflow: hidden;
     transform-origin: center center;
     perspective: 140px;
   }
