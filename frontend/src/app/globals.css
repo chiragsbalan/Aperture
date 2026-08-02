@@ -202,8 +202,14 @@
         rgba(12, 11, 9, 0.35),
         transparent 65%
       );
-    background-size: 160% 160%, 150% 150%, 120% 120%;
-    background-position: 0% 20%, 100% 80%, 50% 100%;
+    background-size:
+      160% 160%,
+      150% 150%,
+      120% 120%;
+    background-position:
+      0% 20%,
+      100% 80%,
+      50% 100%;
     animation: catalog-atmosphere-drift 32s ease-in-out infinite alternate;
     will-change: background-position, transform;
   }
@@ -419,12 +425,18 @@
 
 @keyframes catalog-atmosphere-drift {
   from {
-    background-position: 0% 18%, 100% 78%, 48% 100%;
+    background-position:
+      0% 18%,
+      100% 78%,
+      48% 100%;
     transform: scale(1) translate3d(0, 0, 0);
   }
 
   to {
-    background-position: 72% 62%, 8% 28%, 52% 92%;
+    background-position:
+      72% 62%,
+      8% 28%,
+      52% 92%;
     transform: scale(1.12) translate3d(-1.5%, 1%, 0);
   }
 }
