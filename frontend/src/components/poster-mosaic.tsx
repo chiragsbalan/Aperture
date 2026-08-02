@@ -1,7 +1,21 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+
+import {
+  appendTiles,
+  buildTiles,
+  needsFullTileRebuild,
+  pickReplacementPoster,
+} from '@/lib/poster-mosaic-tiles';
 
 /**
  * Soft circular lens around the cursor.
@@ -28,6 +42,78 @@ const SAFETY_MAX_TILES = 3000;
 const INITIAL_TILE_COUNT = 120;
 /** Binary z-index threshold so we avoid per-frame unique stacking churn. */
 const Z_INDEX_SCALE_THRESHOLD = 1.05;
+/**
+ * Continuous staggered flips: start a new tile every STAGGER_* ms, capped so
+ * several cards turn at once without flooding the grid.
+ * Keep FLIP_ANIM_MS in sync with --poster-flip-ms in tokens.css.
+ */
+const FLIP_ANIM_MS = 640;
+const FLIP_STAGGER_DENSE_MIN_MS = 70;
+const FLIP_STAGGER_DENSE_MAX_MS = 150;
+const FLIP_CONCURRENT_DENSE_MIN = 6;
+const FLIP_CONCURRENT_DENSE_MAX = 14;
+/** Coarse pointer or narrow viewports: lighter flip load. */
+const FLIP_STAGGER_SPARSE_MIN_MS = 180;
+const FLIP_STAGGER_SPARSE_MAX_MS = 360;
+const FLIP_CONCURRENT_SPARSE_MIN = 2;
+const FLIP_CONCURRENT_SPARSE_MAX = 4;
+/** Attempts to find a free tile index that isn't already flipping. */
+const FLIP_PICK_ATTEMPTS = 28;
+const MOSAIC_FLIPS_PAUSED_KEY = 'aperture.mosaicFlipsPaused';
+
+type FlipProfile = 'dense' | 'sparse';
+
+interface PendingFlip {
+  index: number;
+  url: string;
+  /** +1 = rotateY(180), -1 = rotateY(-180). */
+  direction: 1 | -1;
+}
+
+interface PosterMosaicTileProps {
+  url: string;
+  flip: PendingFlip | null;
+}
+
+const PosterMosaicTile = memo(function PosterMosaicTile({
+  url,
+  flip,
+}: PosterMosaicTileProps) {
+  return (
+    <li className="poster-mosaic-tile relative">
+      <div
+        className={`poster-mosaic-tile-inner${
+          flip ? ' is-flipping' : ''
+        }${flip?.direction === -1 ? ' is-flipping-reverse' : ''}`}
+      >
+        <div className="poster-mosaic-tile-face poster-mosaic-tile-face-front">
+          <Image
+            src={url}
+            alt=""
+            fill
+            sizes="72px"
+            className="object-cover"
+            loading="lazy"
+            unoptimized
+          />
+        </div>
+        {flip ? (
+          <div className="poster-mosaic-tile-face poster-mosaic-tile-face-back">
+            <Image
+              src={flip.url}
+              alt=""
+              fill
+              sizes="72px"
+              className="object-cover"
+              loading="eager"
+              unoptimized
+            />
+          </div>
+        ) : null}
+      </div>
+    </li>
+  );
+});
 
 function lensEase(distance: number): number {
   if (distance <= LENS_INNER_PX) {
@@ -48,32 +134,6 @@ function hashSeed(input: string): number {
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
-}
-
-/** Deterministic PRNG so SSR and the client's first paint match. */
-function mulberry32(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function buildTiles(
-  posters: readonly string[],
-  count: number,
-  seed: number,
-): string[] {
-  const rng = mulberry32(seed);
-  const tiles: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const index = Math.floor(rng() * posters.length);
-    tiles.push(posters[index]!);
-  }
-  return tiles;
 }
 
 function columnCountForWidth(width: number): number {
@@ -103,7 +163,7 @@ function tileCountForSize(width: number, height: number): number {
 function tileCountFromLaidOutGrid(
   layer: HTMLElement,
   containerHeight: number,
-): number | null {
+): { cols: number; count: number } | null {
   const cols = getComputedStyle(layer)
     .gridTemplateColumns.split(/\s+/)
     .filter(Boolean).length;
@@ -116,36 +176,96 @@ function tileCountFromLaidOutGrid(
     1,
     Math.ceil((containerHeight + TILE_GAP_PX) / (tileHeight + TILE_GAP_PX)) + 2,
   );
-  return Math.min(SAFETY_MAX_TILES, cols * rows);
+  return {
+    cols,
+    count: Math.min(SAFETY_MAX_TILES, cols * rows),
+  };
 }
 
 function isSearchOverlayOpen(): boolean {
   return document.body.hasAttribute('data-search-open');
 }
 
+function columnCountFromLayer(
+  layer: HTMLUListElement,
+  fallback: number,
+): number {
+  const fromStyle = getComputedStyle(layer)
+    .gridTemplateColumns.split(/\s+/)
+    .filter(Boolean).length;
+  return fromStyle > 0 ? fromStyle : Math.max(1, fallback);
+}
+
+/**
+ * Lens hit-testing centers in layer-local coordinates.
+ * Derived from the live CSS grid (not offsetTop/Height) so absolute flip
+ * faces / transforms cannot collapse measurements to the top rows only.
+ */
 function recomputeTileCenters(
   layer: HTMLUListElement | null,
+  colsFallback: number,
   centersRef: { current: Float32Array | null },
 ) {
   if (!layer) {
     centersRef.current = null;
     return;
   }
-  const items = layer.children;
-  const count = items.length;
+  const cols = columnCountFromLayer(layer, colsFallback);
+  const count = layer.children.length;
+  const width = layer.clientWidth;
+  if (count < 1 || width < 1 || cols < 1) {
+    centersRef.current = null;
+    return;
+  }
+  const tileWidth = (width - TILE_GAP_PX * (cols - 1)) / cols;
+  if (tileWidth < 1) {
+    centersRef.current = null;
+    return;
+  }
+  const tileHeight = tileWidth * (3 / 2);
+  const strideX = tileWidth + TILE_GAP_PX;
+  const strideY = tileHeight + TILE_GAP_PX;
   const centers = new Float32Array(count * 2);
   for (let i = 0; i < count; i++) {
-    const item = items[i] as HTMLElement;
-    centers[i * 2] = item.offsetLeft + item.offsetWidth / 2;
-    centers[i * 2 + 1] = item.offsetTop + item.offsetHeight / 2;
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    centers[i * 2] = col * strideX + tileWidth / 2;
+    centers[i * 2 + 1] = row * strideY + tileHeight / 2;
   }
   centersRef.current = centers;
+}
+
+function nextFlipStaggerMs(profile: FlipProfile): number {
+  if (profile === 'sparse') {
+    return (
+      FLIP_STAGGER_SPARSE_MIN_MS +
+      Math.random() * (FLIP_STAGGER_SPARSE_MAX_MS - FLIP_STAGGER_SPARSE_MIN_MS)
+    );
+  }
+  return (
+    FLIP_STAGGER_DENSE_MIN_MS +
+    Math.random() * (FLIP_STAGGER_DENSE_MAX_MS - FLIP_STAGGER_DENSE_MIN_MS)
+  );
+}
+
+function maxConcurrentFlips(tileCount: number, profile: FlipProfile): number {
+  if (profile === 'sparse') {
+    return Math.min(
+      FLIP_CONCURRENT_SPARSE_MAX,
+      Math.max(FLIP_CONCURRENT_SPARSE_MIN, Math.round(tileCount / 80)),
+    );
+  }
+  return Math.min(
+    FLIP_CONCURRENT_DENSE_MAX,
+    Math.max(FLIP_CONCURRENT_DENSE_MIN, Math.round(tileCount / 55)),
+  );
 }
 
 /**
  * Decorative low-opacity poster grid for landing / auth shells.
  * Sits above `.shell-atmosphere` so the amber gradient shows through.
  * A circular cluster of posters near the pointer gently magnifies.
+ * Tiles occasionally swap to another poster, avoiding nearby duplicates.
  */
 export function PosterMosaic({
   posters,
@@ -167,55 +287,140 @@ export function PosterMosaic({
   const centersRef = useRef<Float32Array | null>(null);
   const rafRef = useRef<number | null>(null);
   const loopRunningRef = useRef(false);
+  const colsRef = useRef(1);
+  /** Stagger / schedule timeouts — kept across tile rebuilds. */
+  const flipScheduleTimersRef = useRef<Set<number>>(new Set());
+  /** Per-index commit timeouts — cancelled on full tile rebuild. */
+  const flipCommitTimersRef = useRef<Map<number, number>>(new Map());
+  const flippingIndicesRef = useRef<Set<number>>(new Set());
   const [reduceMotion, setReduceMotion] = useState(false);
+  /** Pointer lens needs a fine pointer with hover — skip on touch / coarse UIs. */
+  const [lensEnabled, setLensEnabled] = useState(false);
+  const [flipProfile, setFlipProfile] = useState<FlipProfile>('dense');
+  /** Default false for SSR/first paint; hydrated from localStorage after mount. */
+  const [userPaused, setUserPaused] = useState(false);
   const [tileCount, setTileCount] = useState(INITIAL_TILE_COUNT);
+  const [cols, setCols] = useState(1);
+  const [pendingFlips, setPendingFlips] = useState<PendingFlip[]>([]);
+
+  const pendingFlipByIndex = useMemo(() => {
+    const map = new Map<number, PendingFlip>();
+    for (const flip of pendingFlips) {
+      map.set(flip.index, flip);
+    }
+    return map;
+  }, [pendingFlips]);
 
   const seed = useMemo(
     () => hashSeed(posters.join('|') || 'aperture-mosaic'),
     [posters],
   );
-  const seedRef = useRef(seed);
+  const colsForBuild = Math.max(1, cols);
 
   const [tiles, setTiles] = useState<string[]>(() =>
-    posters.length === 0 ? [] : buildTiles(posters, INITIAL_TILE_COUNT, seed),
+    posters.length === 0
+      ? []
+      : buildTiles(posters, INITIAL_TILE_COUNT, 1, seed),
   );
 
-  // Append-only on grow / truncate on shrink; full rebuild when seed changes.
+  const tilesRef = useRef(tiles);
+  const seedRef = useRef(seed);
+  const colsBuildRef = useRef(colsForBuild);
+
+  // Append / slice / full rebuild when cols, seed, or count changes.
   useEffect(() => {
+    const cancelFlipCommitTimers = () => {
+      for (const id of flipCommitTimersRef.current.values()) {
+        window.clearTimeout(id);
+      }
+      flipCommitTimersRef.current.clear();
+    };
+
     if (posters.length === 0) {
       seedRef.current = seed;
+      colsBuildRef.current = colsForBuild;
+      cancelFlipCommitTimers();
+      flippingIndicesRef.current.clear();
+      setPendingFlips([]);
       setTiles([]);
       return;
     }
 
-    setTiles((prev) => {
-      const seedChanged = seedRef.current !== seed;
-      seedRef.current = seed;
+    const rebuild = needsFullTileRebuild({
+      prevLength: tilesRef.current.length,
+      prevCols: colsBuildRef.current,
+      nextCols: colsForBuild,
+      seedChanged: seedRef.current !== seed,
+    });
 
-      if (seedChanged || prev.length === 0) {
-        return buildTiles(posters, tileCount, seed);
-      }
+    seedRef.current = seed;
+    colsBuildRef.current = colsForBuild;
+
+    if (rebuild) {
+      cancelFlipCommitTimers();
+      flippingIndicesRef.current.clear();
+      setPendingFlips([]);
+      setTiles(buildTiles(posters, tileCount, colsForBuild, seed));
+      return;
+    }
+
+    setTiles((prev) => {
       if (tileCount > prev.length) {
-        const full = buildTiles(posters, tileCount, seed);
-        return prev.concat(full.slice(prev.length));
+        return appendTiles(prev, posters, tileCount, colsForBuild, seed);
       }
       if (tileCount < prev.length) {
         return prev.slice(0, tileCount);
       }
       return prev;
     });
-  }, [posters, seed, tileCount]);
+  }, [posters, seed, tileCount, colsForBuild]);
 
   useEffect(() => {
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const sync = () => {
-      setReduceMotion(media.matches);
+    colsRef.current = colsForBuild;
+  }, [colsForBuild]);
+
+  useEffect(() => {
+    tilesRef.current = tiles;
+  }, [tiles]);
+
+  useEffect(() => {
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const lens = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const coarse = window.matchMedia('(pointer: coarse)');
+    const narrow = window.matchMedia('(max-width: 767px)');
+    const syncMotion = () => {
+      setReduceMotion(motion.matches);
     };
-    sync();
-    media.addEventListener('change', sync);
+    const syncLens = () => {
+      setLensEnabled(lens.matches);
+    };
+    const syncFlipProfile = () => {
+      setFlipProfile(coarse.matches || narrow.matches ? 'sparse' : 'dense');
+    };
+    syncMotion();
+    syncLens();
+    syncFlipProfile();
+    motion.addEventListener('change', syncMotion);
+    lens.addEventListener('change', syncLens);
+    coarse.addEventListener('change', syncFlipProfile);
+    narrow.addEventListener('change', syncFlipProfile);
     return () => {
-      media.removeEventListener('change', sync);
+      motion.removeEventListener('change', syncMotion);
+      lens.removeEventListener('change', syncLens);
+      coarse.removeEventListener('change', syncFlipProfile);
+      narrow.removeEventListener('change', syncFlipProfile);
     };
+  }, []);
+
+  // Hydrate pause preference after mount to avoid SSR/client mismatch.
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(MOSAIC_FLIPS_PAUSED_KEY) === '1') {
+        setUserPaused(true);
+      }
+    } catch {
+      // Ignore storage failures (private mode / blocked).
+    }
   }, []);
 
   useLayoutEffect(() => {
@@ -232,15 +437,19 @@ export function PosterMosaic({
       if (width < 1 || height < 1) {
         return;
       }
+      const nextCols = columnCountForWidth(width);
       const estimated = tileCountForSize(width, height);
+      setCols((current) => (nextCols === current ? current : nextCols));
       setTileCount((current) => (estimated === current ? current : estimated));
-      recomputeTileCenters(layerRef.current, centersRef);
+      recomputeTileCenters(layerRef.current, nextCols, centersRef);
     };
 
     if (!root || typeof ResizeObserver === 'undefined') {
       const syncFromWindow = () => {
+        const nextCols = columnCountForWidth(window.innerWidth);
+        setCols(nextCols);
         setTileCount(tileCountForSize(window.innerWidth, window.innerHeight));
-        recomputeTileCenters(layerRef.current, centersRef);
+        recomputeTileCenters(layerRef.current, nextCols, centersRef);
       };
       syncFromWindow();
       window.addEventListener('resize', syncFromWindow);
@@ -268,12 +477,17 @@ export function PosterMosaic({
       return;
     }
     const { height } = root.getBoundingClientRect();
-    const needed = tileCountFromLaidOutGrid(layer, height);
-    if (needed == null || needed <= tileCount) {
+    const laidOut = tileCountFromLaidOutGrid(layer, height);
+    if (laidOut == null) {
       return;
     }
-    setTileCount(needed);
-  }, [posters.length, tileCount, tiles.length]);
+    if (laidOut.cols !== cols) {
+      setCols(laidOut.cols);
+    }
+    if (laidOut.count > tileCount) {
+      setTileCount(laidOut.count);
+    }
+  }, [posters.length, tileCount, tiles.length, cols]);
 
   useEffect(() => {
     if (posters.length === 0 || tiles.length === 0) {
@@ -282,17 +496,190 @@ export function PosterMosaic({
     }
 
     // Layout may not be final until after paint.
-    recomputeTileCenters(layerRef.current, centersRef);
+    recomputeTileCenters(layerRef.current, colsRef.current, centersRef);
     const rafId = window.requestAnimationFrame(() => {
-      recomputeTileCenters(layerRef.current, centersRef);
+      recomputeTileCenters(layerRef.current, colsRef.current, centersRef);
     });
     return () => {
       window.cancelAnimationFrame(rafId);
     };
-  }, [posters.length, tiles.length]);
+  }, [posters.length, tiles.length, cols]);
+
+  // Staggered multi-tile poster flips (paused when hidden / search / reduced motion / user).
+  useEffect(() => {
+    const flippingIndices = flippingIndicesRef.current;
+    // Drop any mid-flip UI from a prior effect instance before scheduling.
+    setPendingFlips([]);
+    flippingIndices.clear();
+
+    if (reduceMotion || userPaused || posters.length < 2) {
+      return;
+    }
+
+    const trackScheduleTimeout = (fn: () => void, delayMs: number): number => {
+      const id = window.setTimeout(() => {
+        flipScheduleTimersRef.current.delete(id);
+        fn();
+      }, delayMs);
+      flipScheduleTimersRef.current.add(id);
+      return id;
+    };
+
+    const trackCommitTimeout = (
+      index: number,
+      fn: () => void,
+      delayMs: number,
+    ): number => {
+      const existing = flipCommitTimersRef.current.get(index);
+      if (existing != null) {
+        window.clearTimeout(existing);
+      }
+      const id = window.setTimeout(() => {
+        flipCommitTimersRef.current.delete(index);
+        fn();
+      }, delayMs);
+      flipCommitTimersRef.current.set(index, id);
+      return id;
+    };
+
+    const clearFlipTimers = () => {
+      for (const id of flipScheduleTimersRef.current) {
+        window.clearTimeout(id);
+      }
+      flipScheduleTimersRef.current.clear();
+      for (const id of flipCommitTimersRef.current.values()) {
+        window.clearTimeout(id);
+      }
+      flipCommitTimersRef.current.clear();
+    };
+
+    const commitFlip = (index: number, nextUrl: string) => {
+      setTiles((latest) => {
+        if (index >= latest.length) {
+          return latest;
+        }
+        const copy = latest.slice();
+        copy[index] = nextUrl;
+        return copy;
+      });
+      flippingIndices.delete(index);
+      setPendingFlips((active) =>
+        active.filter((flip) => flip.index !== index),
+      );
+    };
+
+    const tryStartFlip = () => {
+      if (document.hidden || isSearchOverlayOpen()) {
+        return;
+      }
+      const current = tilesRef.current;
+      if (current.length === 0) {
+        return;
+      }
+      const maxConcurrent = maxConcurrentFlips(current.length, flipProfile);
+      if (flippingIndices.size >= maxConcurrent) {
+        return;
+      }
+
+      let index = -1;
+      for (let attempt = 0; attempt < FLIP_PICK_ATTEMPTS; attempt++) {
+        const candidate = Math.floor(Math.random() * current.length);
+        if (!flippingIndices.has(candidate)) {
+          index = candidate;
+          break;
+        }
+      }
+      if (index < 0) {
+        return;
+      }
+
+      const nextUrl = pickReplacementPoster(
+        posters,
+        current,
+        index,
+        colsRef.current,
+      );
+      if (!nextUrl || nextUrl === current[index]) {
+        return;
+      }
+
+      const direction: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
+      flippingIndices.add(index);
+      setPendingFlips((active) => [
+        ...active,
+        { index, url: nextUrl, direction },
+      ]);
+      trackCommitTimeout(
+        index,
+        () => {
+          commitFlip(index, nextUrl);
+        },
+        FLIP_ANIM_MS,
+      );
+    };
+
+    const scheduleNextStart = () => {
+      if (document.hidden || isSearchOverlayOpen()) {
+        return;
+      }
+      trackScheduleTimeout(() => {
+        tryStartFlip();
+        scheduleNextStart();
+      }, nextFlipStaggerMs(flipProfile));
+    };
+
+    // Kick off a small burst so the first wave feels alive immediately.
+    const burstCap = maxConcurrentFlips(
+      tilesRef.current.length || 1,
+      flipProfile,
+    );
+    const burst = Math.min(4, burstCap);
+    const burstGapMs = flipProfile === 'sparse' ? 140 : 90;
+    for (let i = 0; i < burst; i++) {
+      trackScheduleTimeout(() => {
+        tryStartFlip();
+      }, i * burstGapMs);
+    }
+    scheduleNextStart();
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        clearFlipTimers();
+        flippingIndices.clear();
+        setPendingFlips([]);
+        return;
+      }
+      scheduleNextStart();
+    };
+
+    const onSearchOpenAttr = () => {
+      if (isSearchOverlayOpen()) {
+        clearFlipTimers();
+        flippingIndices.clear();
+        setPendingFlips([]);
+        return;
+      }
+      scheduleNextStart();
+    };
+
+    const searchOpenObserver = new MutationObserver(onSearchOpenAttr);
+    searchOpenObserver.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['data-search-open'],
+    });
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      searchOpenObserver.disconnect();
+      document.removeEventListener('visibilitychange', onVisibility);
+      clearFlipTimers();
+      flippingIndices.clear();
+      // No setState in cleanup — next effect start (or rebuild) clears pendingFlips.
+    };
+  }, [posters, reduceMotion, userPaused, flipProfile]);
 
   useEffect(() => {
-    if (reduceMotion || posters.length === 0) {
+    if (reduceMotion || !lensEnabled || posters.length === 0) {
       return;
     }
 
@@ -311,14 +698,24 @@ export function PosterMosaic({
       }
 
       const layer = layerRef.current;
-      const centers = centersRef.current;
-      if (!layer || !centers) {
+      if (!layer) {
         rafRef.current = window.requestAnimationFrame(tick);
         return;
       }
 
       const items = layer.children;
       const count = items.length;
+      const cols = Math.max(1, colsRef.current);
+      let centers = centersRef.current;
+      if (!centers || centers.length !== count * 2) {
+        recomputeTileCenters(layer, cols, centersRef);
+        centers = centersRef.current;
+      }
+      if (!centers) {
+        rafRef.current = window.requestAnimationFrame(tick);
+        return;
+      }
+
       if (!scalesRef.current || scalesRef.current.length !== count) {
         scalesRef.current = new Float32Array(count);
         scalesRef.current.fill(1);
@@ -433,35 +830,55 @@ export function PosterMosaic({
         }
       }
     };
-  }, [posters.length, reduceMotion, tiles.length]);
+  }, [posters.length, reduceMotion, lensEnabled, tiles.length]);
 
   if (posters.length === 0) {
     return null;
   }
 
+  const togglePaused = () => {
+    setUserPaused((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(MOSAIC_FLIPS_PAUSED_KEY, next ? '1' : '0');
+      } catch {
+        // Ignore storage failures.
+      }
+      return next;
+    });
+  };
+
   return (
-    <div
-      ref={rootRef}
-      aria-hidden
-      className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
-      style={{ opacity }}
-    >
-      <ul ref={layerRef} className="poster-mosaic-layer">
-        {tiles.map((url, index) => (
-          <li key={index} className="poster-mosaic-tile relative">
-            <Image
-              src={url}
-              alt=""
-              fill
-              sizes="72px"
-              className="object-cover"
-              loading="lazy"
-              unoptimized
+    <>
+      <div
+        ref={rootRef}
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+        style={{ opacity }}
+      >
+        <ul ref={layerRef} className="poster-mosaic-layer">
+          {tiles.map((url, index) => (
+            <PosterMosaicTile
+              key={index}
+              url={url}
+              flip={pendingFlipByIndex.get(index) ?? null}
             />
-          </li>
-        ))}
-      </ul>
-      <div className="poster-mosaic-veil absolute inset-0" />
-    </div>
+          ))}
+        </ul>
+        <div className="poster-mosaic-veil absolute inset-0" />
+      </div>
+      {!reduceMotion ? (
+        <button
+          type="button"
+          onClick={togglePaused}
+          aria-pressed={userPaused}
+          className="poster-mosaic-pause absolute bottom-4 left-4 z-[2] text-sm text-muted transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+        >
+          {userPaused
+            ? 'Play background animation'
+            : 'Pause background animation'}
+        </button>
+      ) : null}
+    </>
   );
 }

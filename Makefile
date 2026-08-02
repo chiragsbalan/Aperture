@@ -67,7 +67,12 @@ dev-api:
 	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 dev-web:
-	cd frontend && pnpm dev
+	@set -a; \
+	  [ -f .env ] && . ./.env; \
+	  set +a; \
+	  export API_URL="$${API_URL:-$${NEXT_PUBLIC_API_URL:-http://localhost:8000}}"; \
+	  export NEXT_PUBLIC_API_URL="$${NEXT_PUBLIC_API_URL:-http://localhost:8000}"; \
+	  cd frontend && pnpm dev
 
 up:
 	docker compose up --build -d
