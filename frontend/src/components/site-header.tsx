@@ -13,9 +13,7 @@ function HeaderSearch() {
   const searchParams = useSearchParams();
   const headerQuery =
     pathname === '/search' ? (searchParams.get('q') ?? '') : '';
-  return (
-    <SiteSearch key={`${pathname}:${headerQuery}`} initialQuery={headerQuery} />
-  );
+  return <SiteSearch key={pathname} initialQuery={headerQuery} />;
 }
 
 export function SiteHeader() {
@@ -66,15 +64,14 @@ export function SiteHeader() {
       >
         Aperture
       </Link>
-      {authState === 'signed_in' ? (
-        <Suspense
-          fallback={<div className="min-w-0 flex-1" aria-hidden="true" />}
-        >
-          <HeaderSearch />
-        </Suspense>
-      ) : (
-        <div className="min-w-0 flex-1" aria-hidden="true" />
-      )}
+      <div className="min-w-0 flex-1" aria-hidden="true" />
+      <Suspense
+        fallback={
+          <div className="h-9 w-9 shrink-0" aria-hidden="true" />
+        }
+      >
+        <HeaderSearch />
+      </Suspense>
       <nav
         aria-label="Account"
         className="flex shrink-0 items-center gap-4 text-sm"

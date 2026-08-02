@@ -1,7 +1,13 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 /**
  * Soft circular lens around the cursor.
@@ -17,9 +23,14 @@ const SMOOTHING = 0.22;
 /** Matches `.poster-mosaic-layer` minmax widths in globals.css. */
 const TILE_MIN_WIDTH_MOBILE = 52;
 const TILE_MIN_WIDTH_DESKTOP = 60;
-/** Hard cap — matches backend landing_posters_count upper bound. */
-const MAX_TILES = 200;
-/** SSR / first paint floor before we can measure the viewport. */
+const TILE_GAP_PX = 1;
+/**
+ * Absurdly high guard only — stops a broken ResizeObserver / NaN size from
+ * creating unbounded DOM. Normal viewports use exact cols × rows (posters
+ * are reused randomly from the ~200 URL set; there is no product tile cap).
+ */
+const SAFETY_MAX_TILES = 3000;
+/** SSR / first paint floor before we can measure the container. */
 const INITIAL_TILE_COUNT = 120;
 /** Binary z-index threshold so we avoid per-frame unique stacking churn. */
 const Z_INDEX_SCALE_THRESHOLD = 1.05;
@@ -71,14 +82,70 @@ function buildTiles(
   return tiles;
 }
 
-function tileCountForViewport(width: number, height: number): number {
+function columnCountForWidth(width: number): number {
   const minWidth =
     width >= 768 ? TILE_MIN_WIDTH_DESKTOP : TILE_MIN_WIDTH_MOBILE;
-  const cols = Math.max(1, Math.ceil(width / minWidth));
-  const tileHeight = minWidth * 1.5;
-  // Extra rows so short scroll / subpixel rounding never leaves a bare strip.
-  const rows = Math.max(1, Math.ceil(height / tileHeight) + 4);
-  return Math.min(MAX_TILES, cols * rows);
+  // Match CSS auto-fill: floor((width + gap) / (minWidth + gap)).
+  return Math.max(
+    1,
+    Math.floor((width + TILE_GAP_PX) / (minWidth + TILE_GAP_PX)),
+  );
+}
+
+function tileCountForSize(width: number, height: number): number {
+  const cols = columnCountForWidth(width);
+  const tileWidth = (width - TILE_GAP_PX * (cols - 1)) / cols;
+  const tileHeight = tileWidth * (3 / 2);
+  // Extra rows cover subpixel rounding and short toolbars / URL chrome.
+  const rows = Math.max(
+    1,
+    Math.ceil((height + TILE_GAP_PX) / (tileHeight + TILE_GAP_PX)) + 2,
+  );
+  // Exact cols × rows so the last row is never half-empty.
+  return Math.min(SAFETY_MAX_TILES, cols * rows);
+}
+
+/** After paint: ensure real CSS columns × coverage, not just the estimate. */
+function tileCountFromLaidOutGrid(
+  layer: HTMLElement,
+  containerHeight: number,
+): number | null {
+  const cols = getComputedStyle(layer)
+    .gridTemplateColumns.split(/\s+/)
+    .filter(Boolean).length;
+  if (cols < 1 || layer.children.length === 0) {
+    return null;
+  }
+  const sample = layer.children[0] as HTMLElement;
+  const tileHeight = sample.offsetHeight || 1;
+  const rows = Math.max(
+    1,
+    Math.ceil((containerHeight + TILE_GAP_PX) / (tileHeight + TILE_GAP_PX)) + 2,
+  );
+  return Math.min(SAFETY_MAX_TILES, cols * rows);
+}
+
+function isSearchOverlayOpen(): boolean {
+  return document.body.hasAttribute('data-search-open');
+}
+
+function recomputeTileCenters(
+  layer: HTMLUListElement | null,
+  centersRef: { current: Float32Array | null },
+) {
+  if (!layer) {
+    centersRef.current = null;
+    return;
+  }
+  const items = layer.children;
+  const count = items.length;
+  const centers = new Float32Array(count * 2);
+  for (let i = 0; i < count; i++) {
+    const item = items[i] as HTMLElement;
+    centers[i * 2] = item.offsetLeft + item.offsetWidth / 2;
+    centers[i * 2 + 1] = item.offsetTop + item.offsetHeight / 2;
+  }
+  centersRef.current = centers;
 }
 
 /**
@@ -94,6 +161,7 @@ export function PosterMosaic({
   /** 0–1; keep low so hero copy stays readable. */
   opacity?: number;
 }) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const layerRef = useRef<HTMLUListElement>(null);
   const mouseRef = useRef<{ x: number; y: number; active: boolean }>({
     x: 0,
@@ -112,11 +180,37 @@ export function PosterMosaic({
     () => hashSeed(posters.join('|') || 'aperture-mosaic'),
     [posters],
   );
-  const tiles = useMemo(
-    () =>
-      posters.length === 0 ? [] : buildTiles(posters, tileCount, seed),
-    [posters, tileCount, seed],
+  const seedRef = useRef(seed);
+
+  const [tiles, setTiles] = useState<string[]>(() =>
+    posters.length === 0 ? [] : buildTiles(posters, INITIAL_TILE_COUNT, seed),
   );
+
+  // Append-only on grow / truncate on shrink; full rebuild when seed changes.
+  useEffect(() => {
+    if (posters.length === 0) {
+      seedRef.current = seed;
+      setTiles([]);
+      return;
+    }
+
+    setTiles((prev) => {
+      const seedChanged = seedRef.current !== seed;
+      seedRef.current = seed;
+
+      if (seedChanged || prev.length === 0) {
+        return buildTiles(posters, tileCount, seed);
+      }
+      if (tileCount > prev.length) {
+        const full = buildTiles(posters, tileCount, seed);
+        return prev.concat(full.slice(prev.length));
+      }
+      if (tileCount < prev.length) {
+        return prev.slice(0, tileCount);
+      }
+      return prev;
+    });
+  }, [posters, seed, tileCount]);
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -130,22 +224,66 @@ export function PosterMosaic({
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (posters.length === 0) {
       return;
     }
+    const root = rootRef.current;
 
-    const updateCount = () => {
-      setTileCount(
-        tileCountForViewport(window.innerWidth, window.innerHeight),
+    const syncFromContainer = () => {
+      if (!root) {
+        return;
+      }
+      const { width, height } = root.getBoundingClientRect();
+      if (width < 1 || height < 1) {
+        return;
+      }
+      const estimated = tileCountForSize(width, height);
+      setTileCount((current) =>
+        estimated === current ? current : estimated,
       );
+      recomputeTileCenters(layerRef.current, centersRef);
     };
-    updateCount();
-    window.addEventListener('resize', updateCount);
+
+    if (!root || typeof ResizeObserver === 'undefined') {
+      const syncFromWindow = () => {
+        setTileCount(
+          tileCountForSize(window.innerWidth, window.innerHeight),
+        );
+        recomputeTileCenters(layerRef.current, centersRef);
+      };
+      syncFromWindow();
+      window.addEventListener('resize', syncFromWindow);
+      return () => {
+        window.removeEventListener('resize', syncFromWindow);
+      };
+    }
+
+    syncFromContainer();
+    const observer = new ResizeObserver(syncFromContainer);
+    observer.observe(root);
     return () => {
-      window.removeEventListener('resize', updateCount);
+      observer.disconnect();
     };
   }, [posters.length]);
+
+  // Second pass: if CSS columns differ from the estimate, top up to a full cover.
+  useLayoutEffect(() => {
+    if (posters.length === 0) {
+      return;
+    }
+    const root = rootRef.current;
+    const layer = layerRef.current;
+    if (!root || !layer) {
+      return;
+    }
+    const { height } = root.getBoundingClientRect();
+    const needed = tileCountFromLaidOutGrid(layer, height);
+    if (needed == null || needed <= tileCount) {
+      return;
+    }
+    setTileCount(needed);
+  }, [posters.length, tileCount, tiles.length]);
 
   useEffect(() => {
     if (posters.length === 0 || tiles.length === 0) {
@@ -153,29 +291,13 @@ export function PosterMosaic({
       return;
     }
 
-    const recomputeCenters = () => {
-      const layer = layerRef.current;
-      if (!layer) {
-        return;
-      }
-      const items = layer.children;
-      const count = items.length;
-      const centers = new Float32Array(count * 2);
-      for (let i = 0; i < count; i++) {
-        const item = items[i] as HTMLElement;
-        centers[i * 2] = item.offsetLeft + item.offsetWidth / 2;
-        centers[i * 2 + 1] = item.offsetTop + item.offsetHeight / 2;
-      }
-      centersRef.current = centers;
-    };
-
     // Layout may not be final until after paint.
-    recomputeCenters();
-    const rafId = window.requestAnimationFrame(recomputeCenters);
-    window.addEventListener('resize', recomputeCenters);
+    recomputeTileCenters(layerRef.current, centersRef);
+    const rafId = window.requestAnimationFrame(() => {
+      recomputeTileCenters(layerRef.current, centersRef);
+    });
     return () => {
       window.cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', recomputeCenters);
     };
   }, [posters.length, tiles.length]);
 
@@ -193,7 +315,7 @@ export function PosterMosaic({
     };
 
     const tick = () => {
-      if (document.hidden) {
+      if (document.hidden || isSearchOverlayOpen()) {
         stopLoop();
         return;
       }
@@ -249,7 +371,11 @@ export function PosterMosaic({
     };
 
     const startLoop = () => {
-      if (loopRunningRef.current || document.hidden) {
+      if (
+        loopRunningRef.current ||
+        document.hidden ||
+        isSearchOverlayOpen()
+      ) {
         return;
       }
       loopRunningRef.current = true;
@@ -262,17 +388,31 @@ export function PosterMosaic({
         y: event.clientY,
         active: true,
       };
-      startLoop();
+      if (!isSearchOverlayOpen()) {
+        startLoop();
+      }
     };
 
     const onLeave = () => {
       mouseRef.current = { ...mouseRef.current, active: false };
       // Keep the loop running so scales ease back to 1, then idle-stop.
-      startLoop();
+      if (!isSearchOverlayOpen()) {
+        startLoop();
+      }
     };
 
     const onVisibility = () => {
       if (document.hidden) {
+        stopLoop();
+        return;
+      }
+      if (mouseRef.current.active && !isSearchOverlayOpen()) {
+        startLoop();
+      }
+    };
+
+    const onSearchOpenAttr = () => {
+      if (isSearchOverlayOpen()) {
         stopLoop();
         return;
       }
@@ -281,18 +421,26 @@ export function PosterMosaic({
       }
     };
 
+    const searchOpenObserver = new MutationObserver(onSearchOpenAttr);
+    searchOpenObserver.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['data-search-open'],
+    });
+
+    const layerForCleanup = layerRef.current;
+
     window.addEventListener('pointermove', onMove, { passive: true });
     document.documentElement.addEventListener('mouseleave', onLeave);
     document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
+      searchOpenObserver.disconnect();
       window.removeEventListener('pointermove', onMove);
       document.documentElement.removeEventListener('mouseleave', onLeave);
       document.removeEventListener('visibilitychange', onVisibility);
       stopLoop();
-      const layer = layerRef.current;
-      if (layer) {
-        for (const child of Array.from(layer.children)) {
+      if (layerForCleanup) {
+        for (const child of Array.from(layerForCleanup.children)) {
           const item = child as HTMLElement;
           item.style.transform = '';
           item.style.zIndex = '';
@@ -307,13 +455,14 @@ export function PosterMosaic({
 
   return (
     <div
+      ref={rootRef}
       aria-hidden
       className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
       style={{ opacity }}
     >
       <ul ref={layerRef} className="poster-mosaic-layer">
         {tiles.map((url, index) => (
-          <li key={`${index}-${url}`} className="poster-mosaic-tile relative">
+          <li key={index} className="poster-mosaic-tile relative">
             <Image
               src={url}
               alt=""
