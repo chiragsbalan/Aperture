@@ -83,6 +83,7 @@ class TmdbMovie(BaseModel):
     runtime: int | None = None
     status: str | None = None
     credits: TmdbCredits = Field(default_factory=TmdbCredits)
+    extras: dict[str, Any] = Field(default_factory=dict)
 
 
 class TmdbTvShow(BaseModel):
@@ -104,6 +105,7 @@ class TmdbTvShow(BaseModel):
     number_of_episodes: int | None = None
     credits: TmdbCredits = Field(default_factory=TmdbCredits)
     seasons: list[TmdbSeason] = Field(default_factory=list)
+    extras: dict[str, Any] = Field(default_factory=dict)
 
 
 class TmdbPerson(BaseModel):

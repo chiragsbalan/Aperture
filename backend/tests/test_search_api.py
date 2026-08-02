@@ -118,9 +118,15 @@ def test_search_wrong_bff_secret_ignores_spoofed_ip(
     secret = 'test-bff-shared-secret'
     monkeypatch.setenv('AUTH_BFF_SHARED_SECRET', secret)
     monkeypatch.setenv('SEARCH_RATE_LIMIT_MAX_PER_IP', '2')
+    # Avoid Redis peer-bucket pollution from earlier suite searches when
+    # REDIS_URL is set (shared Upstash/local Redis).
+    monkeypatch.setenv('REDIS_URL', '')
+    from app.core.cache import init_cache, reset_cache
     from app.core.config import get_settings
 
     get_settings.cache_clear()
+    reset_cache()
+    init_cache('')
 
     spoofed = f'198.51.100.{uuid.uuid4().int % 200 + 1}'
     wrong_headers = {

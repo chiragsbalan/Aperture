@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import get_cache
@@ -17,6 +19,8 @@ from app.metadata.cache_keys import (
     person_detail_key,
     tv_detail_key,
 )
+from app.metadata.models import ContentItem
+from app.metadata.tmdb.client import TmdbClient
 from app.metadata.tmdb.dto import (
     TmdbMovie,
     TmdbPerson,
@@ -105,7 +109,7 @@ async def upsert_movie_payload(
     movie: TmdbMovie,
     *,
     source: str = SOURCE_TMDB,
-) -> None:
+) -> ContentItem:
     """Upsert a movie, credits, and any missing people shells."""
     people = await _ensure_credit_people(session, source=source, movie_or_tv=movie)
     item = await metadata_repository.upsert_movie(
@@ -121,6 +125,7 @@ async def upsert_movie_payload(
         release_date=_parse_date(movie.release_date),
         runtime_minutes=movie.runtime,
         status=movie.status,
+        extras=movie.extras,
     )
     for cast in movie.credits.cast:
         person = people[cast.id]
@@ -144,6 +149,7 @@ async def upsert_movie_payload(
             character='',
             billing_order=None,
         )
+    return item
 
 
 async def upsert_tv_payload(
@@ -151,7 +157,7 @@ async def upsert_tv_payload(
     show: TmdbTvShow,
     *,
     source: str = SOURCE_TMDB,
-) -> None:
+) -> ContentItem:
     """Upsert a TV show, seasons/episodes, credits, and people shells."""
     people = await _ensure_credit_people(session, source=source, movie_or_tv=show)
     item = await metadata_repository.upsert_tv_show(
@@ -169,6 +175,7 @@ async def upsert_tv_payload(
         status=show.status,
         number_of_seasons=show.number_of_seasons,
         number_of_episodes=show.number_of_episodes,
+        extras=show.extras,
     )
     for cast in show.credits.cast:
         person = people[cast.id]
@@ -214,6 +221,95 @@ async def upsert_tv_payload(
                 runtime_minutes=episode_payload.runtime,
                 still_path=episode_payload.still_path,
             )
+    return item
+
+
+async def ensure_movie_from_tmdb(
+    session: AsyncSession,
+    tmdb_id: int,
+    *,
+    client: TmdbClient,
+) -> uuid.UUID:
+    """Return catalog id for a TMDb movie, ingesting on first resolve.
+
+    Concurrent inserts may race on ``external_ids`` uniqueness; on
+    ``IntegrityError`` we rollback, re-read the winner's mapping, and retry
+    the full ensure once (max 2 attempts).
+    """
+    for attempt in range(2):
+        mapping = await metadata_repository.get_external_id(
+            session,
+            source=SOURCE_TMDB,
+            source_namespace='movie',
+            external_id=str(tmdb_id),
+        )
+        if mapping is not None and mapping.content_item_id is not None:
+            return mapping.content_item_id
+
+        try:
+            movie = await client.get_movie_for_ingest(tmdb_id)
+            item = await upsert_movie_payload(session, movie)
+            await session.commit()
+            await get_cache().delete(movie_detail_key(item.id))
+            return item.id
+        except IntegrityError:
+            await session.rollback()
+            mapping = await metadata_repository.get_external_id(
+                session,
+                source=SOURCE_TMDB,
+                source_namespace='movie',
+                external_id=str(tmdb_id),
+            )
+            if mapping is not None and mapping.content_item_id is not None:
+                return mapping.content_item_id
+            if attempt == 0:
+                continue
+            raise
+    raise RuntimeError('ensure_movie_from_tmdb exhausted retries')
+
+
+async def ensure_tv_from_tmdb(
+    session: AsyncSession,
+    tmdb_id: int,
+    *,
+    client: TmdbClient,
+) -> uuid.UUID:
+    """Return catalog id for a TMDb TV show, ingesting on first resolve.
+
+    Concurrent inserts may race on ``external_ids`` uniqueness; on
+    ``IntegrityError`` we rollback, re-read the winner's mapping, and retry
+    the full ensure once (max 2 attempts).
+    """
+    for attempt in range(2):
+        mapping = await metadata_repository.get_external_id(
+            session,
+            source=SOURCE_TMDB,
+            source_namespace='tv',
+            external_id=str(tmdb_id),
+        )
+        if mapping is not None and mapping.content_item_id is not None:
+            return mapping.content_item_id
+
+        try:
+            show = await client.get_tv_for_ingest(tmdb_id)
+            item = await upsert_tv_payload(session, show)
+            await session.commit()
+            await get_cache().delete(tv_detail_key(item.id))
+            return item.id
+        except IntegrityError:
+            await session.rollback()
+            mapping = await metadata_repository.get_external_id(
+                session,
+                source=SOURCE_TMDB,
+                source_namespace='tv',
+                external_id=str(tmdb_id),
+            )
+            if mapping is not None and mapping.content_item_id is not None:
+                return mapping.content_item_id
+            if attempt == 0:
+                continue
+            raise
+    raise RuntimeError('ensure_tv_from_tmdb exhausted retries')
 
 
 async def seed_from_fixtures(

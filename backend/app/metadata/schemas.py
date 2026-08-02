@@ -52,6 +52,144 @@ class SeasonDetail(BaseModel):
     episodes: list[EpisodeDetail] = Field(default_factory=list)
 
 
+class NamedId(BaseModel):
+    """Genre / keyword / studio stub."""
+
+    id: int | None = None
+    name: str
+
+
+class StudioRef(BaseModel):
+    """Production company."""
+
+    id: int | None = None
+    name: str
+    origin_country: str | None = None
+
+
+class CountryRef(BaseModel):
+    """Production country."""
+
+    iso_3166_1: str
+    name: str | None = None
+
+
+class LanguageRef(BaseModel):
+    """Spoken / original language."""
+
+    iso_639_1: str | None = None
+    english_name: str | None = None
+    name: str | None = None
+
+
+class AlternativeTitle(BaseModel):
+    """Localized / alternate title."""
+
+    iso_3166_1: str | None = None
+    title: str
+    type: str | None = None
+
+
+class ReleaseEvent(BaseModel):
+    """Country release / rating row."""
+
+    country: str | None = None
+    release_date: str | None = None
+    type: int | None = None
+    certification: str | None = None
+    note: str | None = None
+
+
+class VideoRef(BaseModel):
+    """YouTube trailer / clip."""
+
+    key: str
+    name: str | None = None
+    site: str = 'YouTube'
+    type: str | None = None
+    official: bool = False
+
+
+class MediaGallery(BaseModel):
+    """Backdrop / poster gallery URLs."""
+
+    backdrops: list[str] = Field(default_factory=list)
+    posters: list[str] = Field(default_factory=list)
+
+
+class WatchProvider(BaseModel):
+    """Streaming / rent / buy provider."""
+
+    provider_id: int | None = None
+    provider_name: str
+    logo_url: str | None = None
+    display_priority: int | None = None
+
+
+class WatchProviderRegion(BaseModel):
+    """Providers for one ISO country."""
+
+    link: str | None = None
+    flatrate: list[WatchProvider] = Field(default_factory=list)
+    rent: list[WatchProvider] = Field(default_factory=list)
+    buy: list[WatchProvider] = Field(default_factory=list)
+    ads: list[WatchProvider] = Field(default_factory=list)
+    free: list[WatchProvider] = Field(default_factory=list)
+
+
+class CollectionRef(BaseModel):
+    """Optional franchise / collection."""
+
+    id: int | None = None
+    name: str
+    poster_url: str | None = None
+
+
+class SimilarTitle(BaseModel):
+    """Recommended / similar title card."""
+
+    tmdb_id: int
+    title: str
+    year: int | None = None
+    poster_url: str | None = None
+    content_id: uuid.UUID | None = None
+    content_type: str | None = None
+
+
+class ResolveByTmdbRequest(BaseModel):
+    """Resolve (and optionally ingest) a title by TMDb id."""
+
+    tmdb_id: int = Field(gt=0)
+
+
+class ResolveByTmdbResponse(BaseModel):
+    """Canonical catalog pointer after resolve."""
+
+    id: uuid.UUID
+    type: str
+
+
+class TitleExtras(BaseModel):
+    """Enrichment shown on detail tabs / watch / more-like-this."""
+
+    tagline: str | None = None
+    original_language: str | None = None
+    budget: int | None = None
+    revenue: int | None = None
+    collection: CollectionRef | None = None
+    genres: list[NamedId] = Field(default_factory=list)
+    keywords: list[NamedId] = Field(default_factory=list)
+    studios: list[StudioRef] = Field(default_factory=list)
+    countries: list[CountryRef] = Field(default_factory=list)
+    spoken_languages: list[LanguageRef] = Field(default_factory=list)
+    alternative_titles: list[AlternativeTitle] = Field(default_factory=list)
+    releases: list[ReleaseEvent] = Field(default_factory=list)
+    videos: list[VideoRef] = Field(default_factory=list)
+    images: MediaGallery = Field(default_factory=MediaGallery)
+    watch_providers: dict[str, WatchProviderRegion] = Field(default_factory=dict)
+    similar: list[SimilarTitle] = Field(default_factory=list)
+
+
 class MovieDetail(BaseModel):
     """Curated movie detail response."""
 
@@ -70,6 +208,7 @@ class MovieDetail(BaseModel):
     status: str | None = None
     cast: list[CreditPersonRef] = Field(default_factory=list)
     crew: list[CreditPersonRef] = Field(default_factory=list)
+    extras: TitleExtras = Field(default_factory=TitleExtras)
 
 
 class TvDetail(BaseModel):
@@ -93,6 +232,7 @@ class TvDetail(BaseModel):
     seasons: list[SeasonDetail] = Field(default_factory=list)
     cast: list[CreditPersonRef] = Field(default_factory=list)
     crew: list[CreditPersonRef] = Field(default_factory=list)
+    extras: TitleExtras = Field(default_factory=TitleExtras)
 
 
 class PersonCreditRef(BaseModel):

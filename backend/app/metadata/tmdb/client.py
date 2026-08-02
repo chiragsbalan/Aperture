@@ -4,23 +4,42 @@ from __future__ import annotations
 
 import asyncio
 import time
+from typing import Any
 
 import httpx
 
 from app.core.config import Settings
+from app.metadata.enrichment import build_extras_from_tmdb_payload
 from app.metadata.tmdb.dto import TmdbMovie, TmdbPerson, TmdbTvShow
 
 TMDB_API_BASE = 'https://api.themoviedb.org/3'
 # TMDb guidance is ~40–50 req/s for many plans; stay well under for seed jobs.
 _DEFAULT_MIN_INTERVAL_SECONDS = 0.25
 
+_MOVIE_INGEST_APPEND = (
+    'credits,keywords,images,videos,watch/providers,'
+    'recommendations,release_dates,alternative_titles'
+)
+_TV_INGEST_APPEND = (
+    'credits,keywords,images,videos,watch/providers,'
+    'recommendations,content_ratings,alternative_titles'
+)
+
 
 class TmdbConfigError(RuntimeError):
     """TMDb is not configured (missing API key)."""
 
 
+class TmdbNotFoundError(LookupError):
+    """TMDb returned 404 for the requested resource."""
+
+
+class TmdbUnavailableError(RuntimeError):
+    """TMDb upstream failed (429 / 5xx / timeout / transport error)."""
+
+
 class TmdbClient:
-    """Thin async wrapper around TMDb v3 endpoints used by seed.
+    """Thin async wrapper around TMDb v3 endpoints used by seed / resolve.
 
     The API key is never logged or included in ``repr`` / ``str``.
     """
@@ -59,6 +78,16 @@ class TmdbClient:
         )
         return TmdbMovie.model_validate(data)
 
+    async def get_movie_for_ingest(self, tmdb_id: int) -> TmdbMovie:
+        """Fetch movie detail with enrichment fields for catalog upsert."""
+        data = await self._get(
+            f'/movie/{tmdb_id}',
+            {'append_to_response': _MOVIE_INGEST_APPEND},
+        )
+        movie = TmdbMovie.model_validate(data)
+        movie.extras = build_extras_from_tmdb_payload(data, kind='movie')
+        return movie
+
     async def get_tv(self, tmdb_id: int) -> TmdbTvShow:
         """Fetch TV detail + credits + seasons summary."""
         data = await self._get(
@@ -66,6 +95,16 @@ class TmdbClient:
             {'append_to_response': 'credits'},
         )
         return TmdbTvShow.model_validate(data)
+
+    async def get_tv_for_ingest(self, tmdb_id: int) -> TmdbTvShow:
+        """Fetch TV detail with enrichment fields for catalog upsert."""
+        data = await self._get(
+            f'/tv/{tmdb_id}',
+            {'append_to_response': _TV_INGEST_APPEND},
+        )
+        show = TmdbTvShow.model_validate(data)
+        show.extras = build_extras_from_tmdb_payload(data, kind='tv')
+        return show
 
     async def get_person(self, tmdb_id: int) -> TmdbPerson:
         """Fetch person detail."""
@@ -84,7 +123,7 @@ class TmdbClient:
         self,
         path: str,
         params: dict[str, str] | None = None,
-    ) -> dict[str, object]:
+    ) -> dict[str, Any]:
         query = dict(params or {})
         async with self._lock:
             await self._throttle()
@@ -94,12 +133,28 @@ class TmdbClient:
                 # Never attach default auth headers that might be logged elsewhere.
             ) as client:
                 # Pass api_key only as a request param; do not log query strings.
-                response = await client.get(
-                    path,
-                    params={**query, 'api_key': self._api_key},
-                )
+                try:
+                    response = await client.get(
+                        path,
+                        params={**query, 'api_key': self._api_key},
+                    )
+                except httpx.TimeoutException as exc:
+                    raise TmdbUnavailableError('TMDb request timed out') from exc
+                except httpx.HTTPError as exc:
+                    raise TmdbUnavailableError('TMDb request failed') from exc
                 self._last_request_at = time.monotonic()
-                response.raise_for_status()
+                if response.status_code == 404:
+                    raise TmdbNotFoundError(f'TMDb resource not found: {path}')
+                if response.status_code == 429 or response.status_code >= 500:
+                    raise TmdbUnavailableError(
+                        f'TMDb unavailable: HTTP {response.status_code}'
+                    )
+                try:
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as exc:
+                    raise TmdbUnavailableError(
+                        f'TMDb unavailable: HTTP {response.status_code}'
+                    ) from exc
                 payload = response.json()
                 if not isinstance(payload, dict):
                     raise RuntimeError('unexpected TMDb response shape')
