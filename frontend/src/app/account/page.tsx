@@ -8,11 +8,10 @@ export default function AccountPage() {
       <SiteHeader />
       <div className="motion-fade-rise w-full max-w-lg">
         <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
-          Your account
+          Profile
         </h1>
         <p className="mt-2 text-muted">
-          Overview of your identity and sign-in methods. Edit profile in
-          Settings.
+          Your library, account details, and settings.
         </p>
         <Suspense
           fallback={

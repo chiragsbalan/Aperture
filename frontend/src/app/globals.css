@@ -134,7 +134,7 @@
     }
   }
 
-  /* Soft amber wash so the landing poster mosaic stays atmospheric. */
+  /* Soft cool wash so the landing poster mosaic stays atmospheric. */
   .poster-mosaic-veil {
     background:
       radial-gradient(120% 80% at 50% -10%, var(--bg-glow-1), transparent 55%),
@@ -189,12 +189,12 @@
     background:
       radial-gradient(
         48% 42% at 22% 28%,
-        rgba(224, 164, 92, 0.28),
+        rgba(130, 142, 158, 0.18),
         transparent 72%
       ),
       radial-gradient(
         42% 38% at 78% 68%,
-        rgba(90, 120, 150, 0.2),
+        rgba(90, 120, 150, 0.16),
         transparent 70%
       ),
       radial-gradient(
@@ -222,11 +222,15 @@
   [data-title-contrast='on-dark'] {
     --color-fg: #f3efe6;
     --color-fg-muted: #c4bdb0;
-    --color-accent: #e0a45c;
-    --color-accent-soft: rgba(224, 164, 92, 0.16);
+    --color-accent: #6aae6a;
+    --color-accent-soft: rgba(106, 174, 106, 0.16);
     --color-border: rgba(243, 239, 230, 0.18);
-    --color-focus: #f0c48a;
+    --color-focus: #9fd49f;
     --color-bg-elevated: rgba(22, 20, 17, 0.82);
+    --color-action-watchlist: #c9b07a;
+    --color-action-favorites: #e07a8a;
+    --color-action-lists: #6a9ec9;
+    --color-action-log: #6aae6a;
   }
 
   [data-title-contrast='on-dark'] .catalog-backdrop-veil {
@@ -249,11 +253,15 @@
   [data-title-contrast='on-light'] {
     --color-fg: #1a1712;
     --color-fg-muted: #4d473e;
-    --color-accent: #8a4f10;
-    --color-accent-soft: rgba(138, 79, 16, 0.14);
+    --color-accent: #3d7a45;
+    --color-accent-soft: rgba(61, 122, 69, 0.14);
     --color-border: rgba(26, 23, 18, 0.16);
-    --color-focus: #8a4f10;
+    --color-focus: #2f6f3e;
     --color-bg-elevated: rgba(255, 253, 248, 0.78);
+    --color-action-watchlist: #9a7a3a;
+    --color-action-favorites: #c45c6a;
+    --color-action-lists: #3d6f94;
+    --color-action-log: #3d7a45;
   }
 
   [data-title-contrast='on-light'] .catalog-backdrop-veil {
@@ -277,12 +285,12 @@
     background:
       radial-gradient(
         48% 42% at 22% 28%,
-        rgba(224, 164, 92, 0.22),
+        rgba(100, 112, 128, 0.14),
         transparent 72%
       ),
       radial-gradient(
         42% 38% at 78% 68%,
-        rgba(180, 150, 120, 0.18),
+        rgba(90, 120, 150, 0.12),
         transparent 70%
       ),
       radial-gradient(
@@ -335,6 +343,91 @@
   .motion-fade-in {
     animation: fade-in var(--duration-med) var(--ease-out) both;
     animation-delay: 220ms;
+  }
+
+  /* Title meta tabs: sliding underline + panel crossfade. */
+  .title-tab-indicator {
+    transition:
+      transform var(--duration-med) var(--ease-out),
+      width var(--duration-med) var(--ease-out);
+  }
+
+  .title-tab-panel {
+    transition:
+      opacity 180ms var(--ease-out),
+      transform 180ms var(--ease-out);
+  }
+
+  .title-tab-panel.is-exiting {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
+
+  .title-tab-panel.is-entering {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
+
+  .title-tab-panel.is-active {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Mobile synopsis clamp: soft fade hints more content on tap. */
+  .title-overview-clamped {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      #000 0%,
+      #000 28%,
+      rgba(0, 0, 0, 0.55) 58%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      #000 0%,
+      #000 28%,
+      rgba(0, 0, 0, 0.55) 58%,
+      transparent 100%
+    );
+  }
+
+  /* Title library action icons — fill color only; desktop hover pop. */
+  .library-action-icon {
+    background: transparent;
+    color: var(--color-fg-muted);
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+
+  .library-action-watchlist {
+    --library-action-color: var(--color-action-watchlist);
+  }
+
+  .library-action-favorites {
+    --library-action-color: var(--color-action-favorites);
+  }
+
+  .library-action-lists {
+    --library-action-color: var(--color-action-lists);
+  }
+
+  .library-action-log {
+    --library-action-color: var(--color-action-log);
+  }
+
+  .library-action-icon.is-active,
+  .library-action-icon:hover:not(:disabled) {
+    color: var(--library-action-color);
+  }
+
+  .library-action-icon-glyph {
+    transition: transform var(--duration-fast) var(--ease-out);
+    transform: translateY(0) scale(1);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .library-action-icon:hover:not(:disabled) .library-action-icon-glyph {
+      transform: translateY(-3px) scale(1.12);
+    }
   }
 
   /* Search overlay: soft veil + springy bar (enter / exit). */
@@ -496,6 +589,22 @@
   .search-overlay-panel.is-leaving,
   .status-pulse::before {
     animation: none !important;
+  }
+
+  .title-tab-indicator,
+  .title-tab-panel,
+  .library-action-icon-glyph {
+    transition: none !important;
+  }
+
+  .library-action-icon:hover:not(:disabled) .library-action-icon-glyph {
+    transform: none !important;
+  }
+
+  .title-tab-panel.is-exiting,
+  .title-tab-panel.is-entering {
+    opacity: 1;
+    transform: none;
   }
 
   .catalog-backdrop-drift {

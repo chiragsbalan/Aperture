@@ -1,12 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
+import { ProfileAvatar } from '@/components/profile-avatar';
 import { SiteSearch } from '@/components/site-search';
 
 type AuthState = 'loading' | 'signed_out' | 'signed_in';
+
+interface MeUser {
+  username: string | null;
+  display_name: string | null;
+}
 
 function HeaderSearch() {
   const pathname = usePathname();
@@ -16,11 +22,30 @@ function HeaderSearch() {
   return <SiteSearch key={pathname} initialQuery={headerQuery} />;
 }
 
+function UserIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="12" cy="8" r="3.25" />
+      <path d="M5.5 19.25a6.5 6.5 0 0 1 13 0" />
+    </svg>
+  );
+}
+
 export function SiteHeader() {
-  const router = useRouter();
   const pathname = usePathname();
   const [authState, setAuthState] = useState<AuthState>('loading');
-  const [loggingOut, setLoggingOut] = useState(false);
+  const [meUser, setMeUser] = useState<MeUser | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,12 +53,21 @@ export function SiteHeader() {
     async function loadAuth() {
       try {
         const res = await fetch('/api/auth/me', { cache: 'no-store' });
-        if (!cancelled) {
-          setAuthState(res.ok ? 'signed_in' : 'signed_out');
+        if (cancelled) {
+          return;
         }
+        if (!res.ok) {
+          setAuthState('signed_out');
+          setMeUser(null);
+          return;
+        }
+        const data = (await res.json()) as { user: MeUser | null };
+        setAuthState('signed_in');
+        setMeUser(data.user);
       } catch {
         if (!cancelled) {
           setAuthState('signed_out');
+          setMeUser(null);
         }
       }
     }
@@ -44,75 +78,58 @@ export function SiteHeader() {
     };
   }, [pathname]);
 
-  async function handleLogout() {
-    setLoggingOut(true);
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      setAuthState('signed_out');
-      router.push('/login');
-      router.refresh();
-    } finally {
-      setLoggingOut(false);
-    }
-  }
+  const username = meUser?.username?.trim() || null;
 
   return (
-    <header className="absolute inset-x-0 top-0 z-10 flex items-center gap-2 px-4 py-4 sm:gap-3 sm:px-6 sm:py-5">
+    <header className="absolute inset-x-0 top-0 z-10 flex items-center gap-3 px-5 py-5 sm:gap-4 sm:px-8 sm:py-6">
       <Link
         href="/"
-        className="shrink-0 font-display text-base font-semibold tracking-tight text-foreground sm:text-lg"
+        className="shrink-0 font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
       >
         Aperture
       </Link>
       <div className="min-w-0 flex-1" aria-hidden="true" />
-      <Suspense
-        fallback={<div className="h-9 w-9 shrink-0" aria-hidden="true" />}
+      <nav
+        aria-label="Primary"
+        className="flex shrink-0 items-center gap-1.5 sm:gap-2"
       >
-        <HeaderSearch />
-      </Suspense>
-      {authState === 'loading' ? (
-        <span className="text-sm text-muted" aria-live="polite">
-          Loading account…
-        </span>
-      ) : null}
-      {authState === 'signed_in' ? (
-        <nav
-          aria-label="Account"
-          className="flex shrink-0 items-center gap-3 text-sm sm:gap-4"
+        <Suspense
+          fallback={
+            <div
+              className="h-11 w-11 shrink-0 sm:h-12 sm:w-12"
+              aria-hidden="true"
+            />
+          }
         >
-          <Link
-            href="/library/watchlist"
-            aria-current={pathname.startsWith('/library') ? 'page' : undefined}
-            className="text-muted transition hover:text-foreground"
+          <HeaderSearch />
+        </Suspense>
+        {authState === 'loading' ? (
+          <span
+            className="inline-flex h-11 w-11 shrink-0 sm:h-12 sm:w-12"
+            aria-live="polite"
           >
-            Library
-          </Link>
+            <span className="sr-only">Loading account…</span>
+          </span>
+        ) : null}
+        {authState === 'signed_in' ? (
           <Link
             href="/account"
+            aria-label={username ? `Profile (@${username})` : 'Your account'}
             aria-current={pathname === '/account' ? 'page' : undefined}
-            className="text-muted transition hover:text-foreground"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted transition hover:bg-[var(--color-accent-soft)] hover:text-foreground sm:h-12 sm:w-12"
           >
-            Account
+            {username ? (
+              <ProfileAvatar
+                username={username}
+                displayName={meUser?.display_name}
+                size="sm"
+              />
+            ) : (
+              <UserIcon className="h-6 w-6 sm:h-7 sm:w-7" />
+            )}
           </Link>
-          <Link
-            href="/settings"
-            aria-current={pathname === '/settings' ? 'page' : undefined}
-            className="text-muted transition hover:text-foreground"
-          >
-            Settings
-          </Link>
-          <button
-            type="button"
-            onClick={() => {
-              void handleLogout();
-            }}
-            disabled={loggingOut}
-            className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2.5 py-1.5 text-foreground transition hover:border-[var(--color-accent)] disabled:opacity-60 sm:px-3"
-          >
-            {loggingOut ? 'Logging out…' : 'Log out'}
-          </button>
-        </nav>
-      ) : null}
+        ) : null}
+      </nav>
     </header>
   );
 }

@@ -21,8 +21,8 @@ function SearchIcon({ className }: { className?: string }) {
   return (
     <svg
       className={className}
-      width="20"
-      height="20"
+      width="24"
+      height="24"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -327,13 +327,13 @@ export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
           clearCloseTimer();
           setPhase('open');
         }}
-        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-muted transition hover:bg-[var(--color-accent-soft)] hover:text-foreground"
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-muted transition hover:bg-[var(--color-accent-soft)] hover:text-foreground sm:h-12 sm:w-12"
         aria-label="Search movies, TV, and people"
         aria-expanded={isVisible}
         aria-controls={dialogId}
         aria-haspopup="dialog"
       >
-        <SearchIcon />
+        <SearchIcon className="h-6 w-6 sm:h-7 sm:w-7" />
       </button>
       {overlay}
     </>

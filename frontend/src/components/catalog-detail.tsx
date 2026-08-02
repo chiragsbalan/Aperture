@@ -7,6 +7,7 @@ import { MoreLikeThis } from '@/components/more-like-this';
 import { SiteHeader } from '@/components/site-header';
 import { TitleAtmosphere } from '@/components/title-atmosphere';
 import { TitleMetaTabs } from '@/components/title-meta-tabs';
+import { TitleOverview } from '@/components/title-overview';
 import { WhereToWatch } from '@/components/where-to-watch';
 import type {
   CreditPersonRef,
@@ -103,7 +104,7 @@ function HomeLink() {
 
 function TitleMetaRow({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-muted">
+    <div className="mt-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-xs text-muted sm:mt-3 sm:gap-x-3 sm:text-sm">
       {children}
     </div>
   );
@@ -166,29 +167,35 @@ export function CatalogStatusShell({ children }: { children: ReactNode }) {
 export function CatalogLoading() {
   return (
     <div
-      className="motion-fade-in relative z-[1] mx-auto w-full max-w-5xl px-6 pb-24 pt-28"
+      className="motion-fade-in relative z-[1] mx-auto w-full max-w-5xl px-4 pb-16 pt-24 sm:px-6 sm:pb-24 sm:pt-28"
       role="status"
       aria-live="polite"
       aria-busy="true"
     >
       <span className="sr-only">Loading catalog…</span>
-      <div className="flex flex-col gap-10 sm:flex-row sm:items-start">
-        <div className="min-w-0 flex-1 space-y-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_6.75rem] gap-x-4 gap-y-5 sm:grid-cols-[minmax(0,1fr)_18rem] sm:gap-x-12 sm:gap-y-0">
+        <div
+          aria-hidden
+          className="col-start-2 row-span-2 row-start-1 aspect-[2/3] w-full bg-[var(--color-bg-elevated)] sm:mt-10"
+        />
+        <div className="col-start-1 row-span-2 row-start-1 flex min-w-0 flex-col justify-center space-y-3 py-0.5 sm:row-span-1 sm:justify-start sm:space-y-4 sm:py-0">
           <div
             aria-hidden
-            className="h-10 w-3/4 max-w-md bg-[var(--color-bg-elevated)]"
+            className="h-8 w-full max-w-[12rem] bg-[var(--color-bg-elevated)] sm:h-10 sm:max-w-md"
           />
-          <div aria-hidden className="h-4 w-48 bg-[var(--color-bg-elevated)]" />
-          <div aria-hidden className="mt-8 space-y-2">
-            <div className="h-4 w-full bg-[var(--color-bg-elevated)]" />
-            <div className="h-4 w-11/12 bg-[var(--color-bg-elevated)]" />
-            <div className="h-4 w-4/5 bg-[var(--color-bg-elevated)]" />
-          </div>
+          <div
+            aria-hidden
+            className="h-3 w-28 bg-[var(--color-bg-elevated)] sm:h-4 sm:w-48"
+          />
         </div>
         <div
           aria-hidden
-          className="aspect-[2/3] w-full max-w-[15rem] shrink-0 self-center bg-[var(--color-bg-elevated)] sm:mt-10 sm:self-start"
-        />
+          className="col-span-2 col-start-1 row-start-3 space-y-2 sm:col-span-1 sm:row-start-2 sm:mt-8 sm:max-w-2xl"
+        >
+          <div className="h-3 w-full bg-[var(--color-bg-elevated)] sm:h-4" />
+          <div className="h-3 w-11/12 bg-[var(--color-bg-elevated)] sm:h-4" />
+          <div className="h-3 w-4/5 bg-[var(--color-bg-elevated)] sm:h-4" />
+        </div>
       </div>
     </div>
   );
@@ -232,39 +239,73 @@ function TitleDetailShell({
       </a>
       <SiteHeader />
       <main id="main-content" className="relative">
-        <article className="motion-fade-rise mx-auto w-full max-w-5xl px-6 pb-24 pt-28 text-left">
-          <div className="flex flex-col gap-10 sm:flex-row sm:items-start sm:gap-12">
-            <div className="min-w-0 flex-1">
+        <article className="motion-fade-rise mx-auto w-full max-w-5xl px-4 pb-16 pt-24 text-left sm:px-6 sm:pb-24 sm:pt-28">
+          {/*
+            Text left + poster right on mobile and desktop; mobile uses a
+            compact poster, then full-width body below the hero row.
+            On mobile, title + meta stay grouped and are vertically centered
+            in the hero band beside the poster (above the description).
+          */}
+          <div className="grid grid-cols-[minmax(0,1fr)_6.75rem] gap-x-4 gap-y-5 sm:grid-cols-[minmax(0,1fr)_18rem] sm:gap-x-12 sm:gap-y-0">
+            <div className="col-start-2 row-span-2 row-start-1 w-full sm:mt-12">
+              <CatalogPoster
+                url={posterUrl}
+                alt={posterAlt}
+                priority
+                sizes="(max-width: 640px) 108px, 288px"
+              />
+              <div className="mt-4 hidden sm:block">
+                <WhereToWatch
+                  providers={extras.watch_providers}
+                  title={title}
+                />
+              </div>
+            </div>
+
+            <div className="col-start-1 row-span-2 row-start-1 flex min-w-0 flex-col justify-center py-0.5 sm:row-span-1 sm:justify-start sm:py-0">
               {heading}
               {meta}
-              <LibraryActions contentType={contentType} contentId={contentId} />
+            </div>
+
+            <div className="col-span-2 col-start-1 row-start-3 min-w-0 sm:col-span-1 sm:row-start-2 sm:mt-1">
               {tagline ? (
-                <p className="mt-6 text-sm font-semibold tracking-[0.14em] text-muted uppercase">
+                <p className="text-[0.65rem] font-semibold tracking-[0.12em] text-muted uppercase sm:text-sm sm:tracking-[0.14em]">
                   {tagline}
                 </p>
               ) : null}
               {overview ? (
-                <p className="mt-4 max-w-2xl whitespace-pre-wrap text-[1.05rem] leading-relaxed text-foreground">
-                  {overview}
-                </p>
+                <TitleOverview
+                  text={overview}
+                  className={tagline ? 'mt-2.5 sm:mt-4' : ''}
+                />
               ) : (
-                <p className="mt-7 text-sm text-muted">No overview yet.</p>
+                <p
+                  className={`text-xs text-muted sm:text-sm ${
+                    tagline ? 'mt-2.5 sm:mt-7' : 'sm:mt-7'
+                  }`}
+                >
+                  No overview yet.
+                </p>
               )}
+              <hr className="title-actions-rule mt-5 border-0 border-t border-[var(--color-border)] sm:mt-6" />
+              <LibraryActions contentType={contentType} contentId={contentId} />
               <TitleMetaTabs
                 cast={cast}
                 crew={crew}
                 extras={extras}
                 seasons={seasons}
               />
+              <div className="sm:hidden">
+                <WhereToWatch
+                  providers={extras.watch_providers}
+                  title={title}
+                />
+              </div>
               <MoreLikeThis
                 items={extras.similar ?? []}
                 kind={contentType === 'tv_show' ? 'tv_show' : 'movie'}
                 contentId={contentId}
               />
-            </div>
-            <div className="mx-auto w-full max-w-[18rem] shrink-0 sm:mx-0 sm:mt-12 sm:w-[18rem]">
-              <CatalogPoster url={posterUrl} alt={posterAlt} priority />
-              <WhereToWatch providers={extras.watch_providers} title={title} />
             </div>
           </div>
         </article>
@@ -290,7 +331,7 @@ export function MovieDetailView({ movie }: { movie: MovieDetail }) {
       extras={movie.extras}
       tagline={movie.extras.tagline}
       heading={
-        <h1 className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+        <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-foreground sm:text-4xl sm:leading-none md:text-5xl">
           {movie.title}
         </h1>
       }
@@ -339,7 +380,7 @@ export function TvDetailView({ show }: { show: TvDetail }) {
       seasons={show.seasons}
       tagline={show.extras.tagline}
       heading={
-        <h1 className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+        <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-foreground sm:text-4xl sm:leading-none md:text-5xl">
           {show.title}
         </h1>
       }
@@ -376,13 +417,18 @@ export function TvDetailView({ show }: { show: TvDetail }) {
 
 export function PersonDetailView({ person }: { person: PersonDetail }) {
   return (
-    <article className="motion-fade-rise relative z-[1] mx-auto w-full max-w-3xl px-6 pb-24 pt-28 text-left">
-      <div className="flex flex-col gap-8 sm:flex-row sm:items-start">
-        <div className="mx-auto w-full max-w-[14rem] shrink-0 sm:mx-0 sm:mt-6">
-          <CatalogPoster url={person.profile_url} alt={person.name} priority />
+    <article className="motion-fade-rise relative z-[1] mx-auto w-full max-w-3xl px-4 pb-16 pt-20 text-left sm:px-6 sm:pb-24 sm:pt-28">
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
+        <div className="mx-auto w-[7.5rem] shrink-0 sm:mx-0 sm:mt-6 sm:w-full sm:max-w-[14rem]">
+          <CatalogPoster
+            url={person.profile_url}
+            alt={person.name}
+            priority
+            sizes="(max-width: 640px) 120px, 224px"
+          />
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          <h1 className="font-display text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground sm:text-3xl sm:leading-none md:text-4xl">
             {person.name}
           </h1>
           <div className="mt-3 space-y-1 text-sm text-muted">

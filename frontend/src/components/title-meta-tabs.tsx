@@ -1,9 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { type KeyboardEvent, useMemo, useRef, useState } from 'react';
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import type { CreditPersonRef, SeasonDetail, TitleExtras } from '@/lib/catalog';
+
+const PANEL_FADE_MS = 180;
 
 type MetaTab = 'cast' | 'crew' | 'details' | 'genres' | 'releases' | 'seasons';
 
@@ -16,14 +27,21 @@ const RELEASE_TYPE_LABELS: Record<number, string> = {
   6: 'TV',
 };
 
-const CREDIT_PREVIEW_COUNT = 10;
+/** Mobile 2-col × 3 rows, last cell = toggle → 5 credits. Desktop 3-col × 3 → 8. */
+const CREDIT_PREVIEW_MOBILE = 5;
+const CREDIT_PREVIEW_DESKTOP = 8;
+/** Themes: 2-col × 5 rows → 9; desktop 3-col × 5 → 14. */
+const THEME_PREVIEW_MOBILE = 9;
+const THEME_PREVIEW_DESKTOP = 14;
+/** Details: 4 content rows + show more on the 5th. */
+const DETAILS_PREVIEW_COUNT = 4;
 
 function CreditPill({ credit }: { credit: CreditPersonRef }) {
   const detail = credit.character ?? credit.job;
   return (
     <Link
       href={`/people/${credit.id}`}
-      className="group inline-flex max-w-full items-baseline gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)]/70 px-2.5 py-1.5 text-sm text-foreground transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
+      className="group inline-flex max-w-full items-baseline gap-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)]/70 px-2 py-1 text-xs text-foreground transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)] sm:gap-1.5 sm:px-2.5 sm:py-1.5 sm:text-sm"
       title={detail ? `${credit.name} — ${detail}` : credit.name}
     >
       <span className="truncate">{credit.name}</span>
@@ -36,7 +54,7 @@ function CreditPill({ credit }: { credit: CreditPersonRef }) {
   );
 }
 
-function CreditTogglePill({
+function TogglePill({
   expanded,
   remaining,
   onToggle,
@@ -48,33 +66,55 @@ function CreditTogglePill({
   return (
     <button
       type="button"
+      aria-expanded={expanded}
       onClick={onToggle}
-      className="inline-flex max-w-full items-baseline gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)]/70 px-2.5 py-1.5 text-sm text-foreground transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
+      className="inline-flex max-w-full items-baseline gap-1 rounded-[var(--radius-sm)] border border-[var(--color-fg)]/35 bg-[var(--color-fg)]/18 px-2 py-1 text-xs font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-[var(--color-fg)]/50 hover:bg-[var(--color-fg)]/26 sm:gap-1.5 sm:px-2.5 sm:py-1.5 sm:text-sm"
     >
       {expanded ? 'Show less' : `Show all (+${remaining})`}
     </button>
   );
 }
 
+function useDesktopPreview(mobileCount: number, desktopCount: number): number {
+  const [count, setCount] = useState(mobileCount);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 640px)');
+    const sync = () => {
+      setCount(mq.matches ? desktopCount : mobileCount);
+    };
+    sync();
+    mq.addEventListener('change', sync);
+    return () => {
+      mq.removeEventListener('change', sync);
+    };
+  }, [mobileCount, desktopCount]);
+  return count;
+}
+
 function CreditPillList({ credits }: { credits: CreditPersonRef[] }) {
   const [expanded, setExpanded] = useState(false);
-  const needsToggle = credits.length > CREDIT_PREVIEW_COUNT;
+  const previewCount = useDesktopPreview(
+    CREDIT_PREVIEW_MOBILE,
+    CREDIT_PREVIEW_DESKTOP,
+  );
+  const needsToggle = credits.length > previewCount;
   const visible =
-    expanded || !needsToggle ? credits : credits.slice(0, CREDIT_PREVIEW_COUNT);
-  const remaining = credits.length - CREDIT_PREVIEW_COUNT;
+    expanded || !needsToggle ? credits : credits.slice(0, previewCount);
+  const remaining = credits.length - previewCount;
 
   return (
-    <ul className="flex flex-wrap gap-2">
+    <ul className="flex flex-wrap justify-start gap-2">
       {visible.map((credit) => (
         <li
           key={`${credit.id}-${credit.character ?? ''}-${credit.job ?? ''}-${credit.billing_order ?? ''}`}
+          className="min-w-0 max-w-full"
         >
           <CreditPill credit={credit} />
         </li>
       ))}
       {needsToggle ? (
-        <li>
-          <CreditTogglePill
+        <li className="min-w-0 max-w-full">
+          <TogglePill
             expanded={expanded}
             remaining={remaining}
             onToggle={() => {
@@ -89,7 +129,7 @@ function CreditPillList({ credits }: { credits: CreditPersonRef[] }) {
 
 function Pill({ children }: { children: string }) {
   return (
-    <span className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)]/70 px-2.5 py-1.5 text-sm text-foreground">
+    <span className="inline-flex max-w-full truncate rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)]/70 px-2 py-1 text-xs text-foreground sm:px-2.5 sm:py-1.5 sm:text-sm">
       {children}
     </span>
   );
@@ -97,10 +137,166 @@ function Pill({ children }: { children: string }) {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[8rem_1fr] gap-3 text-sm sm:grid-cols-[10rem_1fr]">
+    <div className="grid grid-cols-[7rem_1fr] gap-2 text-xs sm:grid-cols-[10rem_1fr] sm:gap-3 sm:text-sm">
       <dt className="text-muted">{label}</dt>
-      <dd className="text-foreground">{value}</dd>
+      <dd className="min-w-0 text-foreground">{value}</dd>
     </div>
+  );
+}
+
+function DetailsList({ extras }: { extras: TitleExtras }) {
+  const [expanded, setExpanded] = useState(false);
+  const rows: Array<{ key: string; node: ReactNode }> = [];
+
+  if (extras.studios.length > 0) {
+    rows.push({
+      key: 'studios',
+      node: (
+        <DetailRow
+          label="Studios"
+          value={extras.studios.map((s) => s.name).join(', ')}
+        />
+      ),
+    });
+  }
+  if (extras.countries.length > 0) {
+    rows.push({
+      key: 'countries',
+      node: (
+        <DetailRow
+          label="Countries"
+          value={extras.countries.map((c) => c.name || c.iso_3166_1).join(', ')}
+        />
+      ),
+    });
+  }
+  if (extras.original_language) {
+    rows.push({
+      key: 'language',
+      node: (
+        <DetailRow
+          label="Primary language"
+          value={extras.original_language.toUpperCase()}
+        />
+      ),
+    });
+  }
+  if (extras.spoken_languages.length > 0) {
+    rows.push({
+      key: 'spoken',
+      node: (
+        <DetailRow
+          label="Spoken languages"
+          value={extras.spoken_languages
+            .map((l) => l.english_name || l.name || l.iso_639_1 || '')
+            .filter(Boolean)
+            .join(', ')}
+        />
+      ),
+    });
+  }
+  if (extras.collection) {
+    rows.push({
+      key: 'collection',
+      node: <DetailRow label="Collection" value={extras.collection.name} />,
+    });
+  }
+  if (formatMoney(extras.budget)) {
+    rows.push({
+      key: 'budget',
+      node: <DetailRow label="Budget" value={formatMoney(extras.budget)!} />,
+    });
+  }
+  if (formatMoney(extras.revenue)) {
+    rows.push({
+      key: 'revenue',
+      node: <DetailRow label="Revenue" value={formatMoney(extras.revenue)!} />,
+    });
+  }
+  if (extras.alternative_titles.length > 0) {
+    rows.push({
+      key: 'alts',
+      node: (
+        <div>
+          <p className="mb-1.5 text-xs text-muted sm:mb-2 sm:text-sm">
+            Alternative titles
+          </p>
+          <ul className="flex flex-wrap gap-2">
+            {extras.alternative_titles.map((title) => (
+              <li key={`${title.iso_3166_1}-${title.title}`}>
+                <Pill>
+                  {title.iso_3166_1
+                    ? `${title.title} (${title.iso_3166_1})`
+                    : title.title}
+                </Pill>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ),
+    });
+  }
+
+  const needsToggle = rows.length > DETAILS_PREVIEW_COUNT;
+  const visible =
+    expanded || !needsToggle ? rows : rows.slice(0, DETAILS_PREVIEW_COUNT);
+  const remaining = rows.length - DETAILS_PREVIEW_COUNT;
+
+  return (
+    <dl className="space-y-3 text-left">
+      {visible.map((row) => (
+        <div key={row.key} className="text-left">
+          {row.node}
+        </div>
+      ))}
+      {needsToggle ? (
+        <div className="text-left">
+          <TogglePill
+            expanded={expanded}
+            remaining={remaining}
+            onToggle={() => {
+              setExpanded((value) => !value);
+            }}
+          />
+        </div>
+      ) : null}
+    </dl>
+  );
+}
+
+function ThemePillList({ keywords }: { keywords: TitleExtras['keywords'] }) {
+  const [expanded, setExpanded] = useState(false);
+  const previewCount = useDesktopPreview(
+    THEME_PREVIEW_MOBILE,
+    THEME_PREVIEW_DESKTOP,
+  );
+  const needsToggle = keywords.length > previewCount;
+  const visible =
+    expanded || !needsToggle ? keywords : keywords.slice(0, previewCount);
+  const remaining = keywords.length - previewCount;
+
+  return (
+    <ul className="flex flex-wrap justify-start gap-2">
+      {visible.map((keyword) => (
+        <li
+          key={`${keyword.id}-${keyword.name}`}
+          className="min-w-0 max-w-full"
+        >
+          <Pill>{keyword.name}</Pill>
+        </li>
+      ))}
+      {needsToggle ? (
+        <li className="min-w-0 max-w-full">
+          <TogglePill
+            expanded={expanded}
+            remaining={remaining}
+            onToggle={() => {
+              setExpanded((value) => !value);
+            }}
+          />
+        </li>
+      ) : null}
+    </ul>
   );
 }
 
@@ -151,7 +347,7 @@ function CountryFlag({ code }: { code: string | null | undefined }) {
     return (
       <span
         aria-hidden
-        className="inline-block h-5 w-5 shrink-0 rounded-full bg-[var(--color-border)]"
+        className="inline-block h-3.5 w-3.5 shrink-0 rounded-full bg-[var(--color-border)] sm:h-4 sm:w-4"
       />
     );
   }
@@ -161,9 +357,9 @@ function CountryFlag({ code }: { code: string | null | undefined }) {
     <img
       src={`https://flagcdn.com/w40/${iso}.png`}
       alt=""
-      width={20}
-      height={20}
-      className="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-[var(--color-border)]"
+      width={16}
+      height={16}
+      className="h-3.5 w-3.5 shrink-0 rounded-full object-cover ring-1 ring-[var(--color-border)] sm:h-4 sm:w-4"
       loading="lazy"
     />
   );
@@ -217,11 +413,106 @@ export function TitleMetaTabs({
     return items;
   }, [cast.length, crew.length, extras, seasonList.length]);
 
+  const panelId = useId();
   const [tab, setTab] = useState<MetaTab>(tabs[0]?.id ?? 'details');
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const tablistRef = useRef<HTMLDivElement | null>(null);
   const active = tabs.some((item) => item.id === tab)
     ? tab
     : (tabs[0]?.id ?? 'details');
+  const [panelTab, setPanelTab] = useState<MetaTab>(active);
+  const [panelPhase, setPanelPhase] = useState<
+    'active' | 'exiting' | 'entering'
+  >('active');
+  const [indicator, setIndicator] = useState({ left: 0, width: 0 });
+  const [indicatorReady, setIndicatorReady] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const skipPanelAnimRef = useRef(true);
+
+  useEffect(() => {
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const sync = () => {
+      setReduceMotion(motion.matches);
+    };
+    sync();
+    motion.addEventListener('change', sync);
+    return () => {
+      motion.removeEventListener('change', sync);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const list = tablistRef.current;
+    if (!list) {
+      return;
+    }
+
+    const syncIndicator = () => {
+      const activeIndex = tabs.findIndex((item) => item.id === active);
+      const activeTab = tabRefs.current[activeIndex];
+      if (!activeTab) {
+        setIndicator({ left: 0, width: 0 });
+        return;
+      }
+      setIndicator({
+        left: activeTab.offsetLeft,
+        width: activeTab.offsetWidth,
+      });
+      setIndicatorReady(true);
+    };
+
+    syncIndicator();
+    const observer = new ResizeObserver(syncIndicator);
+    observer.observe(list);
+    for (const button of tabRefs.current) {
+      if (button) {
+        observer.observe(button);
+      }
+    }
+    window.addEventListener('resize', syncIndicator);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', syncIndicator);
+    };
+  }, [active, tabs]);
+
+  useEffect(() => {
+    if (skipPanelAnimRef.current) {
+      skipPanelAnimRef.current = false;
+      setPanelTab(active);
+      setPanelPhase('active');
+      return;
+    }
+    if (reduceMotion) {
+      setPanelTab(active);
+      setPanelPhase('active');
+      return;
+    }
+
+    let cancelled = false;
+    let enterFrame = 0;
+    setPanelPhase('exiting');
+    const exitTimer = window.setTimeout(() => {
+      if (cancelled) {
+        return;
+      }
+      setPanelTab(active);
+      setPanelPhase('entering');
+      enterFrame = window.requestAnimationFrame(() => {
+        enterFrame = window.requestAnimationFrame(() => {
+          if (!cancelled) {
+            setPanelPhase('active');
+          }
+        });
+      });
+    }, PANEL_FADE_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(exitTimer);
+      window.cancelAnimationFrame(enterFrame);
+    };
+  }, [active, reduceMotion]);
 
   if (tabs.length === 0) {
     return null;
@@ -279,24 +570,137 @@ export function TitleMetaTabs({
     focusTabAt(nextIndex);
   }
 
+  function renderPanel(panel: MetaTab): ReactNode {
+    if (panel === 'cast') {
+      return <CreditPillList credits={cast} />;
+    }
+    if (panel === 'crew') {
+      return <CreditPillList credits={crew} />;
+    }
+    if (panel === 'details') {
+      return <DetailsList extras={extras} />;
+    }
+    if (panel === 'genres') {
+      return (
+        <div className="space-y-5">
+          {extras.genres.length > 0 ? (
+            <div>
+              <p className="mb-2 text-sm text-muted">Genres</p>
+              <ul className="flex flex-wrap justify-start gap-2">
+                {extras.genres.map((genre) => (
+                  <li key={`${genre.id}-${genre.name}`} className="min-w-0">
+                    <Pill>{genre.name}</Pill>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {extras.keywords.length > 0 ? (
+            <div>
+              <p className="mb-2 text-sm text-muted">Themes</p>
+              <ThemePillList keywords={extras.keywords} />
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+    if (panel === 'releases') {
+      return (
+        <ul className="catalog-thumb-scroll max-h-[28rem] space-y-0 overflow-y-auto pr-1 text-left text-[0.68rem] leading-none sm:text-xs sm:leading-snug">
+          {sortedReleases.map((release, index) => (
+            <li
+              key={`${release.country}-${release.release_date}-${release.type}-${index}`}
+              className="flex h-7 flex-nowrap items-center gap-x-1.5 overflow-hidden border-b border-[var(--color-border)]/60 sm:h-8 sm:gap-x-2"
+            >
+              <span className="inline-flex min-w-0 shrink items-center gap-1 font-medium text-foreground sm:gap-1.5">
+                <CountryFlag code={release.country} />
+                <span className="truncate">
+                  {countryDisplayName(release.country)}
+                </span>
+              </span>
+              <span className="shrink-0 text-muted">
+                {formatReleaseDate(release.release_date)}
+              </span>
+              {release.type != null ? (
+                <span className="min-w-0 truncate text-foreground">
+                  {RELEASE_TYPE_LABELS[release.type] ?? `Type ${release.type}`}
+                </span>
+              ) : null}
+              {release.certification ? (
+                <span className="shrink-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)]/40 px-1 py-px text-[0.65rem] text-muted">
+                  {release.certification}
+                </span>
+              ) : null}
+              {release.note ? (
+                <span className="min-w-0 truncate text-muted">
+                  {release.note}
+                </span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    if (panel === 'seasons') {
+      return (
+        <ul className="space-y-6">
+          {seasonList.map((season) => (
+            <li key={season.id}>
+              <h3 className="font-medium text-foreground">
+                {season.name?.trim() || `Season ${season.season_number}`}
+              </h3>
+              {season.overview ? (
+                <p className="mt-1 whitespace-pre-wrap text-sm text-muted">
+                  {season.overview}
+                </p>
+              ) : null}
+              {season.episodes.length > 0 ? (
+                <ul className="mt-2 space-y-1 text-sm text-muted">
+                  {season.episodes.map((episode) => (
+                    <li key={episode.id}>
+                      E{episode.episode_number}
+                      {episode.name ? `: ${episode.name}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    return null;
+  }
+
+  const panelPhaseClass =
+    panelPhase === 'exiting'
+      ? 'is-exiting'
+      : panelPhase === 'entering'
+        ? 'is-entering'
+        : 'is-active';
+
   return (
-    <section className="mt-10 text-left">
+    <section className="mt-5 text-left sm:mt-7">
       <div
+        ref={tablistRef}
         role="tablist"
         aria-label="Title details"
-        className="flex flex-wrap gap-6 border-b border-[var(--color-border)]"
+        className="relative flex w-full flex-nowrap items-end justify-between gap-0.5 border-b border-[var(--color-border)] sm:justify-start sm:gap-6"
       >
         {tabs.map((item, index) => {
           const selected = active === item.id;
+          const ariaLabel =
+            item.count != null ? `${item.label}, ${item.count}` : item.label;
           return (
             <button
               key={item.id}
               type="button"
               role="tab"
               aria-selected={selected}
+              aria-label={ariaLabel}
               tabIndex={selected ? 0 : -1}
               id={`title-tab-${item.id}`}
-              aria-controls={`title-panel-${item.id}`}
+              aria-controls={panelId}
               ref={(element) => {
                 tabRefs.current[index] = element;
               }}
@@ -306,182 +710,37 @@ export function TitleMetaTabs({
               onKeyDown={(event) => {
                 onTabKeyDown(event, index);
               }}
-              className={
-                selected
-                  ? 'border-b-2 border-accent pb-2 text-sm font-semibold tracking-[0.12em] text-accent'
-                  : 'pb-2 text-sm font-semibold tracking-[0.12em] text-muted transition hover:text-foreground'
-              }
+              className={`min-w-0 flex-1 whitespace-nowrap pb-1.5 text-center text-xs font-semibold tracking-[0.03em] transition-colors duration-300 sm:flex-none sm:pb-2 sm:text-left sm:text-sm sm:tracking-[0.12em] ${
+                selected ? 'text-accent' : 'text-muted hover:text-foreground'
+              }`}
             >
               {item.label}
               {item.count != null ? (
-                <span className="ml-2 font-normal tracking-normal text-muted">
+                <span className="ml-1 hidden font-normal tracking-normal text-muted sm:ml-2 sm:inline">
                   {item.count}
                 </span>
               ) : null}
             </button>
           );
         })}
+        <span
+          aria-hidden
+          className="title-tab-indicator pointer-events-none absolute bottom-0 h-0.5 bg-accent"
+          style={{
+            width: indicator.width,
+            transform: `translateX(${indicator.left}px)`,
+            opacity: indicatorReady ? 1 : 0,
+          }}
+        />
       </div>
 
       <div
         role="tabpanel"
-        id={`title-panel-${active}`}
+        id={panelId}
         aria-labelledby={`title-tab-${active}`}
-        className="mt-5"
+        className={`title-tab-panel mt-5 text-left ${panelPhaseClass}`}
       >
-        {active === 'cast' ? <CreditPillList credits={cast} /> : null}
-
-        {active === 'crew' ? <CreditPillList credits={crew} /> : null}
-
-        {active === 'details' ? (
-          <dl className="space-y-3">
-            {extras.studios.length > 0 ? (
-              <DetailRow
-                label="Studios"
-                value={extras.studios.map((s) => s.name).join(', ')}
-              />
-            ) : null}
-            {extras.countries.length > 0 ? (
-              <DetailRow
-                label="Countries"
-                value={extras.countries
-                  .map((c) => c.name || c.iso_3166_1)
-                  .join(', ')}
-              />
-            ) : null}
-            {extras.original_language ? (
-              <DetailRow
-                label="Primary language"
-                value={extras.original_language.toUpperCase()}
-              />
-            ) : null}
-            {extras.spoken_languages.length > 0 ? (
-              <DetailRow
-                label="Spoken languages"
-                value={extras.spoken_languages
-                  .map((l) => l.english_name || l.name || l.iso_639_1 || '')
-                  .filter(Boolean)
-                  .join(', ')}
-              />
-            ) : null}
-            {extras.collection ? (
-              <DetailRow label="Collection" value={extras.collection.name} />
-            ) : null}
-            {formatMoney(extras.budget) ? (
-              <DetailRow label="Budget" value={formatMoney(extras.budget)!} />
-            ) : null}
-            {formatMoney(extras.revenue) ? (
-              <DetailRow label="Revenue" value={formatMoney(extras.revenue)!} />
-            ) : null}
-            {extras.alternative_titles.length > 0 ? (
-              <div className="pt-2">
-                <p className="mb-2 text-sm text-muted">Alternative titles</p>
-                <ul className="flex flex-wrap gap-2">
-                  {extras.alternative_titles.map((title) => (
-                    <li key={`${title.iso_3166_1}-${title.title}`}>
-                      <Pill>
-                        {title.iso_3166_1
-                          ? `${title.title} (${title.iso_3166_1})`
-                          : title.title}
-                      </Pill>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </dl>
-        ) : null}
-
-        {active === 'genres' ? (
-          <div className="space-y-5">
-            {extras.genres.length > 0 ? (
-              <div>
-                <p className="mb-2 text-sm text-muted">Genres</p>
-                <ul className="flex flex-wrap gap-2">
-                  {extras.genres.map((genre) => (
-                    <li key={`${genre.id}-${genre.name}`}>
-                      <Pill>{genre.name}</Pill>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {extras.keywords.length > 0 ? (
-              <div>
-                <p className="mb-2 text-sm text-muted">Themes</p>
-                <ul className="flex flex-wrap gap-2">
-                  {extras.keywords.map((keyword) => (
-                    <li key={`${keyword.id}-${keyword.name}`}>
-                      <Pill>{keyword.name}</Pill>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {active === 'releases' ? (
-          <ul className="catalog-thumb-scroll max-h-[28rem] space-y-2 overflow-y-auto pr-1 text-sm">
-            {sortedReleases.map((release, index) => (
-              <li
-                key={`${release.country}-${release.release_date}-${release.type}-${index}`}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[var(--color-border)]/60 py-2"
-              >
-                <span className="inline-flex min-w-0 items-center gap-2 font-medium text-foreground">
-                  <CountryFlag code={release.country} />
-                  <span className="truncate">
-                    {countryDisplayName(release.country)}
-                  </span>
-                </span>
-                <span className="text-muted">
-                  {formatReleaseDate(release.release_date)}
-                </span>
-                {release.type != null ? (
-                  <span className="text-foreground">
-                    {RELEASE_TYPE_LABELS[release.type] ??
-                      `Type ${release.type}`}
-                  </span>
-                ) : null}
-                {release.certification ? (
-                  <span className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)]/40 px-1.5 py-0.5 text-xs text-muted">
-                    {release.certification}
-                  </span>
-                ) : null}
-                {release.note ? (
-                  <span className="text-muted">{release.note}</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
-        {active === 'seasons' ? (
-          <ul className="space-y-6">
-            {seasonList.map((season) => (
-              <li key={season.id}>
-                <h3 className="font-medium text-foreground">
-                  {season.name?.trim() || `Season ${season.season_number}`}
-                </h3>
-                {season.overview ? (
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-muted">
-                    {season.overview}
-                  </p>
-                ) : null}
-                {season.episodes.length > 0 ? (
-                  <ul className="mt-2 space-y-1 text-sm text-muted">
-                    {season.episodes.map((episode) => (
-                      <li key={episode.id}>
-                        E{episode.episode_number}
-                        {episode.name ? `: ${episode.name}` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        {renderPanel(panelTab)}
       </div>
     </section>
   );

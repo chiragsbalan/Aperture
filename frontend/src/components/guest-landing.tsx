@@ -22,7 +22,7 @@ export function GuestLanding() {
       <div className="motion-fade-in mt-8 flex w-full max-w-sm flex-col items-stretch gap-3 sm:mt-10 sm:max-w-none sm:flex-row sm:items-center sm:justify-center sm:gap-4">
         <Link
           href="/signup"
-          className="rounded-[var(--radius-md)] bg-[var(--color-accent)] px-5 py-2.5 text-center text-base font-medium text-[#1a140c] transition hover:brightness-110 sm:text-[0.9375rem]"
+          className="rounded-[var(--radius-md)] bg-[var(--color-accent)] px-5 py-2.5 text-center text-base font-medium text-[var(--color-accent-contrast)] transition hover:brightness-110 sm:text-[0.9375rem]"
         >
           Sign up
         </Link>
