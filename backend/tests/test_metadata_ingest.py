@@ -112,6 +112,41 @@ def test_external_id_xor_rejects_both_fks() -> None:
     _run(body())
 
 
+def test_trim_credits_retains_late_director() -> None:
+    """Priority-ranked trim keeps Director even when it appears last."""
+    from app.metadata.ingest import _trim_credits_for_resolve
+    from app.metadata.tmdb.dto import (
+        TmdbCastCredit,
+        TmdbCredits,
+        TmdbCrewCredit,
+    )
+
+    credits = TmdbCredits(
+        cast=[
+            TmdbCastCredit(id=i, name=f'Actor {i}', order=i) for i in range(25)
+        ],
+        crew=[
+            *[
+                TmdbCrewCredit(
+                    id=i,
+                    name=f'Producer {i}',
+                    job='Executive Producer',
+                )
+                for i in range(15)
+            ],
+            TmdbCrewCredit(id=999, name='Late Director', job='Director'),
+            TmdbCrewCredit(id=1000, name='Lighting', job='Gaffer'),
+        ],
+    )
+    trimmed = _trim_credits_for_resolve(credits)
+    assert len(trimmed.cast) == 20
+    assert trimmed.cast[0].order == 0
+    assert any(row.id == 999 and row.job == 'Director' for row in trimmed.crew)
+    assert all(row.job != 'Gaffer' for row in trimmed.crew)
+    assert len(trimmed.crew) <= 12
+    assert trimmed.crew[0].job == 'Director'
+
+
 def test_tmdb_client_requires_api_key() -> None:
     with pytest.raises(TmdbConfigError, match='TMDB_API_KEY'):
         TmdbClient('')

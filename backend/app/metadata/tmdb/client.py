@@ -15,15 +15,37 @@ from app.metadata.tmdb.dto import TmdbMovie, TmdbPerson, TmdbTvShow
 TMDB_API_BASE = 'https://api.themoviedb.org/3'
 # TMDb guidance is ~40–50 req/s for many plans; stay well under for seed jobs.
 _DEFAULT_MIN_INTERVAL_SECONDS = 0.25
+# Shared AsyncClient timeout — fixed so pooled connections stay consistent.
+_SHARED_TIMEOUT_SECONDS = 30.0
 
-_MOVIE_INGEST_APPEND = (
-    'credits,keywords,images,videos,watch/providers,'
-    'recommendations,release_dates,alternative_titles'
-)
-_TV_INGEST_APPEND = (
-    'credits,keywords,images,videos,watch/providers,'
-    'recommendations,content_ratings,alternative_titles'
-)
+# On-click resolve: credits for cast/director + recommendations for Similar.
+# Heavier appends (images/videos/providers/release_dates/…) stay off this path.
+_MOVIE_INGEST_APPEND = 'credits,recommendations'
+_TV_INGEST_APPEND = 'credits,recommendations'
+
+_shared_http_client: httpx.AsyncClient | None = None
+_shared_http_client_lock = asyncio.Lock()
+
+# Process-wide throttle so concurrent TmdbClient instances share one budget.
+_throttle_lock = asyncio.Lock()
+_last_request_at = 0.0
+
+
+async def _shared_client() -> httpx.AsyncClient:
+    """Reuse one AsyncClient across resolve/seed calls (connection pooling)."""
+    global _shared_http_client
+    client = _shared_http_client
+    if client is not None and not client.is_closed:
+        return client
+    async with _shared_http_client_lock:
+        client = _shared_http_client
+        if client is None or client.is_closed:
+            _shared_http_client = httpx.AsyncClient(
+                base_url=TMDB_API_BASE,
+                timeout=_SHARED_TIMEOUT_SECONDS,
+            )
+            client = _shared_http_client
+        return client
 
 
 class TmdbConfigError(RuntimeError):
@@ -48,7 +70,6 @@ class TmdbClient:
         self,
         api_key: str,
         *,
-        timeout: float = 30.0,
         min_interval_seconds: float = _DEFAULT_MIN_INTERVAL_SECONDS,
     ) -> None:
         if not api_key.strip():
@@ -57,10 +78,7 @@ class TmdbClient:
                 'with --source fixtures (no key required).'
             )
         self._api_key = api_key.strip()
-        self._timeout = timeout
         self._min_interval = max(0.0, min_interval_seconds)
-        self._lock = asyncio.Lock()
-        self._last_request_at = 0.0
 
     def __repr__(self) -> str:
         return f'TmdbClient(base={TMDB_API_BASE!r}, api_key=***)'
@@ -118,10 +136,11 @@ class TmdbClient:
         return await self._get('/movie/top_rated', {'page': str(page)})
 
     async def _throttle(self) -> None:
+        global _last_request_at
         if self._min_interval <= 0:
             return
         now = time.monotonic()
-        wait = self._min_interval - (now - self._last_request_at)
+        wait = self._min_interval - (now - _last_request_at)
         if wait > 0:
             await asyncio.sleep(wait)
 
@@ -130,38 +149,35 @@ class TmdbClient:
         path: str,
         params: dict[str, str] | None = None,
     ) -> dict[str, Any]:
+        global _last_request_at
         query = dict(params or {})
-        async with self._lock:
+        async with _throttle_lock:
             await self._throttle()
-            async with httpx.AsyncClient(
-                base_url=TMDB_API_BASE,
-                timeout=self._timeout,
-                # Never attach default auth headers that might be logged elsewhere.
-            ) as client:
-                # Pass api_key only as a request param; do not log query strings.
-                try:
-                    response = await client.get(
-                        path,
-                        params={**query, 'api_key': self._api_key},
-                    )
-                except httpx.TimeoutException as exc:
-                    raise TmdbUnavailableError('TMDb request timed out') from exc
-                except httpx.HTTPError as exc:
-                    raise TmdbUnavailableError('TMDb request failed') from exc
-                self._last_request_at = time.monotonic()
-                if response.status_code == 404:
-                    raise TmdbNotFoundError(f'TMDb resource not found: {path}')
-                if response.status_code == 429 or response.status_code >= 500:
-                    raise TmdbUnavailableError(
-                        f'TMDb unavailable: HTTP {response.status_code}'
-                    )
-                try:
-                    response.raise_for_status()
-                except httpx.HTTPStatusError as exc:
-                    raise TmdbUnavailableError(
-                        f'TMDb unavailable: HTTP {response.status_code}'
-                    ) from exc
-                payload = response.json()
-                if not isinstance(payload, dict):
-                    raise RuntimeError('unexpected TMDb response shape')
-                return payload
+            client = await _shared_client()
+            # Pass api_key only as a request param; do not log query strings.
+            try:
+                response = await client.get(
+                    path,
+                    params={**query, 'api_key': self._api_key},
+                )
+            except httpx.TimeoutException as exc:
+                raise TmdbUnavailableError('TMDb request timed out') from exc
+            except httpx.HTTPError as exc:
+                raise TmdbUnavailableError('TMDb request failed') from exc
+            _last_request_at = time.monotonic()
+            if response.status_code == 404:
+                raise TmdbNotFoundError(f'TMDb resource not found: {path}')
+            if response.status_code == 429 or response.status_code >= 500:
+                raise TmdbUnavailableError(
+                    f'TMDb unavailable: HTTP {response.status_code}'
+                )
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                raise TmdbUnavailableError(
+                    f'TMDb unavailable: HTTP {response.status_code}'
+                ) from exc
+            payload = response.json()
+            if not isinstance(payload, dict):
+                raise RuntimeError('unexpected TMDb response shape')
+            return payload

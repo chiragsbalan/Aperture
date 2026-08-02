@@ -157,6 +157,145 @@ async def upsert_person(
     return person
 
 
+async def ensure_person_shells(
+    session: AsyncSession,
+    *,
+    source: str,
+    shells: list[tuple[str, str, str | None]],
+) -> dict[str, Person]:
+    """Batch-create thin person shells for credit ingest.
+
+    ``shells`` is ``(external_id, name, profile_path)``. Existing people are
+    looked up in one query; new rows share a single flush. Returns
+    ``external_id → Person``.
+    """
+    if not shells:
+        return {}
+
+    by_external: dict[str, tuple[str, str | None]] = {}
+    for external_id, name, profile_path in shells:
+        # First occurrence wins (cast before crew in callers).
+        if external_id not in by_external:
+            by_external[external_id] = (name, profile_path)
+
+    external_ids = list(by_external.keys())
+    result = await session.execute(
+        select(ExternalId).where(
+            ExternalId.source == source,
+            ExternalId.source_namespace == 'person',
+            ExternalId.external_id.in_(external_ids),
+        )
+    )
+    mappings = list(result.scalars().all())
+    person_ids = [
+        mapping.person_id
+        for mapping in mappings
+        if mapping.person_id is not None
+    ]
+    people_by_id: dict[uuid.UUID, Person] = {}
+    if person_ids:
+        people_result = await session.execute(
+            select(Person).where(Person.id.in_(person_ids))
+        )
+        people_by_id = {
+            person.id: person for person in people_result.scalars().all()
+        }
+
+    out: dict[str, Person] = {}
+    for mapping in mappings:
+        if mapping.person_id is None:
+            continue
+        person = people_by_id.get(mapping.person_id)
+        if person is None:
+            continue
+        name, profile_path = by_external[mapping.external_id]
+        person.name = name
+        if profile_path is not None:
+            person.profile_path = profile_path
+        out[mapping.external_id] = person
+
+    created: list[tuple[str, Person]] = []
+    for external_id, (name, profile_path) in by_external.items():
+        if external_id in out:
+            continue
+        person = Person(name=name, profile_path=profile_path)
+        session.add(person)
+        created.append((external_id, person))
+
+    if created:
+        await session.flush()
+        for external_id, person in created:
+            session.add(
+                ExternalId(
+                    source=source,
+                    source_namespace='person',
+                    external_id=external_id,
+                    entity_type='person',
+                    person_id=person.id,
+                )
+            )
+            out[external_id] = person
+        await session.flush()
+    elif out:
+        await session.flush()
+
+    return out
+
+
+async def upsert_credits_batch(
+    session: AsyncSession,
+    *,
+    content_item_id: uuid.UUID,
+    credits: list[tuple[uuid.UUID, str, str, str, int | None]],
+) -> None:
+    """Insert missing credits for a title in one read + one flush.
+
+    Each credit is ``(person_id, credit_kind, job, character, billing_order)``.
+    Existing identity rows are left untouched aside from billing_order.
+    """
+    if not credits:
+        return
+
+    result = await session.execute(
+        select(ContentCredit).where(
+            ContentCredit.content_item_id == content_item_id,
+        )
+    )
+    existing = {
+        (
+            credit.person_id,
+            credit.credit_kind,
+            credit.job,
+            credit.character,
+        ): credit
+        for credit in result.scalars().all()
+    }
+
+    dirty = False
+    for person_id, credit_kind, job, character, billing_order in credits:
+        key = (person_id, credit_kind, job, character)
+        current = existing.get(key)
+        if current is not None:
+            if current.billing_order != billing_order:
+                current.billing_order = billing_order
+                dirty = True
+            continue
+        credit = ContentCredit(
+            content_item_id=content_item_id,
+            person_id=person_id,
+            credit_kind=credit_kind,
+            job=job,
+            character=character,
+            billing_order=billing_order,
+        )
+        session.add(credit)
+        existing[key] = credit
+        dirty = True
+
+    if dirty:
+        await session.flush()
+
+
 async def upsert_movie(
     session: AsyncSession,
     *,

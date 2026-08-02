@@ -565,34 +565,50 @@ async def get_content_summaries(
 async def get_movie_detail(
     session: AsyncSession,
     content_item_id: uuid.UUID,
+    *,
+    resolve_similar: bool = True,
 ) -> MovieDetail:
-    """Load a movie detail DTO or raise :class:`CatalogNotFoundError`."""
+    """Load a movie detail DTO or raise :class:`CatalogNotFoundError`.
+
+    The write-through warm path after ingest uses ``resolve_similar=True`` so
+    Similar titles are catalog-linked before the post-redirect detail GET.
+    Pass ``resolve_similar=False`` only when the caller will resolve them later.
+    """
     item = await metadata_repository.get_movie_by_id(session, content_item_id)
     if item is None or item.movie is None:
         raise CatalogNotFoundError('movie not found')
     detail = _movie_detail(item)
-    await _resolve_similar_catalog_ids(
-        session,
-        detail.extras,
-        source_namespace='movie',
-    )
+    if resolve_similar:
+        await _resolve_similar_catalog_ids(
+            session,
+            detail.extras,
+            source_namespace='movie',
+        )
     return detail
 
 
 async def get_tv_detail(
     session: AsyncSession,
     content_item_id: uuid.UUID,
+    *,
+    resolve_similar: bool = True,
 ) -> TvDetail:
-    """Load a TV detail DTO or raise :class:`CatalogNotFoundError`."""
+    """Load a TV detail DTO or raise :class:`CatalogNotFoundError`.
+
+    The write-through warm path after ingest uses ``resolve_similar=True`` so
+    Similar titles are catalog-linked before the post-redirect detail GET.
+    Pass ``resolve_similar=False`` only when the caller will resolve them later.
+    """
     item = await metadata_repository.get_tv_by_id(session, content_item_id)
     if item is None or item.tv_show is None:
         raise CatalogNotFoundError('tv show not found')
     detail = _tv_detail(item)
-    await _resolve_similar_catalog_ids(
-        session,
-        detail.extras,
-        source_namespace='tv',
-    )
+    if resolve_similar:
+        await _resolve_similar_catalog_ids(
+            session,
+            detail.extras,
+            source_namespace='tv',
+        )
     return detail
 
 

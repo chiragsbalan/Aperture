@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { CatalogPoster } from '@/components/catalog-poster';
+import { TmdbResolveLink } from '@/components/tmdb-resolve-link';
 import type { SimilarTitle } from '@/lib/catalog';
 
 /**
@@ -43,19 +44,39 @@ export function MoreLikeThis({
       <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-4">
         {visible.map((item) => {
           const resolvedType = item.content_type ?? kind;
-          const href =
-            item.content_id != null
-              ? resolvedType === 'tv_show'
+          if (item.content_id != null) {
+            const href =
+              resolvedType === 'tv_show'
                 ? `/tv/${item.content_id}`
-                : `/movies/${item.content_id}`
-              : resolvedType === 'tv_show'
-                ? `/tv/tmdb/${item.tmdb_id}`
-                : `/movies/tmdb/${item.tmdb_id}`;
+                : `/movies/${item.content_id}`;
+            return (
+              <li key={`${item.tmdb_id}-${item.title}`} className="min-w-0">
+                <Link
+                  href={href}
+                  aria-label={item.title}
+                  className="block transition hover:opacity-90"
+                >
+                  <CatalogPoster
+                    url={item.poster_url}
+                    alt={item.title}
+                    sizes="(max-width: 640px) 45vw, 140px"
+                  />
+                </Link>
+              </li>
+            );
+          }
+
+          const href =
+            resolvedType === 'tv_show'
+              ? `/tv/tmdb/${item.tmdb_id}`
+              : `/movies/tmdb/${item.tmdb_id}`;
           return (
             <li key={`${item.tmdb_id}-${item.title}`} className="min-w-0">
-              <Link
+              <TmdbResolveLink
                 href={href}
-                aria-label={item.title}
+                tmdbId={item.tmdb_id}
+                kind={resolvedType === 'tv_show' ? 'tv' : 'movie'}
+                ariaLabel={item.title}
                 className="block transition hover:opacity-90"
               >
                 <CatalogPoster
@@ -63,7 +84,7 @@ export function MoreLikeThis({
                   alt={item.title}
                   sizes="(max-width: 640px) 45vw, 140px"
                 />
-              </Link>
+              </TmdbResolveLink>
             </li>
           );
         })}
