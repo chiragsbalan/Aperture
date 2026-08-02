@@ -38,6 +38,47 @@
       var(--color-bg);
   }
 
+  /* Dense small-poster mosaic — pack rows tight; parent clips overflow. */
+  .poster-mosaic-layer {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    align-content: start;
+    justify-content: stretch;
+    gap: 1px;
+    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  }
+
+  .poster-mosaic-tile {
+    aspect-ratio: 2 / 3;
+    width: 100%;
+    transform-origin: center center;
+  }
+
+  @media (min-width: 768px) {
+    .poster-mosaic-layer {
+      grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .poster-mosaic-tile {
+      transform: none !important;
+    }
+  }
+
+  /* Soft amber wash so the landing poster mosaic stays atmospheric. */
+  .poster-mosaic-veil {
+    background:
+      radial-gradient(120% 80% at 50% -10%, var(--bg-glow-1), transparent 55%),
+      linear-gradient(
+        180deg,
+        rgba(12, 11, 9, 0.35) 0%,
+        rgba(12, 11, 9, 0.55) 55%,
+        rgba(12, 11, 9, 0.78) 100%
+      );
+  }
+
   /* Soft wash so a full-page TMDB backdrop keeps text readable. */
   .catalog-backdrop-veil {
     background:
@@ -129,6 +170,24 @@
     animation-delay: 220ms;
   }
 
+  /* Search overlay: soft veil + springy bar (enter / exit). */
+  .search-overlay-backdrop {
+    animation: search-backdrop-in 320ms var(--ease-out) both;
+  }
+
+  .search-overlay-panel {
+    animation: search-panel-in 420ms var(--ease-out) both;
+    animation-delay: 40ms;
+  }
+
+  .search-overlay-backdrop.is-leaving {
+    animation: search-backdrop-out 220ms var(--ease-out) both;
+  }
+
+  .search-overlay-panel.is-leaving {
+    animation: search-panel-out 200ms var(--ease-out) both;
+  }
+
   .status-pulse::before {
     content: '';
     display: inline-block;
@@ -177,10 +236,58 @@
   }
 }
 
+@keyframes search-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes search-backdrop-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes search-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.85rem) scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes search-panel-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(0.4rem) scale(0.97);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .motion-fade-rise,
   .motion-fade-rise-delay,
   .motion-fade-in,
+  .search-overlay-backdrop,
+  .search-overlay-panel,
+  .search-overlay-backdrop.is-leaving,
+  .search-overlay-panel.is-leaving,
   .status-pulse::before {
     animation: none !important;
   }

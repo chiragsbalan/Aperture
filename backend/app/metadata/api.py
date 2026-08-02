@@ -2,22 +2,30 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
+from pydantic import ValidationError
 
-from app.core.cache import get_cache
+from app.core.cache import CacheBackend, get_cache
 from app.core.deps import DbSessionDep, SettingsDep
 from app.core.trusted_client import resolve_client_ip
 from app.metadata import resolve as metadata_resolve
 from app.metadata import service as metadata_service
 from app.metadata.cache_keys import (
+    landing_top_posters_key,
     movie_detail_key,
     person_detail_key,
     tv_detail_key,
 )
-from app.metadata.rate_limit import enforce_resolve_rate_limit
+from app.metadata.rate_limit import (
+    enforce_landing_posters_rate_limit,
+    enforce_resolve_rate_limit,
+)
 from app.metadata.schemas import (
+    LandingPoster,
+    LandingPostersResponse,
     MovieDetail,
     PersonDetail,
     ResolveByTmdbRequest,
@@ -28,6 +36,12 @@ from app.metadata.schemas import (
 router = APIRouter(tags=['metadata'])
 
 _CACHE_CONTROL = 'public, max-age=300'
+_LANDING_CACHE_CONTROL = 'public, max-age=3600'
+_LANDING_EMPTY_CACHE_CONTROL = 'public, max-age=60'
+_TMDB_POSTER_URL_PREFIX = 'https://image.tmdb.org/t/p/'
+
+# Single-flight fill so concurrent cold misses share one TMDb fetch.
+_landing_singleflight = asyncio.Lock()
 
 
 def _not_found(detail: str) -> HTTPException:
@@ -39,6 +53,126 @@ def _unavailable(detail: str) -> HTTPException:
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail=detail,
     )
+
+
+def _is_valid_tmdb_poster_url(url: str) -> bool:
+    return url.startswith(_TMDB_POSTER_URL_PREFIX)
+
+
+def _filter_landing_posters(
+    detail: LandingPostersResponse,
+) -> LandingPostersResponse:
+    filtered = [
+        poster
+        for poster in detail.posters
+        if _is_valid_tmdb_poster_url(poster.poster_url)
+    ]
+    if len(filtered) == len(detail.posters):
+        return detail
+    return LandingPostersResponse(posters=filtered)
+
+
+def _apply_landing_cache_control(
+    response: Response,
+    posters: list[LandingPoster],
+) -> None:
+    response.headers['Cache-Control'] = (
+        _LANDING_CACHE_CONTROL if posters else _LANDING_EMPTY_CACHE_CONTROL
+    )
+
+
+async def _read_cached_landing(
+    cache: CacheBackend,
+    key: str,
+) -> LandingPostersResponse | None:
+    """Return a validated, URL-filtered cache hit, or ``None`` to fall through.
+
+    Deletes the key when JSON is corrupt or every poster URL fails the
+    allowlist. An intentionally empty (negative-cache) payload is kept.
+    """
+    cached = await cache.get(key)
+    if cached is None:
+        return None
+    try:
+        detail = LandingPostersResponse.model_validate_json(cached)
+    except ValidationError:
+        await cache.delete(key)
+        return None
+    filtered = _filter_landing_posters(detail)
+    if detail.posters and not filtered.posters:
+        await cache.delete(key)
+        return None
+    return filtered
+
+
+@router.get('/landing/posters', response_model=LandingPostersResponse)
+async def get_landing_posters(
+    request: Request,
+    settings: SettingsDep,
+    response: Response,
+) -> LandingPostersResponse:
+    """Return a shared TMDb top-rated poster set for landing / auth shells.
+
+    Cached via CacheBackend (Redis when available). Degrades to an empty list
+    when TMDb is unavailable so the UI can fall back to the amber atmosphere.
+    """
+    client_ip = resolve_client_ip(request, settings)
+    cache = get_cache()
+    await enforce_landing_posters_rate_limit(
+        cache,
+        settings=settings,
+        client_ip=client_ip,
+    )
+
+    key = landing_top_posters_key(count=settings.landing_posters_count)
+
+    hit = await _read_cached_landing(cache, key)
+    if hit is not None:
+        response.headers['X-Cache'] = 'HIT'
+        _apply_landing_cache_control(response, hit.posters)
+        return hit
+
+    async with _landing_singleflight:
+        hit = await _read_cached_landing(cache, key)
+        if hit is not None:
+            response.headers['X-Cache'] = 'HIT'
+            _apply_landing_cache_control(response, hit.posters)
+            return hit
+
+        if not settings.tmdb_api_key.strip():
+            response.headers['X-Cache'] = 'BYPASS'
+            _apply_landing_cache_control(response, [])
+            return LandingPostersResponse(posters=[])
+
+        try:
+            detail = await metadata_service.fetch_landing_top_posters(settings)
+        except metadata_service.LandingPostersUnavailableError:
+            detail = LandingPostersResponse(posters=[])
+
+        filtered = _filter_landing_posters(detail)
+        if not filtered.posters:
+            existing = await _read_cached_landing(cache, key)
+            if existing is not None and existing.posters:
+                response.headers['X-Cache'] = 'HIT'
+                _apply_landing_cache_control(response, existing.posters)
+                return existing
+            await cache.set(
+                key,
+                LandingPostersResponse(posters=[]).model_dump_json(),
+                ttl_seconds=settings.landing_posters_negative_cache_ttl_seconds,
+            )
+            response.headers['X-Cache'] = 'MISS'
+            _apply_landing_cache_control(response, [])
+            return LandingPostersResponse(posters=[])
+
+        await cache.set(
+            key,
+            filtered.model_dump_json(),
+            ttl_seconds=settings.landing_posters_cache_ttl_seconds,
+        )
+        response.headers['X-Cache'] = 'MISS'
+        _apply_landing_cache_control(response, filtered.posters)
+        return filtered
 
 
 @router.post('/movies/resolve', response_model=ResolveByTmdbResponse)

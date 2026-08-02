@@ -236,6 +236,49 @@ async function fetchCatalogJson<T>(
   }
 }
 
+export interface LandingPoster {
+  poster_url: string;
+  title: string | null;
+}
+
+export interface LandingPostersResponse {
+  posters: LandingPoster[];
+}
+
+const TMDB_POSTER_URL_RE = /^https:\/\/image\.tmdb\.org\/t\/p\//;
+
+/** Shared TMDb top-rated posters for landing / auth atmosphere. */
+export async function fetchLandingPosterUrls(): Promise<string[]> {
+  let base: string;
+  try {
+    base = upstreamApiBaseUrl();
+  } catch {
+    return [];
+  }
+
+  try {
+    // Shorter revalidate than catalog detail — empty/degraded responses
+    // should not stick in the Next Data Cache for five minutes.
+    const res = await fetch(`${base}/api/v1/landing/posters`, {
+      ...(process.env.NODE_ENV === 'development'
+        ? { cache: 'no-store' as const }
+        : { next: { revalidate: 60 } }),
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      await res.text().catch(() => undefined);
+      return [];
+    }
+    const data = (await res.json()) as LandingPostersResponse;
+    return (data.posters ?? [])
+      .map((poster) => poster.poster_url)
+      .filter((url) => TMDB_POSTER_URL_RE.test(url));
+  } catch {
+    return [];
+  }
+}
+
 export function fetchMovie(
   id: string,
 ): Promise<CatalogFetchResult<MovieDetail>> {

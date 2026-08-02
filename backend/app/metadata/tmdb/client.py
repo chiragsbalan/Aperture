@@ -111,6 +111,12 @@ class TmdbClient:
         data = await self._get(f'/person/{tmdb_id}')
         return TmdbPerson.model_validate(data)
 
+    async def get_movie_top_rated(self, *, page: int = 1) -> dict[str, Any]:
+        """Fetch one page of TMDb all-time top-rated movies."""
+        if page < 1:
+            raise ValueError('page must be >= 1')
+        return await self._get('/movie/top_rated', {'page': str(page)})
+
     async def _throttle(self) -> None:
         if self._min_interval <= 0:
             return

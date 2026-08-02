@@ -1,10 +1,8 @@
 import { ShellHealth } from '@/components/shell-health';
-import { SiteHeader } from '@/components/site-header';
 
 export default function Home() {
   return (
-    <main className="shell-atmosphere relative flex min-h-dvh flex-col items-center justify-center px-6 py-16 text-center">
-      <SiteHeader />
+    <div className="flex flex-col items-center text-center">
       <h1 className="motion-fade-rise font-display [font-size:var(--text-brand)] font-semibold leading-none tracking-[var(--tracking-brand)] text-foreground">
         Aperture
       </h1>
@@ -26,6 +24,6 @@ export default function Home() {
       <div className="mt-10">
         <ShellHealth />
       </div>
-    </main>
+    </div>
   );
 }

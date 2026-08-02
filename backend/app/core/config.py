@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Self
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -98,6 +98,13 @@ class Settings(BaseSettings):
     redis_url: str = ''
     # Metadata detail cache TTL (seconds).
     metadata_cache_ttl_seconds: int = 600
+    # Landing poster mosaic (TMDb top-rated). Long TTL — list changes slowly.
+    landing_posters_cache_ttl_seconds: int = 60 * 60 * 24
+    landing_posters_count: int = Field(default=200, ge=1, le=300)
+    # Short TTL when TMDb fails / returns empty so we do not stampede forever.
+    landing_posters_negative_cache_ttl_seconds: int = 60
+    landing_posters_rate_limit_window_seconds: int = 60
+    landing_posters_rate_limit_max_per_ip: int = 60
 
     @model_validator(mode='after')
     def validate_production_secrets(self) -> Self:

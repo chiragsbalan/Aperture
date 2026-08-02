@@ -156,6 +156,19 @@ class SimilarTitle(BaseModel):
     content_type: str | None = None
 
 
+class LandingPoster(BaseModel):
+    """Decorative poster tile for the logged-out landing mosaic."""
+
+    poster_url: str
+    title: str | None = None
+
+
+class LandingPostersResponse(BaseModel):
+    """Shared TMDb top-rated poster set for landing / auth shells."""
+
+    posters: list[LandingPoster] = Field(default_factory=list)
+
+
 class ResolveByTmdbRequest(BaseModel):
     """Resolve (and optionally ingest) a title by TMDb id."""
 

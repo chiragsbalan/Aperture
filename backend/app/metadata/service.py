@@ -8,6 +8,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import Settings
 from app.metadata import repository as metadata_repository
 from app.metadata.images import InvalidImagePathError, tmdb_image_url
 from app.metadata.models import ContentCredit, ContentItem, Person
@@ -17,6 +18,8 @@ from app.metadata.schemas import (
     CountryRef,
     CreditPersonRef,
     EpisodeDetail,
+    LandingPoster,
+    LandingPostersResponse,
     LanguageRef,
     MediaGallery,
     MovieDetail,
@@ -33,10 +36,15 @@ from app.metadata.schemas import (
     WatchProvider,
     WatchProviderRegion,
 )
+from app.metadata.tmdb.client import TmdbClient, TmdbConfigError, TmdbUnavailableError
 
 
 class CatalogNotFoundError(Exception):
     """Requested catalog entity does not exist (or wrong type)."""
+
+
+class LandingPostersUnavailableError(Exception):
+    """TMDb top-rated posters could not be fetched."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +64,64 @@ def _image_url(path: str | None, *, size: str = 'w500') -> str | None:
         return tmdb_image_url(path, size=size)
     except InvalidImagePathError:
         return None
+
+
+async def fetch_landing_top_posters(
+    settings: Settings,
+    *,
+    count: int | None = None,
+    client: TmdbClient | None = None,
+) -> LandingPostersResponse:
+    """Return TMDb all-time top-rated movie posters for the landing mosaic.
+
+    Does not touch Postgres — posters are CDN URLs only. Raises
+    :class:`LandingPostersUnavailableError` when TMDb is misconfigured or down.
+    """
+    limit = count if count is not None else settings.landing_posters_count
+    if limit < 1:
+        return LandingPostersResponse(posters=[])
+
+    try:
+        tmdb = client or TmdbClient.from_settings(settings)
+    except TmdbConfigError as exc:
+        raise LandingPostersUnavailableError(str(exc)) from exc
+
+    posters: list[LandingPoster] = []
+    page = 1
+    # TMDb returns 20 results per page; cap pages so a bad response cannot loop.
+    max_pages = max(1, (limit + 19) // 20)
+    try:
+        while len(posters) < limit and page <= max_pages:
+            payload = await tmdb.get_movie_top_rated(page=page)
+            results = payload.get('results')
+            if not isinstance(results, list) or not results:
+                break
+            for row in results:
+                if not isinstance(row, dict):
+                    continue
+                url = _image_url(
+                    row.get('poster_path')
+                    if isinstance(row.get('poster_path'), str)
+                    else None,
+                    # Small CDN size — mosaic tiles are intentionally tiny.
+                    size='w154',
+                )
+                if url is None:
+                    continue
+                title = row.get('title')
+                posters.append(
+                    LandingPoster(
+                        poster_url=url,
+                        title=title if isinstance(title, str) else None,
+                    )
+                )
+                if len(posters) >= limit:
+                    break
+            page += 1
+    except TmdbUnavailableError as exc:
+        raise LandingPostersUnavailableError(str(exc)) from exc
+
+    return LandingPostersResponse(posters=posters)
 
 
 def _title_extras(raw: dict[str, Any] | None) -> TitleExtras:
