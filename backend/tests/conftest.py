@@ -29,11 +29,13 @@ def _clear_settings_cache() -> Iterator[None]:
     from app.core.cache import reset_cache
     from app.core.config import get_settings
     from app.lists.rate_limit import reset_lists_rate_limit_fallback
+    from app.metadata import resolve as metadata_resolve
     from app.metadata.rate_limit import reset_metadata_rate_limit_fallback
     from app.search.rate_limit import reset_search_rate_limit_fallback
 
     get_settings.cache_clear()
     reset_cache()
+    metadata_resolve._resolve_flights.clear()
     reset_refresh_grace_l1()
     reset_search_rate_limit_fallback()
     reset_lists_rate_limit_fallback()
@@ -41,6 +43,7 @@ def _clear_settings_cache() -> Iterator[None]:
     yield
     get_settings.cache_clear()
     reset_cache()
+    metadata_resolve._resolve_flights.clear()
     reset_refresh_grace_l1()
     reset_search_rate_limit_fallback()
     reset_lists_rate_limit_fallback()

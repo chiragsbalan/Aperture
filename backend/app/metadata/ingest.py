@@ -22,6 +22,8 @@ from app.metadata.cache_keys import (
 from app.metadata.models import ContentItem
 from app.metadata.tmdb.client import TmdbClient
 from app.metadata.tmdb.dto import (
+    TmdbCredits,
+    TmdbCrewCredit,
     TmdbMovie,
     TmdbPerson,
     TmdbTvShow,
@@ -32,6 +34,35 @@ from app.metadata.tmdb.dto import (
 
 FIXTURES_DIR = Path(__file__).resolve().parent / 'fixtures'
 SOURCE_TMDB = 'tmdb'
+
+# Bound credit writes on live resolve — full TMDb crews are huge and each
+# person/credit used to cost a DB round-trip. Detail UI only needs a short cast
+# list plus key creatives for first paint.
+_MAX_RESOLVE_CAST = 20
+_KEY_CREW_JOBS = frozenset(
+    {
+        'Director',
+        'Writer',
+        'Screenplay',
+        'Story',
+        'Creator',
+        'Characters',
+        'Novel',
+        'Executive Producer',
+    }
+)
+# Lower rank = higher priority when trimming oversized key-crew lists.
+_CREW_JOB_PRIORITY: dict[str, int] = {
+    'Director': 0,
+    'Creator': 1,
+    'Writer': 2,
+    'Screenplay': 3,
+    'Story': 4,
+    'Characters': 5,
+    'Novel': 6,
+    'Executive Producer': 7,
+}
+_MAX_RESOLVE_CREW = 12
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -73,6 +104,36 @@ async def upsert_person_payload(
     )
 
 
+def _trim_credits_for_resolve(credits: TmdbCredits) -> TmdbCredits:
+    """Keep a short cast list + key crew for on-click ingest latency."""
+    cast = sorted(
+        credits.cast,
+        key=lambda row: (
+            row.order if row.order is not None else 10_000,
+            row.name,
+        ),
+    )[:_MAX_RESOLVE_CAST]
+    seen_crew: set[tuple[int, str]] = set()
+    filtered: list[TmdbCrewCredit] = []
+    for row in credits.crew:
+        job = (row.job or '').strip()
+        if job not in _KEY_CREW_JOBS:
+            continue
+        key = (row.id, job)
+        if key in seen_crew:
+            continue
+        seen_crew.add(key)
+        filtered.append(row)
+    filtered.sort(
+        key=lambda row: (
+            _CREW_JOB_PRIORITY.get((row.job or '').strip(), 99),
+            row.name,
+        ),
+    )
+    crew = filtered[:_MAX_RESOLVE_CREW]
+    return TmdbCredits(cast=cast, crew=crew)
+
+
 async def _ensure_credit_people(
     session: AsyncSession,
     *,
@@ -80,28 +141,55 @@ async def _ensure_credit_people(
     movie_or_tv: TmdbMovie | TmdbTvShow,
 ) -> dict[int, Any]:
     """Upsert thin person shells from credits; return tmdb_id → Person."""
-    people_by_tmdb: dict[int, Any] = {}
+    shells: list[tuple[str, str, str | None]] = []
     for cast in movie_or_tv.credits.cast:
-        person = await metadata_repository.upsert_person(
-            session,
-            source=source,
-            external_id=str(cast.id),
-            name=cast.name,
-            profile_path=cast.profile_path,
-        )
-        people_by_tmdb[cast.id] = person
+        shells.append((str(cast.id), cast.name, cast.profile_path))
     for crew in movie_or_tv.credits.crew:
-        if crew.id in people_by_tmdb:
-            continue
-        person = await metadata_repository.upsert_person(
-            session,
-            source=source,
-            external_id=str(crew.id),
-            name=crew.name,
-            profile_path=crew.profile_path,
+        shells.append((str(crew.id), crew.name, crew.profile_path))
+    by_external = await metadata_repository.ensure_person_shells(
+        session,
+        source=source,
+        shells=shells,
+    )
+    return {int(external_id): person for external_id, person in by_external.items()}
+
+
+async def _upsert_title_credits(
+    session: AsyncSession,
+    *,
+    content_item_id: uuid.UUID,
+    movie_or_tv: TmdbMovie | TmdbTvShow,
+    people: dict[int, Any],
+) -> None:
+    """Persist cast/crew rows for a title with a single batch write."""
+    rows: list[tuple[uuid.UUID, str, str, str, int | None]] = []
+    for cast in movie_or_tv.credits.cast:
+        person = people[cast.id]
+        rows.append(
+            (
+                person.id,
+                'cast',
+                '',
+                cast.character or '',
+                cast.order,
+            )
         )
-        people_by_tmdb[crew.id] = person
-    return people_by_tmdb
+    for crew in movie_or_tv.credits.crew:
+        person = people[crew.id]
+        rows.append(
+            (
+                person.id,
+                'crew',
+                crew.job or '',
+                '',
+                None,
+            )
+        )
+    await metadata_repository.upsert_credits_batch(
+        session,
+        content_item_id=content_item_id,
+        credits=rows,
+    )
 
 
 async def upsert_movie_payload(
@@ -109,8 +197,13 @@ async def upsert_movie_payload(
     movie: TmdbMovie,
     *,
     source: str = SOURCE_TMDB,
+    trim_credits: bool = False,
 ) -> ContentItem:
     """Upsert a movie, credits, and any missing people shells."""
+    if trim_credits:
+        movie = movie.model_copy(
+            update={'credits': _trim_credits_for_resolve(movie.credits)},
+        )
     people = await _ensure_credit_people(session, source=source, movie_or_tv=movie)
     item = await metadata_repository.upsert_movie(
         session,
@@ -127,28 +220,12 @@ async def upsert_movie_payload(
         status=movie.status,
         extras=movie.extras,
     )
-    for cast in movie.credits.cast:
-        person = people[cast.id]
-        await metadata_repository.upsert_credit(
-            session,
-            content_item_id=item.id,
-            person_id=person.id,
-            credit_kind='cast',
-            job='',
-            character=cast.character or '',
-            billing_order=cast.order,
-        )
-    for crew in movie.credits.crew:
-        person = people[crew.id]
-        await metadata_repository.upsert_credit(
-            session,
-            content_item_id=item.id,
-            person_id=person.id,
-            credit_kind='crew',
-            job=crew.job or '',
-            character='',
-            billing_order=None,
-        )
+    await _upsert_title_credits(
+        session,
+        content_item_id=item.id,
+        movie_or_tv=movie,
+        people=people,
+    )
     return item
 
 
@@ -157,8 +234,13 @@ async def upsert_tv_payload(
     show: TmdbTvShow,
     *,
     source: str = SOURCE_TMDB,
+    trim_credits: bool = False,
 ) -> ContentItem:
     """Upsert a TV show, seasons/episodes, credits, and people shells."""
+    if trim_credits:
+        show = show.model_copy(
+            update={'credits': _trim_credits_for_resolve(show.credits)},
+        )
     people = await _ensure_credit_people(session, source=source, movie_or_tv=show)
     item = await metadata_repository.upsert_tv_show(
         session,
@@ -177,28 +259,12 @@ async def upsert_tv_payload(
         number_of_episodes=show.number_of_episodes,
         extras=show.extras,
     )
-    for cast in show.credits.cast:
-        person = people[cast.id]
-        await metadata_repository.upsert_credit(
-            session,
-            content_item_id=item.id,
-            person_id=person.id,
-            credit_kind='cast',
-            job='',
-            character=cast.character or '',
-            billing_order=cast.order,
-        )
-    for crew in show.credits.crew:
-        person = people[crew.id]
-        await metadata_repository.upsert_credit(
-            session,
-            content_item_id=item.id,
-            person_id=person.id,
-            credit_kind='crew',
-            job=crew.job or '',
-            character='',
-            billing_order=None,
-        )
+    await _upsert_title_credits(
+        session,
+        content_item_id=item.id,
+        movie_or_tv=show,
+        people=people,
+    )
     for season_payload in show.seasons:
         season = await metadata_repository.upsert_season(
             session,
@@ -248,9 +314,12 @@ async def ensure_movie_from_tmdb(
 
         try:
             movie = await client.get_movie_for_ingest(tmdb_id)
-            item = await upsert_movie_payload(session, movie)
+            item = await upsert_movie_payload(
+                session,
+                movie,
+                trim_credits=True,
+            )
             await session.commit()
-            await get_cache().delete(movie_detail_key(item.id))
             return item.id
         except IntegrityError:
             await session.rollback()
@@ -292,9 +361,12 @@ async def ensure_tv_from_tmdb(
 
         try:
             show = await client.get_tv_for_ingest(tmdb_id)
-            item = await upsert_tv_payload(session, show)
+            item = await upsert_tv_payload(
+                session,
+                show,
+                trim_credits=True,
+            )
             await session.commit()
-            await get_cache().delete(tv_detail_key(item.id))
             return item.id
         except IntegrityError:
             await session.rollback()

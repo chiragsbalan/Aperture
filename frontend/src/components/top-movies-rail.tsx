@@ -1,6 +1,5 @@
-import Link from 'next/link';
-
 import { CatalogPoster } from '@/components/catalog-poster';
+import { TmdbResolveLink } from '@/components/tmdb-resolve-link';
 import type { TopMovie } from '@/lib/catalog';
 
 /**
@@ -31,9 +30,11 @@ export function TopMoviesRail({ movies }: { movies: TopMovie[] }) {
         <ul className="mt-5 grid grid-cols-2 gap-x-3 gap-y-5 sm:mt-6 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-6 md:grid-cols-4 lg:grid-cols-6">
           {movies.map((movie) => (
             <li key={movie.tmdb_id} className="min-w-0">
-              <Link
+              <TmdbResolveLink
                 href={`/movies/tmdb/${movie.tmdb_id}`}
-                aria-label={
+                tmdbId={movie.tmdb_id}
+                kind="movie"
+                ariaLabel={
                   movie.year != null
                     ? `${movie.title} (${movie.year})`
                     : movie.title
@@ -51,7 +52,7 @@ export function TopMoviesRail({ movies }: { movies: TopMovie[] }) {
                 {movie.year != null ? (
                   <p className="truncate text-xs text-muted">{movie.year}</p>
                 ) : null}
-              </Link>
+              </TmdbResolveLink>
             </li>
           ))}
         </ul>

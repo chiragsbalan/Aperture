@@ -12,6 +12,7 @@ from app.core.db import dispose_db, init_db, session_scope
 from app.main import app
 from app.metadata import ingest as metadata_ingest
 from app.metadata import repository as metadata_repository
+from app.metadata import resolve as metadata_resolve
 from app.metadata.ingest import ensure_movie_from_tmdb, seed_from_fixtures
 from app.metadata.tmdb.client import (
     TmdbClient,
@@ -306,3 +307,112 @@ def test_resolve_rate_limit_returns_429(
     assert first.status_code == 200, first.text
     assert second.status_code == 200, second.text
     assert third.status_code == 429, third.text
+
+
+def _unique_synthetic_tmdb_id() -> int:
+    """High synthetic TMDb id unlikely to collide with fixtures or prior runs."""
+    return 2_000_000_000 + (uuid.uuid4().int % 100_000_000)
+
+
+@pytest.mark.integration
+def test_resolve_ingest_rate_limit_returns_429(
+    api_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cold resolves share a stricter per-IP ingest bucket than catalog hits."""
+    from app.core.cache import init_cache, reset_cache
+
+    secret = 'test-bff-shared-secret'
+    unique_ip = f'198.51.100.{uuid.uuid4().int % 200 + 10}'
+    monkeypatch.setenv('AUTH_BFF_SHARED_SECRET', secret)
+    monkeypatch.setenv('METADATA_RESOLVE_RATE_LIMIT_MAX_PER_IP', '100')
+    monkeypatch.setenv('METADATA_RESOLVE_INGEST_RATE_LIMIT_MAX_PER_IP', '2')
+    monkeypatch.setenv('TMDB_API_KEY', 'test-key-not-real')
+    # Isolate from shared Redis peer buckets when REDIS_URL is set in .env.
+    monkeypatch.setenv('REDIS_URL', '')
+    get_settings.cache_clear()
+    reset_cache()
+    init_cache('')
+
+    async def _fake_ingest(self: TmdbClient, requested_id: int) -> TmdbMovie:
+        return TmdbMovie(
+            id=requested_id,
+            title=f'Ingest RL {requested_id}',
+            overview='rate-limit probe',
+            extras={},
+        )
+
+    monkeypatch.setattr(TmdbClient, 'get_movie_for_ingest', _fake_ingest)
+
+    headers = {
+        'X-Aperture-Client-IP': unique_ip,
+        'X-Aperture-BFF-Secret': secret,
+    }
+    base_id = _unique_synthetic_tmdb_id()
+    cold_ids = (base_id, base_id + 1, base_id + 2)
+    statuses = [
+        api_client.post(
+            '/api/v1/movies/resolve',
+            json={'tmdb_id': tmdb_id},
+            headers=headers,
+        ).status_code
+        for tmdb_id in cold_ids
+    ]
+    assert statuses[0] == 200, statuses
+    assert statuses[1] == 200, statuses
+    assert statuses[2] == 429, statuses
+
+
+@pytest.mark.integration
+def test_resolve_concurrent_coalesce_single_tmdb_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two concurrent cold resolves for the same id share one TMDb fetch."""
+    tmdb_id = _unique_synthetic_tmdb_id()
+    calls = {'n': 0}
+    # Drop any stale completed futures from prior event loops / runs.
+    metadata_resolve._resolve_flights.clear()
+
+    async def _fake_ingest(self: TmdbClient, requested_id: int) -> TmdbMovie:
+        assert requested_id == tmdb_id
+        calls['n'] += 1
+        await asyncio.sleep(0.15)
+        return TmdbMovie(
+            id=requested_id,
+            title='Coalesced Resolve Movie',
+            overview='single upstream fetch',
+            extras={},
+        )
+
+    monkeypatch.setenv('TMDB_API_KEY', 'test-key-not-real')
+    get_settings.cache_clear()
+    monkeypatch.setattr(TmdbClient, 'get_movie_for_ingest', _fake_ingest)
+
+    async def _run() -> tuple[uuid.UUID, uuid.UUID]:
+        settings = get_settings()
+        async with session_scope() as session_a, session_scope() as session_b:
+            results = await asyncio.gather(
+                metadata_resolve.resolve_movie_by_tmdb(
+                    session_a,
+                    settings,
+                    tmdb_id,
+                    client_ip='203.0.113.50',
+                ),
+                metadata_resolve.resolve_movie_by_tmdb(
+                    session_b,
+                    settings,
+                    tmdb_id,
+                    client_ip='203.0.113.50',
+                ),
+            )
+        return results[0].id, results[1].id
+
+    init_db()
+    try:
+        id_a, id_b = asyncio.run(_run())
+    finally:
+        metadata_resolve._resolve_flights.clear()
+        asyncio.run(dispose_db())
+
+    assert id_a == id_b
+    assert calls['n'] == 1

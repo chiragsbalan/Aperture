@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import { cache } from 'react';
 
 import { upstreamApiBaseUrl } from '@/lib/api';
 import {
@@ -348,25 +349,30 @@ export async function fetchTopMovies(limit = 12): Promise<TopMovie[]> {
   }
 }
 
-export function fetchMovie(
+/** Dedupes generateMetadata + page fetch within one RSC request. */
+export const fetchMovie = cache(function fetchMovie(
   id: string,
 ): Promise<CatalogFetchResult<MovieDetail>> {
   return fetchCatalogJson<MovieDetail>(
     `/api/v1/movies/${encodeURIComponent(id)}`,
   );
-}
+});
 
-export function fetchTv(id: string): Promise<CatalogFetchResult<TvDetail>> {
+/** Dedupes generateMetadata + page fetch within one RSC request. */
+export const fetchTv = cache(function fetchTv(
+  id: string,
+): Promise<CatalogFetchResult<TvDetail>> {
   return fetchCatalogJson<TvDetail>(`/api/v1/tv/${encodeURIComponent(id)}`);
-}
+});
 
-export function fetchPerson(
+/** Dedupes generateMetadata + page fetch within one RSC request. */
+export const fetchPerson = cache(function fetchPerson(
   id: string,
 ): Promise<CatalogFetchResult<PersonDetail>> {
   return fetchCatalogJson<PersonDetail>(
     `/api/v1/people/${encodeURIComponent(id)}`,
   );
-}
+});
 
 export interface ResolveByTmdbResult {
   id: string;

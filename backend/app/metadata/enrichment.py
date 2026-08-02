@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-_MAX_KEYWORDS = 40
-_MAX_ALT_TITLES = 24
+_MAX_GENRES = 12
+_MAX_KEYWORDS = 16
+_MAX_ALT_TITLES = 12
 _MAX_VIDEOS = 12
 _MAX_BACKDROPS = 24
 _MAX_POSTERS = 12
-_MAX_RELEASE_ROWS = 120
+_MAX_RELEASE_ROWS = 24
 _MAX_SIMILAR = 6
 
 _VIDEO_TYPE_RANK = {
@@ -38,7 +39,7 @@ def build_extras_from_tmdb_payload(
         {'id': g.get('id'), 'name': g.get('name')}
         for g in _as_list(payload.get('genres'))
         if isinstance(g, dict) and g.get('name')
-    ]
+    ][:_MAX_GENRES]
 
     keyword_block = _as_dict(payload.get('keywords'))
     keyword_rows = _as_list(
