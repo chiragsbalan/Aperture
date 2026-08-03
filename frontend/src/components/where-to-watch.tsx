@@ -129,7 +129,7 @@ export function WhereToWatch({
   return (
     <section className="mt-6 w-full text-left">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-xs font-semibold tracking-[0.14em] text-muted">
+        <h2 className="text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-wider)] text-muted">
           WHERE TO WATCH
         </h2>
         <span className="text-xs text-muted">{picked.region}</span>
@@ -176,7 +176,7 @@ export function WhereToWatch({
                     {site.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-1.5 py-0.5 text-[0.65rem] tracking-wide text-muted"
+                        className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-1.5 py-0.5 text-[length:var(--text-eyebrow)] tracking-[var(--tracking-wide)] text-muted"
                       >
                         {tag}
                       </span>

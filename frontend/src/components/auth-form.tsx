@@ -36,9 +36,9 @@ const FIELD_FOCUS_ORDER: FieldKey[] = [
 const INPUT_CLASS =
   'w-full rounded-[var(--radius-md)] border border-[var(--color-border)] ' +
   'bg-[var(--color-bg-elevated)] px-3 py-2 text-base text-foreground ' +
-  'outline-none transition sm:py-2.5 sm:text-[0.9375rem] ' +
-  'hover:border-[var(--color-accent)]/40 ' +
-  'focus-visible:border-[var(--color-accent)] ' +
+  'outline-none transition sm:py-2.5 sm:[font-size:var(--text-body-sm)] ' +
+  'hover:border-[var(--color-primary)]/40 ' +
+  'focus-visible:border-[var(--color-primary)] ' +
   'focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]';
 
 function errorMessage(data: unknown, fallback: string): string {
@@ -237,9 +237,7 @@ export function AuthForm({ mode, initialError = null }: AuthFormProps) {
 
   return (
     <div className="w-full max-w-md">
-      <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-        {title}
-      </h1>
+      <h1 className="type-page text-foreground">{title}</h1>
       <p className="mt-1.5 text-sm text-muted sm:mt-2 sm:text-base">
         {isSignup
           ? 'Join to track and rediscover what you watch.'
@@ -472,7 +470,7 @@ export function AuthForm({ mode, initialError = null }: AuthFormProps) {
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-[var(--radius-md)] bg-[var(--color-accent)] px-4 py-2.5 text-base font-medium text-[var(--color-accent-contrast)] transition hover:brightness-110 disabled:opacity-60 sm:text-[0.9375rem]"
+          className="w-full rounded-[var(--radius-md)] bg-[var(--color-primary)] px-4 py-2.5 text-base font-medium text-[var(--color-primary-contrast)] transition hover:brightness-110 disabled:opacity-60 sm:[font-size:var(--text-body-sm)]"
         >
           {pending ? 'Please wait…' : submitLabel}
         </button>
@@ -487,7 +485,7 @@ export function AuthForm({ mode, initialError = null }: AuthFormProps) {
       <div className="mt-5">
         <a
           href="/api/auth/google/start?intent=sign_in"
-          className="flex w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-muted transition hover:border-[var(--color-accent)] hover:text-foreground"
+          className="flex w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-muted transition hover:border-[var(--color-primary)] hover:text-foreground"
         >
           Continue with Google
         </a>

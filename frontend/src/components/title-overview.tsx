@@ -2,8 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 
+import { MOTION_DURATION_MED_MS } from '@/lib/motion';
+
 const MOBILE_MQ = '(max-width: 639px)';
-const EXPAND_MS = 320;
 
 /**
  * Title synopsis: full text on desktop; on mobile clamps to 3 lines and
@@ -114,7 +115,7 @@ export function TitleOverview({
         id={synopsisId}
         data-title-overview=""
         aria-hidden={interactive && !expanded ? true : undefined}
-        className={`max-w-2xl whitespace-pre-wrap text-[0.875rem] leading-relaxed text-foreground sm:text-[1.05rem] ${
+        className={`type-overview max-w-2xl whitespace-pre-wrap text-foreground ${
           showFade ? 'title-overview-clamped' : ''
         } ${className}`}
         style={{
@@ -122,7 +123,7 @@ export function TitleOverview({
           overflow: maxHeight != null ? 'hidden' : undefined,
           transition:
             maxHeight != null && !reduceMotion
-              ? `max-height ${EXPAND_MS}ms var(--ease-out)`
+              ? `max-height ${MOTION_DURATION_MED_MS}ms var(--ease-out)`
               : undefined,
         }}
       >

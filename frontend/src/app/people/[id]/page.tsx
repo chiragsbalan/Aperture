@@ -36,13 +36,18 @@ export default async function PersonPage({ params }: PersonPageProps) {
   }
 
   return (
-    <main className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
+    <div className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <SiteHeader />
-      {!result.ok ? (
-        <CatalogUnavailable message={result.error} />
-      ) : (
-        <PersonDetailView person={result.data} />
-      )}
-    </main>
+      <main id="main-content" className="relative z-[1]">
+        {!result.ok ? (
+          <CatalogUnavailable message={result.error} />
+        ) : (
+          <PersonDetailView person={result.data} />
+        )}
+      </main>
+    </div>
   );
 }

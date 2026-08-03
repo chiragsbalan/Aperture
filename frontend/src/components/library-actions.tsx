@@ -554,10 +554,7 @@ export function LibraryActions({
         className="w-full max-w-md border border-[var(--color-border)] bg-[var(--color-bg)] p-6 text-foreground backdrop:bg-black/50"
         aria-labelledby={`${formId}-lists-heading`}
       >
-        <h2
-          id={`${formId}-lists-heading`}
-          className="font-display text-xl font-semibold"
-        >
+        <h2 id={`${formId}-lists-heading`} className="type-card-title">
           Add to list
         </h2>
         {lists.length === 0 ? (
@@ -613,10 +610,7 @@ export function LibraryActions({
           }}
           className="space-y-4"
         >
-          <h2
-            id={`${formId}-diary-heading`}
-            className="font-display text-xl font-semibold"
-          >
+          <h2 id={`${formId}-diary-heading`} className="type-card-title">
             Log watch
           </h2>
           <div>

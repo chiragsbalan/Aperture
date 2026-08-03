@@ -89,10 +89,8 @@ export function CustomListsPage() {
   }
 
   return (
-    <div className="motion-fade-rise w-full max-w-3xl text-left">
-      <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
-        Lists
-      </h1>
+    <div className="layout-content motion-fade-rise text-left">
+      <h1 className="type-page-lg text-foreground">Lists</h1>
       <p className="mt-2 text-muted">Curate named collections of titles.</p>
       <LibraryNav />
 
@@ -128,7 +126,7 @@ export function CustomListsPage() {
           >
             <h2
               id={`${formId}-heading`}
-              className="font-display text-xl font-semibold text-foreground"
+              className="type-card-title text-foreground"
             >
               Create a list
             </h2>

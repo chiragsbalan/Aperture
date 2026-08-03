@@ -21,7 +21,7 @@ export function ProfileAvatar({
 
   return (
     <div
-      className={`inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-accent-soft)] font-display font-semibold tracking-wide text-foreground ${sizeClass}`}
+      className={`inline-flex items-center justify-center rounded-[var(--radius-pill)] border border-[var(--color-border)] bg-[var(--color-primary-soft)] font-display font-semibold tracking-wide text-foreground ${sizeClass}`}
       aria-hidden="true"
     >
       {initials}

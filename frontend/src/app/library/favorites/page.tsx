@@ -9,13 +9,18 @@ export const metadata: Metadata = {
 
 export default function FavoritesPage() {
   return (
-    <main className="shell-atmosphere relative flex min-h-dvh flex-col items-center px-6 py-24">
+    <div className="shell-atmosphere relative flex min-h-dvh flex-col items-center py-24">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <SiteHeader />
-      <LibraryListPage
-        kind="favorites"
-        title="Favorites"
-        emptyMessage="No favorites yet. Add a title to favorites from any movie or TV page."
-      />
-    </main>
+      <main id="main-content" className="relative z-[1] w-full">
+        <LibraryListPage
+          kind="favorites"
+          title="Favorites"
+          emptyMessage="No favorites yet. Add a title to favorites from any movie or TV page."
+        />
+      </main>
+    </div>
   );
 }

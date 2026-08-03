@@ -30,9 +30,7 @@ export function MoreLikeThis({
   return (
     <section className="mt-8 w-full text-left sm:mt-10">
       <div className="flex items-baseline justify-between gap-3 border-b border-[var(--color-border)] pb-2">
-        <h2 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
-          Similar
-        </h2>
+        <h2 className="type-section text-foreground">Similar</h2>
         <Link
           href={seeMoreHref}
           aria-label="See all similar titles"

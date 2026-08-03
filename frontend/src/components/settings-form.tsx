@@ -196,9 +196,7 @@ export function SettingsForm() {
       ) : null}
 
       <fieldset className="space-y-4" disabled={pending}>
-        <legend className="font-display text-lg font-semibold text-foreground">
-          Profile
-        </legend>
+        <legend className="type-subsection text-foreground">Profile</legend>
 
         <div>
           <label htmlFor={usernameId} className="text-sm text-muted">
@@ -260,9 +258,7 @@ export function SettingsForm() {
       </fieldset>
 
       <fieldset className="space-y-4" disabled={pending}>
-        <legend className="font-display text-lg font-semibold text-foreground">
-          Preferences
-        </legend>
+        <legend className="type-subsection text-foreground">Preferences</legend>
 
         <div>
           <label htmlFor={themeId} className="text-sm text-muted">

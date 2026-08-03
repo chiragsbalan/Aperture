@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import {
+  Fragment,
   type KeyboardEvent,
   type ReactNode,
   useEffect,
@@ -13,8 +14,7 @@ import {
 } from 'react';
 
 import type { CreditPersonRef, SeasonDetail, TitleExtras } from '@/lib/catalog';
-
-const PANEL_FADE_MS = 180;
+import { MOTION_DURATION_MED_MS } from '@/lib/motion';
 
 type MetaTab = 'cast' | 'crew' | 'details' | 'genres' | 'releases' | 'seasons';
 
@@ -33,15 +33,13 @@ const CREDIT_PREVIEW_DESKTOP = 8;
 /** Themes: 2-col × 5 rows → 9; desktop 3-col × 5 → 14. */
 const THEME_PREVIEW_MOBILE = 9;
 const THEME_PREVIEW_DESKTOP = 14;
-/** Details: 4 content rows + show more on the 5th. */
-const DETAILS_PREVIEW_COUNT = 4;
 
 function CreditPill({ credit }: { credit: CreditPersonRef }) {
   const detail = credit.character ?? credit.job;
   return (
     <Link
       href={`/people/${credit.id}`}
-      className="group inline-flex max-w-full items-baseline gap-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)]/70 px-2 py-1 text-xs text-foreground transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)] sm:gap-1.5 sm:px-2.5 sm:py-1.5 sm:text-sm"
+      className="group inline-flex max-w-full items-baseline gap-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-2 py-1 text-[length:var(--text-xs)] text-foreground transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] sm:gap-1.5 sm:px-2.5 sm:py-1.5 sm:text-[length:var(--text-sm)]"
       title={detail ? `${credit.name} — ${detail}` : credit.name}
     >
       <span className="truncate">{credit.name}</span>
@@ -129,7 +127,7 @@ function CreditPillList({ credits }: { credits: CreditPersonRef[] }) {
 
 function Pill({ children }: { children: string }) {
   return (
-    <span className="inline-flex max-w-full truncate rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)]/70 px-2 py-1 text-xs text-foreground sm:px-2.5 sm:py-1.5 sm:text-sm">
+    <span className="inline-flex max-w-full truncate rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-2 py-1 text-[length:var(--text-xs)] text-foreground sm:px-2.5 sm:py-1.5 sm:text-[length:var(--text-sm)]">
       {children}
     </span>
   );
@@ -137,15 +135,14 @@ function Pill({ children }: { children: string }) {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[7rem_1fr] gap-2 text-xs sm:grid-cols-[10rem_1fr] sm:gap-3 sm:text-sm">
+    <>
       <dt className="text-muted">{label}</dt>
       <dd className="min-w-0 text-foreground">{value}</dd>
-    </div>
+    </>
   );
 }
 
 function DetailsList({ extras }: { extras: TitleExtras }) {
-  const [expanded, setExpanded] = useState(false);
   const rows: Array<{ key: string; node: ReactNode }> = [];
 
   if (extras.studios.length > 0) {
@@ -217,54 +214,50 @@ function DetailsList({ extras }: { extras: TitleExtras }) {
     rows.push({
       key: 'alts',
       node: (
-        <div>
-          <p className="mb-1.5 text-xs text-muted sm:mb-2 sm:text-sm">
-            Alternative titles
-          </p>
-          <ul className="flex flex-wrap gap-2">
-            {extras.alternative_titles.map((title) => (
-              <li key={`${title.iso_3166_1}-${title.title}`}>
-                <Pill>
-                  {title.iso_3166_1
-                    ? `${title.title} (${title.iso_3166_1})`
-                    : title.title}
-                </Pill>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <>
+          <dt className="text-muted">Alternative titles</dt>
+          <dd className="min-w-0">
+            <ul className="flex flex-wrap gap-2">
+              {extras.alternative_titles.map((title) => (
+                <li key={`${title.iso_3166_1}-${title.title}`}>
+                  <Pill>
+                    {title.iso_3166_1
+                      ? `${title.title} (${title.iso_3166_1})`
+                      : title.title}
+                  </Pill>
+                </li>
+              ))}
+            </ul>
+          </dd>
+        </>
       ),
     });
   }
 
-  const needsToggle = rows.length > DETAILS_PREVIEW_COUNT;
-  const visible =
-    expanded || !needsToggle ? rows : rows.slice(0, DETAILS_PREVIEW_COUNT);
-  const remaining = rows.length - DETAILS_PREVIEW_COUNT;
+  if (rows.length === 0) {
+    return (
+      <p className="text-sm text-muted">No additional details available.</p>
+    );
+  }
 
   return (
-    <dl className="space-y-3 text-left">
-      {visible.map((row) => (
-        <div key={row.key} className="text-left">
-          {row.node}
-        </div>
+    <dl className="grid grid-cols-[7rem_1fr] gap-x-2 gap-y-3 text-left text-xs sm:grid-cols-[10rem_1fr] sm:gap-x-3 sm:text-sm">
+      {rows.map((row) => (
+        <Fragment key={row.key}>{row.node}</Fragment>
       ))}
-      {needsToggle ? (
-        <div className="text-left">
-          <TogglePill
-            expanded={expanded}
-            remaining={remaining}
-            onToggle={() => {
-              setExpanded((value) => !value);
-            }}
-          />
-        </div>
-      ) : null}
     </dl>
   );
 }
 
-function ThemePillList({ keywords }: { keywords: TitleExtras['keywords'] }) {
+function ThemePillList({
+  keywords,
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
+}: {
+  keywords: TitleExtras['keywords'];
+  'aria-label'?: string;
+  'aria-labelledby'?: string;
+}) {
   const [expanded, setExpanded] = useState(false);
   const previewCount = useDesktopPreview(
     THEME_PREVIEW_MOBILE,
@@ -276,7 +269,11 @@ function ThemePillList({ keywords }: { keywords: TitleExtras['keywords'] }) {
   const remaining = keywords.length - previewCount;
 
   return (
-    <ul className="flex flex-wrap justify-start gap-2">
+    <ul
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
+      className="flex flex-wrap justify-start gap-2"
+    >
       {visible.map((keyword) => (
         <li
           key={`${keyword.id}-${keyword.name}`}
@@ -347,7 +344,7 @@ function CountryFlag({ code }: { code: string | null | undefined }) {
     return (
       <span
         aria-hidden
-        className="inline-block h-3.5 w-3.5 shrink-0 rounded-full bg-[var(--color-border)] sm:h-4 sm:w-4"
+        className="inline-block h-3.5 w-3.5 shrink-0 rounded-[var(--radius-pill)] bg-[var(--color-border)] sm:h-4 sm:w-4"
       />
     );
   }
@@ -359,7 +356,7 @@ function CountryFlag({ code }: { code: string | null | undefined }) {
       alt=""
       width={16}
       height={16}
-      className="h-3.5 w-3.5 shrink-0 rounded-full object-cover ring-1 ring-[var(--color-border)] sm:h-4 sm:w-4"
+      className="h-3.5 w-3.5 shrink-0 rounded-[var(--radius-pill)] object-cover ring-1 ring-[var(--color-border)] sm:h-4 sm:w-4"
       loading="lazy"
     />
   );
@@ -381,7 +378,12 @@ export function TitleMetaTabs({
 }) {
   const seasonList = seasons ?? [];
   const tabs = useMemo(() => {
-    const items: Array<{ id: MetaTab; label: string; count?: number }> = [];
+    const items: Array<{
+      id: MetaTab;
+      label: string;
+      count?: number;
+      ariaLabel?: string;
+    }> = [];
     if (cast.length > 0) {
       items.push({ id: 'cast', label: 'CAST', count: cast.length });
     }
@@ -390,11 +392,27 @@ export function TitleMetaTabs({
     }
     items.push({ id: 'details', label: 'DETAILS' });
     if (extras.genres.length > 0 || extras.keywords.length > 0) {
-      items.push({
-        id: 'genres',
-        label: 'GENRES',
-        count: extras.genres.length + extras.keywords.length,
-      });
+      const genreCount = extras.genres.length;
+      const themeCount = extras.keywords.length;
+      if (genreCount > 0 && themeCount > 0) {
+        items.push({
+          id: 'genres',
+          label: 'GENRES & THEMES',
+          ariaLabel: `Genres and themes, ${genreCount} genres, ${themeCount} themes`,
+        });
+      } else if (genreCount > 0) {
+        items.push({
+          id: 'genres',
+          label: 'GENRES',
+          count: genreCount,
+        });
+      } else {
+        items.push({
+          id: 'genres',
+          label: 'THEMES',
+          count: themeCount,
+        });
+      }
     }
     if (extras.releases.length > 0) {
       items.push({
@@ -414,6 +432,7 @@ export function TitleMetaTabs({
   }, [cast.length, crew.length, extras, seasonList.length]);
 
   const panelId = useId();
+  const themesHeadingId = useId();
   const [tab, setTab] = useState<MetaTab>(tabs[0]?.id ?? 'details');
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const tablistRef = useRef<HTMLDivElement | null>(null);
@@ -421,13 +440,15 @@ export function TitleMetaTabs({
     ? tab
     : (tabs[0]?.id ?? 'details');
   const [panelTab, setPanelTab] = useState<MetaTab>(active);
-  const [panelPhase, setPanelPhase] = useState<
-    'active' | 'exiting' | 'entering'
-  >('active');
+  const [outgoingTab, setOutgoingTab] = useState<MetaTab | null>(null);
+  /** Fixed stage height while crossfading so content below eases with the panel. */
+  const [stageHeight, setStageHeight] = useState<number | undefined>();
   const [indicator, setIndicator] = useState({ left: 0, width: 0 });
   const [indicatorReady, setIndicatorReady] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const skipPanelAnimRef = useRef(true);
+  const panelTabRef = useRef<MetaTab>(active);
+  const stageRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -479,38 +500,64 @@ export function TitleMetaTabs({
   useEffect(() => {
     if (skipPanelAnimRef.current) {
       skipPanelAnimRef.current = false;
+      panelTabRef.current = active;
       setPanelTab(active);
-      setPanelPhase('active');
+      setOutgoingTab(null);
+      setStageHeight(undefined);
       return;
     }
     if (reduceMotion) {
+      panelTabRef.current = active;
       setPanelTab(active);
-      setPanelPhase('active');
+      setOutgoingTab(null);
+      setStageHeight(undefined);
+      return;
+    }
+    if (active === panelTabRef.current) {
       return;
     }
 
+    const previous = panelTabRef.current;
+    const fromHeight = stageRef.current?.offsetHeight ?? 0;
+
+    setOutgoingTab(previous);
+    panelTabRef.current = active;
+    setPanelTab(active);
+    if (fromHeight > 0) {
+      setStageHeight(fromHeight);
+    }
+
     let cancelled = false;
-    let enterFrame = 0;
-    setPanelPhase('exiting');
-    const exitTimer = window.setTimeout(() => {
-      if (cancelled) {
-        return;
-      }
-      setPanelTab(active);
-      setPanelPhase('entering');
-      enterFrame = window.requestAnimationFrame(() => {
-        enterFrame = window.requestAnimationFrame(() => {
-          if (!cancelled) {
-            setPanelPhase('active');
+    let settleTimer = 0;
+    let measureFrame = 0;
+
+    // Paint locked height, then measure the incoming panel and ease to it.
+    measureFrame = window.requestAnimationFrame(() => {
+      measureFrame = window.requestAnimationFrame(() => {
+        if (cancelled) {
+          return;
+        }
+        const incoming =
+          stageRef.current?.querySelector<HTMLElement>('[role="tabpanel"]');
+        const toHeight = incoming?.scrollHeight ?? 0;
+        if (toHeight > 0) {
+          setStageHeight(toHeight);
+        }
+
+        settleTimer = window.setTimeout(() => {
+          if (cancelled) {
+            return;
           }
-        });
+          setOutgoingTab(null);
+          setStageHeight(undefined);
+        }, MOTION_DURATION_MED_MS);
       });
-    }, PANEL_FADE_MS);
+    });
 
     return () => {
       cancelled = true;
-      window.clearTimeout(exitTimer);
-      window.cancelAnimationFrame(enterFrame);
+      window.cancelAnimationFrame(measureFrame);
+      window.clearTimeout(settleTimer);
     };
   }, [active, reduceMotion]);
 
@@ -581,25 +628,39 @@ export function TitleMetaTabs({
       return <DetailsList extras={extras} />;
     }
     if (panel === 'genres') {
+      const hasGenres = extras.genres.length > 0;
+      const hasThemes = extras.keywords.length > 0;
       return (
         <div className="space-y-5">
-          {extras.genres.length > 0 ? (
-            <div>
-              <p className="mb-2 text-sm text-muted">Genres</p>
-              <ul className="flex flex-wrap justify-start gap-2">
-                {extras.genres.map((genre) => (
-                  <li key={`${genre.id}-${genre.name}`} className="min-w-0">
-                    <Pill>{genre.name}</Pill>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {hasGenres ? (
+            <ul
+              aria-label="Genres"
+              className="flex flex-wrap justify-start gap-2"
+            >
+              {extras.genres.map((genre) => (
+                <li key={`${genre.id}-${genre.name}`} className="min-w-0">
+                  <Pill>{genre.name}</Pill>
+                </li>
+              ))}
+            </ul>
           ) : null}
-          {extras.keywords.length > 0 ? (
-            <div>
-              <p className="mb-2 text-sm text-muted">Themes</p>
-              <ThemePillList keywords={extras.keywords} />
-            </div>
+          {hasThemes ? (
+            hasGenres ? (
+              <div>
+                <h3
+                  id={themesHeadingId}
+                  className="mb-2 text-sm font-normal text-muted"
+                >
+                  Themes
+                </h3>
+                <ThemePillList
+                  keywords={extras.keywords}
+                  aria-labelledby={themesHeadingId}
+                />
+              </div>
+            ) : (
+              <ThemePillList keywords={extras.keywords} aria-label="Themes" />
+            )
           ) : null}
         </div>
       );
@@ -627,7 +688,7 @@ export function TitleMetaTabs({
                 </span>
               ) : null}
               {release.certification ? (
-                <span className="shrink-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)]/40 px-1 py-px text-[0.65rem] text-muted">
+                <span className="shrink-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)]/40 px-1 py-px text-[length:var(--text-eyebrow)] text-muted">
                   {release.certification}
                 </span>
               ) : null}
@@ -672,25 +733,21 @@ export function TitleMetaTabs({
     return null;
   }
 
-  const panelPhaseClass =
-    panelPhase === 'exiting'
-      ? 'is-exiting'
-      : panelPhase === 'entering'
-        ? 'is-entering'
-        : 'is-active';
+  const isCrossfading = outgoingTab != null;
 
   return (
     <section className="mt-5 text-left sm:mt-7">
       <div
         ref={tablistRef}
         role="tablist"
-        aria-label="Title details"
+        aria-label="Title metadata"
         className="relative flex w-full flex-nowrap items-end justify-between gap-0.5 border-b border-[var(--color-border)] sm:justify-start sm:gap-6"
       >
         {tabs.map((item, index) => {
           const selected = active === item.id;
           const ariaLabel =
-            item.count != null ? `${item.label}, ${item.count}` : item.label;
+            item.ariaLabel ??
+            (item.count != null ? `${item.label}, ${item.count}` : item.label);
           return (
             <button
               key={item.id}
@@ -710,7 +767,7 @@ export function TitleMetaTabs({
               onKeyDown={(event) => {
                 onTabKeyDown(event, index);
               }}
-              className={`min-w-0 flex-1 whitespace-nowrap pb-1.5 text-center text-xs font-semibold tracking-[0.03em] transition-colors duration-300 sm:flex-none sm:pb-2 sm:text-left sm:text-sm sm:tracking-[0.12em] ${
+              className={`min-w-0 flex-1 whitespace-nowrap pb-1.5 text-center text-xs font-semibold tracking-[0.03em] transition-colors duration-[var(--duration-med)] sm:flex-none sm:pb-2 sm:text-left sm:text-sm sm:tracking-[0.12em] ${
                 selected ? 'text-accent' : 'text-muted hover:text-foreground'
               }`}
             >
@@ -735,12 +792,33 @@ export function TitleMetaTabs({
       </div>
 
       <div
-        role="tabpanel"
-        id={panelId}
-        aria-labelledby={`title-tab-${active}`}
-        className={`title-tab-panel mt-5 text-left ${panelPhaseClass}`}
+        ref={stageRef}
+        className={`title-tab-panel-stage relative mt-5 text-left${
+          stageHeight != null ? ' is-resizing' : ''
+        }`}
+        style={stageHeight != null ? { height: stageHeight } : undefined}
       >
-        {renderPanel(panelTab)}
+        {outgoingTab != null ? (
+          <div
+            key={`out-${outgoingTab}`}
+            className="title-tab-panel title-tab-panel-layer is-outgoing"
+            aria-hidden
+            inert
+          >
+            {renderPanel(outgoingTab)}
+          </div>
+        ) : null}
+        <div
+          key={`in-${panelTab}`}
+          role="tabpanel"
+          id={panelId}
+          aria-labelledby={`title-tab-${active}`}
+          className={`title-tab-panel ${
+            isCrossfading ? 'is-incoming' : 'is-active'
+          }`}
+        >
+          {renderPanel(panelTab)}
+        </div>
       </div>
     </section>
   );

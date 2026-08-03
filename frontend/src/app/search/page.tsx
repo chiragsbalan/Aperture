@@ -18,11 +18,15 @@ export default async function SearchPage({
 
   return (
     <div className="shell-atmosphere relative min-h-screen">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <SiteHeader />
-      <main className="mx-auto max-w-2xl px-6 pb-16 pt-28 motion-fade-rise">
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
-          Search
-        </h1>
+      <main
+        id="main-content"
+        className="layout-content relative z-[1] pb-16 pt-28 motion-fade-rise"
+      >
+        <h1 className="type-page-lg text-foreground">Search</h1>
         <p className="mt-2 text-muted">
           Find movies, TV shows, and people in the catalog.
         </p>

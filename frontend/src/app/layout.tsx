@@ -27,10 +27,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="dark">
-      <body
-        className={`${fraunces.variable} ${sourceSans.variable} antialiased`}
-      >
+    <html
+      lang="en"
+      data-theme="dark"
+      className={`${fraunces.variable} ${sourceSans.variable}`}
+    >
+      <body className="antialiased">
         <ThemeSync />
         {children}
       </body>

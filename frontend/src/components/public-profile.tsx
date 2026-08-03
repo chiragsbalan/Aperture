@@ -100,9 +100,7 @@ export function PublicProfileView({ username }: PublicProfileViewProps) {
           size="lg"
         />
         <div>
-          <h1 className="font-display text-2xl font-semibold text-foreground">
-            {title}
-          </h1>
+          <h1 className="type-page-lg text-foreground">{title}</h1>
           <p className="mt-1 text-muted">@{profile.username}</p>
         </div>
       </div>

@@ -167,7 +167,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
   }
 
   return (
-    <div className="motion-fade-rise w-full max-w-3xl text-left">
+    <div className="layout-content motion-fade-rise text-left">
       {state.status === 'loading' ? (
         <p className="mt-10 text-muted" role="status">
           Loading…
@@ -190,7 +190,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
               Lists
             </Link>
           </p>
-          <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-foreground">
+          <h1 className="mt-2 type-page-lg text-foreground">
             {state.list.title}
           </h1>
           <p className="mt-2 text-muted">
@@ -319,10 +319,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
               }}
               className="space-y-4"
             >
-              <h2
-                id={`${formId}-edit-title`}
-                className="font-display text-xl font-semibold"
-              >
+              <h2 id={`${formId}-edit-title`} className="type-card-title">
                 Edit list
               </h2>
               <div>
@@ -407,10 +404,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
             className="w-full max-w-md border border-[var(--color-border)] bg-[var(--color-bg)] p-6 text-foreground backdrop:bg-black/50"
             aria-labelledby={`${formId}-delete-title`}
           >
-            <h2
-              id={`${formId}-delete-title`}
-              className="font-display text-xl font-semibold"
-            >
+            <h2 id={`${formId}-delete-title`} className="type-card-title">
               Delete this list?
             </h2>
             <p className="mt-2 text-sm text-muted">

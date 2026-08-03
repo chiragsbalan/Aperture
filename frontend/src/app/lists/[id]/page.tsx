@@ -14,9 +14,14 @@ export default async function PublicListPage({
 }) {
   const { id } = await params;
   return (
-    <main className="shell-atmosphere relative flex min-h-dvh flex-col items-center px-6 py-24">
+    <div className="shell-atmosphere relative flex min-h-dvh flex-col items-center py-24">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <SiteHeader />
-      <CustomListDetailPage listId={id} />
-    </main>
+      <main id="main-content" className="relative z-[1] w-full">
+        <CustomListDetailPage listId={id} />
+      </main>
+    </div>
   );
 }
