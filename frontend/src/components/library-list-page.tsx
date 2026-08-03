@@ -1,10 +1,10 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { LibraryNav } from '@/components/library-nav';
+import { TitlePosterLink } from '@/components/title-poster-link';
 import {
   fetchSystemList,
   hrefForLibraryContent,
@@ -174,34 +174,21 @@ export function LibraryListPage({
           <ul className="mt-10 grid grid-cols-2 gap-6 sm:grid-cols-3">
             {state.items.map((item) => (
               <li key={item.item_id} className="min-w-0">
-                <Link
+                <TitlePosterLink
                   href={hrefForLibraryContent(item.content)}
+                  contentId={item.content.id}
+                  posterUrl={item.content.poster_url}
+                  posterAlt={`${item.content.title} poster`}
+                  sizes="(max-width: 640px) 45vw, 200px"
                   className="block"
                 >
-                  {item.content.poster_url ? (
-                    <Image
-                      src={item.content.poster_url}
-                      alt={`${item.content.title} poster`}
-                      width={200}
-                      height={300}
-                      className="h-auto w-full object-cover"
-                      sizes="(max-width: 640px) 45vw, 200px"
-                    />
-                  ) : (
-                    <div
-                      aria-hidden
-                      className="flex aspect-[2/3] items-center justify-center bg-[var(--color-bg-elevated)] text-sm text-muted"
-                    >
-                      No image
-                    </div>
-                  )}
                   <p className="mt-2 truncate font-medium text-foreground">
                     {item.content.title}
                   </p>
                   {item.content.year != null ? (
                     <p className="text-sm text-muted">{item.content.year}</p>
                   ) : null}
-                </Link>
+                </TitlePosterLink>
                 <button
                   type="button"
                   aria-label={`Remove ${item.content.title} from ${kind}`}

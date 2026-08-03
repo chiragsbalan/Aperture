@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { TitlePosterLink } from '@/components/title-poster-link';
 import {
   fetchSearch,
   hrefForHit,
@@ -92,35 +93,59 @@ export function SearchResults({ query }: { query: string }) {
         {loading ? ' · updating…' : ''}
       </p>
       <ul className="divide-y divide-[var(--color-border)]">
-        {(results ?? []).map((hit) => (
-          <li key={`${hit.type}:${hit.id}`}>
-            <Link
-              href={hrefForHit(hit)}
-              className="flex gap-4 py-4 transition hover:bg-[var(--color-surface)]/40"
-            >
-              <div className="relative h-20 w-14 shrink-0 overflow-hidden bg-[var(--color-surface)]">
-                {hit.poster_url ? (
-                  <Image
-                    src={hit.poster_url}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    sizes="56px"
-                  />
-                ) : null}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wide text-muted">
-                  {labelForHitType(hit.type)}
-                  {hit.year != null ? ` · ${hit.year}` : ''}
-                </p>
-                <p className="font-display [font-size:var(--text-subsection)] text-foreground">
-                  {hit.title}
-                </p>
-              </div>
-            </Link>
-          </li>
-        ))}
+        {(results ?? []).map((hit) => {
+          const meta = (
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wide text-muted">
+                {labelForHitType(hit.type)}
+                {hit.year != null ? ` · ${hit.year}` : ''}
+              </p>
+              <p className="font-display [font-size:var(--text-subsection)] text-foreground">
+                {hit.title}
+              </p>
+            </div>
+          );
+
+          if (hit.type === 'movie' || hit.type === 'tv') {
+            return (
+              <li key={`${hit.type}:${hit.id}`}>
+                <TitlePosterLink
+                  href={hrefForHit(hit)}
+                  contentId={hit.id}
+                  posterUrl={hit.poster_url}
+                  posterAlt=""
+                  sizes="56px"
+                  posterFrameClassName="w-14 shrink-0"
+                  className="flex gap-4 py-4 transition hover:bg-[var(--color-surface)]/40"
+                >
+                  {meta}
+                </TitlePosterLink>
+              </li>
+            );
+          }
+
+          return (
+            <li key={`${hit.type}:${hit.id}`}>
+              <Link
+                href={hrefForHit(hit)}
+                className="flex gap-4 py-4 transition hover:bg-[var(--color-surface)]/40"
+              >
+                <div className="relative h-20 w-14 shrink-0 overflow-hidden bg-[var(--color-surface)]">
+                  {hit.poster_url ? (
+                    <Image
+                      src={hit.poster_url}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      sizes="56px"
+                    />
+                  ) : null}
+                </div>
+                {meta}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

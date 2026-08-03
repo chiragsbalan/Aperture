@@ -10,6 +10,10 @@
  * Size easing (height/width when those are explicitly set): use `.motion-size`
  * from `globals.css`. Horizontal overflow hints: `.scroll-fade-x` +
  * `useScrollFadeX` from `scroll-fade.ts`.
+ *
+ * Title poster open morph (product-wide): every openable movie/TV poster must
+ * use `TitleNavPoster` (or `TitlePosterLink` / `TmdbResolveLink`). See
+ * `title-poster-morph.ts` and `title-poster-flight.ts`.
  */
 
 /** Micro interactions (hover color, small icon motion). */

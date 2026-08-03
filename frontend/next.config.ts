@@ -20,6 +20,10 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   // Avoid picking up unrelated lockfiles outside this monorepo.
   outputFileTracingRoot: path.join(__dirname),
+  // Title-poster morphs use click-time FLIP (title-poster-flight.ts), not
+  // React <ViewTransition>. Do not enable experimental.viewTransition — it
+  // makes startTransition navigations (Similar → detail) run a document VT
+  // that fights the FLIP as detail text commits.
   images: {
     remotePatterns: [
       {

@@ -1,12 +1,11 @@
 import Link from 'next/link';
 
-import { CatalogPoster } from '@/components/catalog-poster';
-import { TmdbResolveLink } from '@/components/tmdb-resolve-link';
+import { TitleNavPoster } from '@/components/title-nav-poster';
 import type { SimilarTitle } from '@/lib/catalog';
 
 /**
  * Similar titles row under the main detail column.
- * Missing catalog rows resolve via /movies|tv/tmdb/{tmdbId} on click.
+ * Every openable poster uses ``TitleNavPoster`` (product-wide morph).
  */
 export function MoreLikeThis({
   items,
@@ -42,47 +41,19 @@ export function MoreLikeThis({
       <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-4">
         {visible.map((item) => {
           const resolvedType = item.content_type ?? kind;
-          if (item.content_id != null) {
-            const href =
-              resolvedType === 'tv_show'
-                ? `/tv/${item.content_id}`
-                : `/movies/${item.content_id}`;
-            return (
-              <li key={`${item.tmdb_id}-${item.title}`} className="min-w-0">
-                <Link
-                  href={href}
-                  aria-label={item.title}
-                  className="block transition hover:opacity-90"
-                >
-                  <CatalogPoster
-                    url={item.poster_url}
-                    alt={item.title}
-                    sizes="(max-width: 640px) 45vw, 140px"
-                  />
-                </Link>
-              </li>
-            );
-          }
-
-          const href =
-            resolvedType === 'tv_show'
-              ? `/tv/tmdb/${item.tmdb_id}`
-              : `/movies/tmdb/${item.tmdb_id}`;
+          const navKind = resolvedType === 'tv_show' ? 'tv' : 'movie';
           return (
             <li key={`${item.tmdb_id}-${item.title}`} className="min-w-0">
-              <TmdbResolveLink
-                href={href}
+              <TitleNavPoster
+                contentId={item.content_id}
                 tmdbId={item.tmdb_id}
-                kind={resolvedType === 'tv_show' ? 'tv' : 'movie'}
+                kind={navKind}
+                posterUrl={item.poster_url}
+                posterAlt={item.title}
                 ariaLabel={item.title}
                 className="block transition hover:opacity-90"
-              >
-                <CatalogPoster
-                  url={item.poster_url}
-                  alt={item.title}
-                  sizes="(max-width: 640px) 45vw, 140px"
-                />
-              </TmdbResolveLink>
+                sizes="(max-width: 640px) 45vw, 140px"
+              />
             </li>
           );
         })}
