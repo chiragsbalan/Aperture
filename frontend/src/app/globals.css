@@ -448,6 +448,7 @@
 
   .catalog-thumb-scroll::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
 
   .catalog-thumb-scroll::-webkit-scrollbar-track {
@@ -463,6 +464,91 @@
     display: none;
     width: 0;
     height: 0;
+  }
+
+  /*
+   * Horizontal overflow scroller — no visible scrollbar; edge fades when
+   * more content exists that way. Drive `data-fade-start` / `data-fade-end`
+   * with `useScrollFadeX` from `lib/scroll-fade.ts`.
+   */
+  .scroll-fade-x {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+  }
+
+  .scroll-fade-x::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scroll-fade-x[data-fade-start='true'][data-fade-end='true'] {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--scroll-fade-size),
+      #000 calc(100% - var(--scroll-fade-size)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--scroll-fade-size),
+      #000 calc(100% - var(--scroll-fade-size)),
+      transparent
+    );
+  }
+
+  .scroll-fade-x[data-fade-start='true'][data-fade-end='false'] {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--scroll-fade-size),
+      #000 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--scroll-fade-size),
+      #000 100%
+    );
+  }
+
+  .scroll-fade-x[data-fade-start='false'][data-fade-end='true'] {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      #000 0%,
+      #000 calc(100% - var(--scroll-fade-size)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      #000 0%,
+      #000 calc(100% - var(--scroll-fade-size)),
+      transparent
+    );
+  }
+
+  /*
+   * Smooth size changes when height/width (or max-*) are explicitly set
+   * during layout transitions (tab panels, expand/collapse, etc.).
+   */
+  .motion-size {
+    transition:
+      height var(--duration-med) var(--ease-out),
+      width var(--duration-med) var(--ease-out),
+      max-height var(--duration-med) var(--ease-out),
+      max-width var(--duration-med) var(--ease-out),
+      min-height var(--duration-med) var(--ease-out),
+      min-width var(--duration-med) var(--ease-out);
+  }
+
+  .motion-size.is-resizing {
+    overflow: hidden;
   }
 
   /* Clip TMDB provider logos (square PNGs with squircle art + black corners). */
@@ -490,14 +576,6 @@
     transition:
       transform var(--duration-med) var(--ease-out),
       width var(--duration-med) var(--ease-out);
-  }
-
-  .title-tab-panel-stage {
-    transition: height var(--duration-med) var(--ease-out);
-  }
-
-  .title-tab-panel-stage.is-resizing {
-    overflow: hidden;
   }
 
   .title-tab-panel {
@@ -862,6 +940,7 @@
   .title-tab-indicator,
   .title-tab-panel-stage,
   .title-tab-panel,
+  .motion-size,
   .library-action-icon-glyph {
     transition: none !important;
   }

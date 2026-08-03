@@ -8,6 +8,7 @@ import { SiteHeader } from '@/components/site-header';
 import { TitleAtmosphere } from '@/components/title-atmosphere';
 import { TitleMetaTabs } from '@/components/title-meta-tabs';
 import { TitleOverview } from '@/components/title-overview';
+import { TitleSeasons } from '@/components/title-seasons';
 import { WhereToWatch } from '@/components/where-to-watch';
 import type {
   CreditPersonRef,
@@ -43,13 +44,18 @@ function formatMonthYear(isoDate: string | null | undefined): string | null {
 }
 
 function uniquePeople(credits: CreditPersonRef[]): CreditPersonRef[] {
-  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  const seenNames = new Set<string>();
   const result: CreditPersonRef[] = [];
   for (const credit of credits) {
-    if (seen.has(credit.id)) {
+    const nameKey = credit.name.trim().toLowerCase();
+    if (seenIds.has(credit.id) || (nameKey && seenNames.has(nameKey))) {
       continue;
     }
-    seen.add(credit.id);
+    seenIds.add(credit.id);
+    if (nameKey) {
+      seenNames.add(nameKey);
+    }
     result.push(credit);
   }
   return result;
@@ -60,11 +66,7 @@ function directorsFromCrew(crew: CreditPersonRef[]): CreditPersonRef[] {
 }
 
 function creatorsFromCrew(crew: CreditPersonRef[]): CreditPersonRef[] {
-  return uniquePeople(
-    crew.filter(
-      (credit) => credit.job === 'Creator' || credit.job === 'Director',
-    ),
-  );
+  return uniquePeople(crew.filter((credit) => credit.job === 'Creator'));
 }
 
 function PersonLinks({ people }: { people: CreditPersonRef[] }) {
@@ -107,14 +109,6 @@ function TitleMetaRow({ children }: { children: ReactNode }) {
     <div className="mt-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-xs text-muted sm:mt-3 sm:gap-x-3 sm:text-sm">
       {children}
     </div>
-  );
-}
-
-function MetaDot() {
-  return (
-    <span aria-hidden className="text-muted opacity-50">
-      ·
-    </span>
   );
 }
 
@@ -212,6 +206,7 @@ function TitleDetailShell({
   tagline,
   contentId,
   contentType,
+  status,
   cast,
   crew,
   extras,
@@ -226,12 +221,14 @@ function TitleDetailShell({
   overview: string | null;
   tagline: string | null;
   contentId: string;
-  contentType: string;
+  contentType: 'movie' | 'tv_show';
+  status: string | null;
   cast: CreditPersonRef[];
   crew: CreditPersonRef[];
   extras: TitleExtras;
   seasons?: SeasonDetail[];
 }) {
+  const seasonList = seasons ?? [];
   return (
     <TitleAtmosphere backdropUrl={backdropUrl}>
       <a href="#main-content" className="skip-link">
@@ -291,8 +288,12 @@ function TitleDetailShell({
                 cast={cast}
                 crew={crew}
                 extras={extras}
-                seasons={seasons}
+                contentType={contentType}
+                status={status}
               />
+              {contentType === 'tv_show' ? (
+                <TitleSeasons seasons={seasonList} />
+              ) : null}
               <div className="sm:hidden">
                 <WhereToWatch
                   providers={extras.watch_providers}
@@ -323,7 +324,8 @@ export function MovieDetailView({ movie }: { movie: MovieDetail }) {
       posterAlt={`${movie.title} poster`}
       title={movie.title}
       contentId={movie.id}
-      contentType={movie.type}
+      contentType="movie"
+      status={movie.status}
       cast={movie.cast}
       crew={movie.crew}
       extras={movie.extras}
@@ -332,17 +334,13 @@ export function MovieDetailView({ movie }: { movie: MovieDetail }) {
       meta={
         <TitleMetaRow>
           {releaseLabel ? <span>{releaseLabel}</span> : null}
-          {releaseLabel && movie.runtime_minutes != null ? <MetaDot /> : null}
           {movie.runtime_minutes != null ? (
             <span>{movie.runtime_minutes} min</span>
           ) : null}
           {directors.length > 0 ? (
-            <>
-              {(releaseLabel || movie.runtime_minutes != null) && <MetaDot />}
-              <span>
-                Directed by <PersonLinks people={directors} />
-              </span>
-            </>
+            <span>
+              Directed by <PersonLinks people={directors} />
+            </span>
           ) : null}
         </TitleMetaRow>
       }
@@ -359,6 +357,9 @@ export function TvDetailView({ show }: { show: TvDetail }) {
       ? `${firstAir} – ${lastAir}`
       : firstAir || lastAir;
   const creators = creatorsFromCrew(show.crew);
+  const episodeRuntime = show.extras.episode_runtime_minutes;
+  const statusLabel = show.status?.trim() || null;
+  const hasCounts = show.number_of_seasons != null;
 
   return (
     <TitleDetailShell
@@ -367,7 +368,8 @@ export function TvDetailView({ show }: { show: TvDetail }) {
       posterAlt={`${show.title} poster`}
       title={show.title}
       contentId={show.id}
-      contentType={show.type}
+      contentType="tv_show"
+      status={show.status}
       cast={show.cast}
       crew={show.crew}
       extras={show.extras}
@@ -377,8 +379,7 @@ export function TvDetailView({ show }: { show: TvDetail }) {
       meta={
         <TitleMetaRow>
           {airLabel ? <span>{airLabel}</span> : null}
-          {airLabel && show.number_of_seasons != null ? <MetaDot /> : null}
-          {show.number_of_seasons != null ? (
+          {hasCounts ? (
             <span>
               {show.number_of_seasons} season
               {show.number_of_seasons === 1 ? '' : 's'}
@@ -387,16 +388,12 @@ export function TvDetailView({ show }: { show: TvDetail }) {
                 : ''}
             </span>
           ) : null}
+          {statusLabel ? <span>{statusLabel}</span> : null}
+          {episodeRuntime != null ? <span>~{episodeRuntime} min</span> : null}
           {creators.length > 0 ? (
-            <>
-              {(airLabel || show.number_of_seasons != null) && <MetaDot />}
-              <span>
-                {creators.every((person) => person.job === 'Creator')
-                  ? 'Created by '
-                  : 'Directed by '}
-                <PersonLinks people={creators} />
-              </span>
-            </>
+            <span>
+              Created by <PersonLinks people={creators} />
+            </span>
           ) : null}
         </TitleMetaRow>
       }

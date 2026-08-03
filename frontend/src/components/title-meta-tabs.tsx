@@ -13,10 +13,11 @@ import {
   useState,
 } from 'react';
 
-import type { CreditPersonRef, SeasonDetail, TitleExtras } from '@/lib/catalog';
+import type { CreditPersonRef, TitleExtras } from '@/lib/catalog';
 import { MOTION_DURATION_MED_MS } from '@/lib/motion';
 
-type MetaTab = 'cast' | 'crew' | 'details' | 'genres' | 'releases' | 'seasons';
+type MetaTab = 'cast' | 'crew' | 'details' | 'genres' | 'releases';
+type TitleContentType = 'movie' | 'tv_show';
 
 const RELEASE_TYPE_LABELS: Record<number, string> = {
   1: 'Premiere',
@@ -142,15 +143,53 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DetailsList({ extras }: { extras: TitleExtras }) {
+function DetailsList({
+  extras,
+  contentType,
+  status,
+}: {
+  extras: TitleExtras;
+  contentType: TitleContentType;
+  status: string | null;
+}) {
   const rows: Array<{ key: string; node: ReactNode }> = [];
+  const isTv = contentType === 'tv_show';
+  const networks = extras.networks ?? [];
 
+  if (isTv && status?.trim()) {
+    rows.push({
+      key: 'status',
+      node: <DetailRow label="Status" value={status.trim()} />,
+    });
+  }
+  if (isTv && networks.length > 0) {
+    rows.push({
+      key: 'networks',
+      node: (
+        <DetailRow
+          label="Networks"
+          value={networks.map((network) => network.name).join(', ')}
+        />
+      ),
+    });
+  }
+  if (isTv && extras.episode_runtime_minutes != null) {
+    rows.push({
+      key: 'episode-runtime',
+      node: (
+        <DetailRow
+          label="Episode runtime"
+          value={`${extras.episode_runtime_minutes} min`}
+        />
+      ),
+    });
+  }
   if (extras.studios.length > 0) {
     rows.push({
       key: 'studios',
       node: (
         <DetailRow
-          label="Studios"
+          label={isTv ? 'Production' : 'Studios'}
           value={extras.studios.map((s) => s.name).join(', ')}
         />
       ),
@@ -192,19 +231,19 @@ function DetailsList({ extras }: { extras: TitleExtras }) {
       ),
     });
   }
-  if (extras.collection) {
+  if (!isTv && extras.collection) {
     rows.push({
       key: 'collection',
       node: <DetailRow label="Collection" value={extras.collection.name} />,
     });
   }
-  if (formatMoney(extras.budget)) {
+  if (!isTv && formatMoney(extras.budget)) {
     rows.push({
       key: 'budget',
       node: <DetailRow label="Budget" value={formatMoney(extras.budget)!} />,
     });
   }
-  if (formatMoney(extras.revenue)) {
+  if (!isTv && formatMoney(extras.revenue)) {
     rows.push({
       key: 'revenue',
       node: <DetailRow label="Revenue" value={formatMoney(extras.revenue)!} />,
@@ -369,14 +408,16 @@ export function TitleMetaTabs({
   cast,
   crew,
   extras,
-  seasons,
+  contentType,
+  status = null,
 }: {
   cast: CreditPersonRef[];
   crew: CreditPersonRef[];
   extras: TitleExtras;
-  seasons?: SeasonDetail[];
+  contentType: TitleContentType;
+  status?: string | null;
 }) {
-  const seasonList = seasons ?? [];
+  const isTv = contentType === 'tv_show';
   const tabs = useMemo(() => {
     const items: Array<{
       id: MetaTab;
@@ -417,19 +458,12 @@ export function TitleMetaTabs({
     if (extras.releases.length > 0) {
       items.push({
         id: 'releases',
-        label: 'RELEASES',
+        label: isTv ? 'RATINGS' : 'RELEASES',
         count: extras.releases.length,
       });
     }
-    if (seasonList.length > 0) {
-      items.push({
-        id: 'seasons',
-        label: 'SEASONS',
-        count: seasonList.length,
-      });
-    }
     return items;
-  }, [cast.length, crew.length, extras, seasonList.length]);
+  }, [cast.length, crew.length, extras, isTv]);
 
   const panelId = useId();
   const themesHeadingId = useId();
@@ -566,6 +600,15 @@ export function TitleMetaTabs({
   }
 
   const sortedReleases = [...extras.releases].sort((a, b) => {
+    if (isTv) {
+      const byCountry = countryDisplayName(a.country).localeCompare(
+        countryDisplayName(b.country),
+      );
+      if (byCountry !== 0) {
+        return byCountry;
+      }
+      return (a.certification ?? '').localeCompare(b.certification ?? '');
+    }
     const left = a.release_date ?? '';
     const right = b.release_date ?? '';
     if (left !== right) {
@@ -625,7 +668,13 @@ export function TitleMetaTabs({
       return <CreditPillList credits={crew} />;
     }
     if (panel === 'details') {
-      return <DetailsList extras={extras} />;
+      return (
+        <DetailsList
+          extras={extras}
+          contentType={contentType}
+          status={status}
+        />
+      );
     }
     if (panel === 'genres') {
       const hasGenres = extras.genres.length > 0;
@@ -667,22 +716,27 @@ export function TitleMetaTabs({
     }
     if (panel === 'releases') {
       return (
-        <ul className="catalog-thumb-scroll max-h-[28rem] space-y-0 overflow-y-auto pr-1 text-left text-[0.68rem] leading-none sm:text-xs sm:leading-snug">
+        <ul
+          aria-label={isTv ? 'Content ratings' : 'Release dates'}
+          className="catalog-thumb-scroll max-h-[18rem] space-y-0 overflow-y-auto pr-1 text-left text-[0.68rem] leading-none sm:max-h-[28rem] sm:text-xs sm:leading-snug"
+        >
           {sortedReleases.map((release, index) => (
             <li
-              key={`${release.country}-${release.release_date}-${release.type}-${index}`}
+              key={`${release.country}-${release.release_date}-${release.type}-${release.certification}-${index}`}
               className="flex h-7 flex-nowrap items-center gap-x-1.5 overflow-hidden border-b border-[var(--color-border)]/60 sm:h-8 sm:gap-x-2"
             >
-              <span className="inline-flex min-w-0 shrink items-center gap-1 font-medium text-foreground sm:gap-1.5">
+              <span className="inline-flex min-w-0 flex-1 items-center gap-1 font-medium text-foreground sm:gap-1.5">
                 <CountryFlag code={release.country} />
                 <span className="truncate">
                   {countryDisplayName(release.country)}
                 </span>
               </span>
-              <span className="shrink-0 text-muted">
-                {formatReleaseDate(release.release_date)}
-              </span>
-              {release.type != null ? (
+              {!isTv ? (
+                <span className="shrink-0 text-muted">
+                  {formatReleaseDate(release.release_date)}
+                </span>
+              ) : null}
+              {!isTv && release.type != null ? (
                 <span className="min-w-0 truncate text-foreground">
                   {RELEASE_TYPE_LABELS[release.type] ?? `Type ${release.type}`}
                 </span>
@@ -692,38 +746,10 @@ export function TitleMetaTabs({
                   {release.certification}
                 </span>
               ) : null}
-              {release.note ? (
-                <span className="min-w-0 truncate text-muted">
+              {!isTv && release.note ? (
+                <span className="hidden min-w-0 truncate text-muted sm:inline">
                   {release.note}
                 </span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      );
-    }
-    if (panel === 'seasons') {
-      return (
-        <ul className="space-y-6">
-          {seasonList.map((season) => (
-            <li key={season.id}>
-              <h3 className="font-medium text-foreground">
-                {season.name?.trim() || `Season ${season.season_number}`}
-              </h3>
-              {season.overview ? (
-                <p className="mt-1 whitespace-pre-wrap text-sm text-muted">
-                  {season.overview}
-                </p>
-              ) : null}
-              {season.episodes.length > 0 ? (
-                <ul className="mt-2 space-y-1 text-sm text-muted">
-                  {season.episodes.map((episode) => (
-                    <li key={episode.id}>
-                      E{episode.episode_number}
-                      {episode.name ? `: ${episode.name}` : ''}
-                    </li>
-                  ))}
-                </ul>
               ) : null}
             </li>
           ))}
@@ -741,6 +767,7 @@ export function TitleMetaTabs({
         ref={tablistRef}
         role="tablist"
         aria-label="Title metadata"
+        aria-orientation="horizontal"
         className="relative flex w-full flex-nowrap items-end justify-between gap-0.5 border-b border-[var(--color-border)] sm:justify-start sm:gap-6"
       >
         {tabs.map((item, index) => {
@@ -793,7 +820,7 @@ export function TitleMetaTabs({
 
       <div
         ref={stageRef}
-        className={`title-tab-panel-stage relative mt-5 text-left${
+        className={`motion-size title-tab-panel-stage relative mt-5 text-left${
           stageHeight != null ? ' is-resizing' : ''
         }`}
         style={stageHeight != null ? { height: stageHeight } : undefined}

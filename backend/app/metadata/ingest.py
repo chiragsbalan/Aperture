@@ -134,6 +134,63 @@ def _trim_credits_for_resolve(credits: TmdbCredits) -> TmdbCredits:
     return TmdbCredits(cast=cast, crew=crew)
 
 
+def _tv_with_creator_credits(show: TmdbTvShow) -> TmdbTvShow:
+    """Merge TMDb ``created_by`` into crew as Creator jobs (deduped)."""
+    if not show.created_by:
+        return show
+    existing = {(row.id, (row.job or '').strip()) for row in show.credits.crew}
+    creators: list[TmdbCrewCredit] = []
+    for creator in show.created_by:
+        key = (creator.id, 'Creator')
+        if key in existing:
+            continue
+        existing.add(key)
+        creators.append(
+            TmdbCrewCredit(
+                id=creator.id,
+                name=creator.name,
+                job='Creator',
+                department='Writing',
+                profile_path=creator.profile_path,
+            )
+        )
+    if not creators:
+        return show
+    return show.model_copy(
+        update={
+            'credits': TmdbCredits(
+                cast=show.credits.cast,
+                crew=[*creators, *show.credits.crew],
+            ),
+        },
+    )
+
+
+def _tv_extras_with_show_fields(
+    show: TmdbTvShow,
+) -> dict[str, Any]:
+    """Ensure fixture/live extras include networks + episode runtime."""
+    extras = dict(show.extras) if show.extras else {}
+    if show.networks and not extras.get('networks'):
+        extras['networks'] = [
+            {
+                'id': network.id,
+                'name': network.name,
+                'origin_country': network.origin_country,
+            }
+            for network in show.networks
+            if network.name
+        ]
+    if show.episode_run_time and extras.get('episode_runtime_minutes') is None:
+        runtime = next(
+            (int(value) for value in show.episode_run_time if int(value) > 0),
+            None,
+        )
+        if runtime is not None:
+            extras['episode_runtime_minutes'] = runtime
+    return extras
+
+
 async def _ensure_credit_people(
     session: AsyncSession,
     *,
@@ -237,6 +294,8 @@ async def upsert_tv_payload(
     trim_credits: bool = False,
 ) -> ContentItem:
     """Upsert a TV show, seasons/episodes, credits, and people shells."""
+    show = _tv_with_creator_credits(show)
+    extras = _tv_extras_with_show_fields(show)
     if trim_credits:
         show = show.model_copy(
             update={'credits': _trim_credits_for_resolve(show.credits)},
@@ -257,7 +316,7 @@ async def upsert_tv_payload(
         status=show.status,
         number_of_seasons=show.number_of_seasons,
         number_of_episodes=show.number_of_episodes,
-        extras=show.extras,
+        extras=extras,
     )
     await _upsert_title_credits(
         session,

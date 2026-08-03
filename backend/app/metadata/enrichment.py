@@ -11,6 +11,8 @@ _MAX_VIDEOS = 12
 _MAX_BACKDROPS = 24
 _MAX_POSTERS = 12
 _MAX_RELEASE_ROWS = 24
+_MAX_STUDIOS = 16
+_MAX_NETWORKS = 12
 _MAX_SIMILAR = 6
 
 _VIDEO_TYPE_RANK = {
@@ -61,7 +63,25 @@ def build_extras_from_tmdb_payload(
         }
         for c in _as_list(payload.get('production_companies'))
         if isinstance(c, dict) and c.get('name')
+    ][:_MAX_STUDIOS]
+    networks = [
+        {
+            'id': n.get('id'),
+            'name': n.get('name'),
+            'origin_country': n.get('origin_country') or None,
+        }
+        for n in _as_list(payload.get('networks'))
+        if isinstance(n, dict) and n.get('name')
+    ][:_MAX_NETWORKS]
+    episode_runtime_minutes: int | None = None
+    runtimes = [
+        int(value)
+        for value in _as_list(payload.get('episode_run_time'))
+        if isinstance(value, (int, float)) and int(value) > 0
     ]
+    if runtimes:
+        # TMDb often returns one typical length; prefer the first listed.
+        episode_runtime_minutes = runtimes[0]
     countries = [
         {
             'iso_3166_1': c.get('iso_3166_1'),
@@ -129,6 +149,8 @@ def build_extras_from_tmdb_payload(
                     'note': None,
                 }
             )
+            if len(releases) >= _MAX_RELEASE_ROWS:
+                break
 
     video_rows = [
         v
@@ -238,6 +260,8 @@ def build_extras_from_tmdb_payload(
         'genres': genres,
         'keywords': keywords,
         'studios': studios,
+        'networks': networks if kind == 'tv' else [],
+        'episode_runtime_minutes': (episode_runtime_minutes if kind == 'tv' else None),
         'countries': countries,
         'spoken_languages': spoken_languages,
         'alternative_titles': alternative_titles,

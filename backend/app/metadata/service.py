@@ -282,6 +282,21 @@ def _title_extras(raw: dict[str, Any] | None) -> TitleExtras:
             for s in doc.get('studios', [])
             if isinstance(s, dict) and s.get('name')
         ],
+        networks=[
+            StudioRef(
+                id=n.get('id'),
+                name=str(n['name']),
+                origin_country=n.get('origin_country'),
+            )
+            for n in doc.get('networks', [])
+            if isinstance(n, dict) and n.get('name')
+        ],
+        episode_runtime_minutes=(
+            int(doc['episode_runtime_minutes'])
+            if isinstance(doc.get('episode_runtime_minutes'), (int, float))
+            and int(doc['episode_runtime_minutes']) > 0
+            else None
+        ),
         countries=[
             CountryRef(
                 iso_3166_1=str(c['iso_3166_1']),

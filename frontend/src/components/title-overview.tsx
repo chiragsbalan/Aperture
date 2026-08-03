@@ -2,8 +2,6 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 
-import { MOTION_DURATION_MED_MS } from '@/lib/motion';
-
 const MOBILE_MQ = '(max-width: 639px)';
 
 /**
@@ -23,19 +21,6 @@ export function TitleOverview({
   const [collapsible, setCollapsible] = useState(false);
   const [collapsedHeight, setCollapsedHeight] = useState(0);
   const [fullHeight, setFullHeight] = useState(0);
-  const [reduceMotion, setReduceMotion] = useState(false);
-
-  useEffect(() => {
-    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const syncMotion = () => {
-      setReduceMotion(motion.matches);
-    };
-    syncMotion();
-    motion.addEventListener('change', syncMotion);
-    return () => {
-      motion.removeEventListener('change', syncMotion);
-    };
-  }, []);
 
   useEffect(() => {
     const el = textRef.current;
@@ -115,16 +100,12 @@ export function TitleOverview({
         id={synopsisId}
         data-title-overview=""
         aria-hidden={interactive && !expanded ? true : undefined}
-        className={`type-overview max-w-2xl whitespace-pre-wrap text-foreground ${
+        className={`type-overview motion-size max-w-2xl whitespace-pre-wrap text-foreground ${
           showFade ? 'title-overview-clamped' : ''
         } ${className}`}
         style={{
           maxHeight: maxHeight != null ? `${maxHeight}px` : undefined,
           overflow: maxHeight != null ? 'hidden' : undefined,
-          transition:
-            maxHeight != null && !reduceMotion
-              ? `max-height ${MOTION_DURATION_MED_MS}ms var(--ease-out)`
-              : undefined,
         }}
       >
         {text}
