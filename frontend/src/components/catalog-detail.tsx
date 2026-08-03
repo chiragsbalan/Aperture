@@ -120,8 +120,8 @@ function MetaDot() {
 
 export function CatalogNotFound({ label }: { label: string }) {
   return (
-    <div className="motion-fade-rise mx-auto mt-8 max-w-3xl space-y-4 px-6 text-center">
-      <h1 className="font-display text-2xl font-semibold text-foreground">
+    <div className="layout-content motion-fade-rise mt-8 space-y-4 text-center">
+      <h1 className="font-display [font-size:var(--text-page)] font-semibold text-foreground">
         {label} not found
       </h1>
       <p className="text-muted">
@@ -134,8 +134,8 @@ export function CatalogNotFound({ label }: { label: string }) {
 
 export function CatalogUnavailable({ message }: { message?: string }) {
   return (
-    <div className="motion-fade-rise mx-auto mt-8 max-w-3xl space-y-4 px-6 text-center">
-      <h1 className="font-display text-2xl font-semibold text-foreground">
+    <div className="layout-content motion-fade-rise mt-8 space-y-4 text-center">
+      <h1 className="font-display [font-size:var(--text-page)] font-semibold text-foreground">
         Catalog unavailable
       </h1>
       <p className="text-muted">
@@ -167,7 +167,7 @@ export function CatalogStatusShell({ children }: { children: ReactNode }) {
 export function CatalogLoading() {
   return (
     <div
-      className="motion-fade-in relative z-[1] mx-auto w-full max-w-5xl px-4 pb-16 pt-24 sm:px-6 sm:pb-24 sm:pt-28"
+      className="layout-content motion-fade-in relative z-[1] pb-16 pt-24 sm:pb-24 sm:pt-28"
       role="status"
       aria-live="polite"
       aria-busy="true"
@@ -239,7 +239,7 @@ function TitleDetailShell({
       </a>
       <SiteHeader />
       <main id="main-content" className="relative">
-        <article className="motion-fade-rise mx-auto w-full max-w-5xl px-4 pb-16 pt-24 text-left sm:px-6 sm:pb-24 sm:pt-28">
+        <article className="layout-content motion-fade-rise pb-16 pt-24 text-left sm:pb-24 sm:pt-28">
           {/*
             Text left + poster right on mobile and desktop; mobile uses a
             compact poster, then full-width body below the hero row.
@@ -269,9 +269,7 @@ function TitleDetailShell({
 
             <div className="col-span-2 col-start-1 row-start-3 min-w-0 sm:col-span-1 sm:row-start-2 sm:mt-1">
               {tagline ? (
-                <p className="text-[0.65rem] font-semibold tracking-[0.12em] text-muted uppercase sm:text-sm sm:tracking-[0.14em]">
-                  {tagline}
-                </p>
+                <p className="type-eyebrow text-muted">{tagline}</p>
               ) : null}
               {overview ? (
                 <TitleOverview
@@ -331,9 +329,7 @@ export function MovieDetailView({ movie }: { movie: MovieDetail }) {
       extras={movie.extras}
       tagline={movie.extras.tagline}
       heading={
-        <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-foreground sm:text-4xl sm:leading-none md:text-5xl">
-          {movie.title}
-        </h1>
+        <h1 className="type-title text-foreground">{movie.title}</h1>
       }
       meta={
         <TitleMetaRow>
@@ -380,9 +376,7 @@ export function TvDetailView({ show }: { show: TvDetail }) {
       seasons={show.seasons}
       tagline={show.extras.tagline}
       heading={
-        <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-foreground sm:text-4xl sm:leading-none md:text-5xl">
-          {show.title}
-        </h1>
+        <h1 className="type-title text-foreground">{show.title}</h1>
       }
       meta={
         <TitleMetaRow>
@@ -417,7 +411,7 @@ export function TvDetailView({ show }: { show: TvDetail }) {
 
 export function PersonDetailView({ person }: { person: PersonDetail }) {
   return (
-    <article className="motion-fade-rise relative z-[1] mx-auto w-full max-w-3xl px-4 pb-16 pt-20 text-left sm:px-6 sm:pb-24 sm:pt-28">
+    <article className="layout-content motion-fade-rise relative z-[1] pb-16 pt-20 text-left sm:pb-24 sm:pt-28">
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
         <div className="mx-auto w-[7.5rem] shrink-0 sm:mx-0 sm:mt-6 sm:w-full sm:max-w-[14rem]">
           <CatalogPoster
@@ -428,9 +422,7 @@ export function PersonDetailView({ person }: { person: PersonDetail }) {
           />
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground sm:text-3xl sm:leading-none md:text-4xl">
-            {person.name}
-          </h1>
+          <h1 className="type-title-person text-foreground">{person.name}</h1>
           <div className="mt-3 space-y-1 text-sm text-muted">
             {person.birthday ? <p>Born {person.birthday}</p> : null}
             {person.deathday ? <p>Died {person.deathday}</p> : null}
@@ -447,9 +439,7 @@ export function PersonDetailView({ person }: { person: PersonDetail }) {
       </div>
       {person.credits.length > 0 ? (
         <section className="mt-10">
-          <h2 className="font-display text-lg font-semibold text-foreground">
-            Known for
-          </h2>
+          <h2 className="type-subsection text-foreground">Known for</h2>
           <ul className="mt-4 space-y-2">
             {person.credits.map((credit) => {
               const href =

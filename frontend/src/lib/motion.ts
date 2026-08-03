@@ -1,9 +1,11 @@
 /**
  * @fileoverview Shared motion durations for JS timers and inline styles.
  *
- * Keep these millisecond values in sync with `--duration-*` in
- * `frontend/src/styles/tokens.css`. Prefer {@link MOTION_DURATION_MED_MS} /
- * `--duration-med` for tab panels, popups, overlays, and expand/collapse.
+ * Color, type, radius, and other design tokens live in
+ * `frontend/src/styles/tokens.css` (CSS variables / `.type-*` utilities).
+ * Keep these millisecond values in sync with `--duration-*` there.
+ * Prefer {@link MOTION_DURATION_MED_MS} / `--duration-med` for tab panels,
+ * popups, overlays, and expand/collapse.
  */
 
 /** Micro interactions (hover color, small icon motion). */

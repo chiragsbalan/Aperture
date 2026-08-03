@@ -135,7 +135,8 @@ export function AccountPanel() {
   const { me } = state;
   const providers = me.providers ?? [];
   const hasGoogle = providers.includes('google');
-  const username = me.user?.username;
+  const username = me.user?.username?.trim() || '';
+  const publicProfileHref = username ? `/u/${username}` : null;
 
   return (
     <div className="mt-8 space-y-6 text-left">
@@ -152,7 +153,7 @@ export function AccountPanel() {
             displayName={me.user?.display_name}
           />
           <div>
-            <p className="font-display text-xl font-semibold text-foreground">
+            <p className="type-card-title text-foreground">
               {me.user?.display_name?.trim() || username}
             </p>
             <p className="text-sm text-muted">@{username}</p>
@@ -177,38 +178,43 @@ export function AccountPanel() {
 
       <nav aria-label="Account" className="space-y-1">
         <Link
-          href="/library/watchlist"
+          href="/library"
           aria-current={pathname.startsWith('/library') ? 'page' : undefined}
-          className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3 text-foreground transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
+          className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3 text-foreground transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-soft)]"
         >
           Library
-          <span className="text-sm text-muted">Watchlist & lists</span>
+          <span className="text-sm text-muted">Watchlist, lists & diary</span>
         </Link>
         <Link
           href="/account"
           aria-current={pathname === '/account' ? 'page' : undefined}
-          className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-accent-soft)] px-4 py-3 text-foreground"
+          className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-primary-soft)] px-4 py-3 text-foreground"
         >
-          Account
-          <span className="text-sm text-muted">This page</span>
+          Profile
+          <span className="text-sm text-muted">
+            {username ? `@${username}` : 'This page'}
+          </span>
         </Link>
-        <Link
-          href="/settings"
-          aria-current={pathname === '/settings' ? 'page' : undefined}
-          className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3 text-foreground transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
-        >
-          Settings
-          <span className="text-sm text-muted">Profile & preferences</span>
-        </Link>
-        {username ? (
+        {publicProfileHref ? (
           <Link
-            href={`/u/${encodeURIComponent(username)}`}
-            className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3 text-foreground transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
+            href={publicProfileHref}
+            aria-current={
+              pathname === publicProfileHref ? 'page' : undefined
+            }
+            className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3 text-foreground transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-soft)]"
           >
             Public profile
             <span className="text-sm text-muted">@{username}</span>
           </Link>
         ) : null}
+        <Link
+          href="/settings"
+          aria-current={pathname === '/settings' ? 'page' : undefined}
+          className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3 text-foreground transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-soft)]"
+        >
+          Settings
+          <span className="text-sm text-muted">Preferences</span>
+        </Link>
       </nav>
 
       {!hasGoogle ? (

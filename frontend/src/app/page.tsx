@@ -95,14 +95,14 @@ export default async function HomePage() {
   if (await shouldShowSignedInHome()) {
     const movies = await fetchTopMovies();
     return (
-      <div className="shell-atmosphere relative flex min-h-dvh flex-col items-center px-5 py-16 sm:px-6 sm:py-24">
+      <div className="shell-atmosphere relative flex min-h-dvh flex-col items-center py-16 sm:py-24">
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
         <SiteHeader />
         <main
           id="main-content"
-          className="motion-fade-rise relative z-[1] w-full max-w-5xl text-left"
+          className="layout-content motion-fade-rise relative z-[1] text-left"
         >
           <TopMoviesRail movies={movies} />
         </main>

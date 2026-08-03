@@ -3,9 +3,14 @@ import { SiteHeader } from '@/components/site-header';
 
 export default function PersonLoading() {
   return (
-    <main className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
+    <div className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <SiteHeader />
-      <CatalogLoading />
-    </main>
+      <main id="main-content" className="relative z-[1]">
+        <CatalogLoading />
+      </main>
+    </div>
   );
 }

@@ -4,8 +4,9 @@ import {
   MovieDetailView,
 } from '@/components/catalog-detail';
 import { fetchMovie } from '@/lib/catalog';
+import { parseTmdbIdParam } from '@/lib/content_ids';
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 interface MoviePageProps {
   params: Promise<{ id: string }>;
@@ -15,6 +16,9 @@ export async function generateMetadata({
   params,
 }: MoviePageProps): Promise<Metadata> {
   const { id } = await params;
+  if (parseTmdbIdParam(id) != null) {
+    return { title: 'Movie · Aperture' };
+  }
   const result = await fetchMovie(id);
   if (!result.ok) {
     return { title: 'Movie · Aperture' };
@@ -29,6 +33,10 @@ export async function generateMetadata({
 
 export default async function MoviePage({ params }: MoviePageProps) {
   const { id } = await params;
+  const tmdbId = parseTmdbIdParam(id);
+  if (tmdbId != null) {
+    redirect(`/movies/tmdb/${tmdbId}`);
+  }
   const result = await fetchMovie(id);
 
   if (!result.ok && result.status === 404) {

@@ -4,12 +4,16 @@ import { Suspense } from 'react';
 
 export default function AccountPage() {
   return (
-    <main className="shell-atmosphere relative flex min-h-dvh flex-col items-center justify-center px-6 py-24">
+    <div className="shell-atmosphere relative flex min-h-dvh flex-col items-center justify-center py-24">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <SiteHeader />
-      <div className="motion-fade-rise w-full max-w-lg">
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
-          Profile
-        </h1>
+      <main
+        id="main-content"
+        className="layout-content motion-fade-rise relative z-[1]"
+      >
+        <h1 className="type-page-lg text-foreground">Profile</h1>
         <p className="mt-2 text-muted">
           Your library, account details, and settings.
         </p>
@@ -22,7 +26,7 @@ export default function AccountPage() {
         >
           <AccountPanel />
         </Suspense>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

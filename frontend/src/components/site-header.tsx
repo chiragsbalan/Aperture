@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
-import { ProfileAvatar } from '@/components/profile-avatar';
+import { AccountMenu } from '@/components/account-menu';
 import { SiteSearch } from '@/components/site-search';
 
 type AuthState = 'loading' | 'signed_out' | 'signed_in';
@@ -20,26 +20,6 @@ function HeaderSearch() {
   const headerQuery =
     pathname === '/search' ? (searchParams.get('q') ?? '') : '';
   return <SiteSearch key={pathname} initialQuery={headerQuery} />;
-}
-
-function UserIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <circle cx="12" cy="8" r="3.25" />
-      <path d="M5.5 19.25a6.5 6.5 0 0 1 13 0" />
-    </svg>
-  );
 }
 
 export function SiteHeader() {
@@ -78,14 +58,9 @@ export function SiteHeader() {
     };
   }, [pathname]);
 
-  const username = meUser?.username?.trim() || null;
-
   return (
-    <header className="absolute inset-x-0 top-0 z-10 flex items-center gap-3 px-5 py-5 sm:gap-4 sm:px-8 sm:py-6">
-      <Link
-        href="/"
-        className="shrink-0 font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
-      >
+    <header className="absolute inset-x-0 top-0 z-[var(--z-header)] flex items-center gap-3 px-5 py-5 sm:gap-4 sm:px-8 sm:py-6">
+      <Link href="/" className="type-page shrink-0 text-foreground">
         Aperture
       </Link>
       <div className="min-w-0 flex-1" aria-hidden="true" />
@@ -112,22 +87,10 @@ export function SiteHeader() {
           </span>
         ) : null}
         {authState === 'signed_in' ? (
-          <Link
-            href="/account"
-            aria-label={username ? `Profile (@${username})` : 'Your account'}
-            aria-current={pathname === '/account' ? 'page' : undefined}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted transition hover:bg-[var(--color-accent-soft)] hover:text-foreground sm:h-12 sm:w-12"
-          >
-            {username ? (
-              <ProfileAvatar
-                username={username}
-                displayName={meUser?.display_name}
-                size="sm"
-              />
-            ) : (
-              <UserIcon className="h-6 w-6 sm:h-7 sm:w-7" />
-            )}
-          </Link>
+          <AccountMenu
+            username={meUser?.username?.trim() || null}
+            displayName={meUser?.display_name ?? null}
+          />
         ) : null}
       </nav>
     </header>

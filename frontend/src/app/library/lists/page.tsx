@@ -9,9 +9,14 @@ export const metadata: Metadata = {
 
 export default function LibraryListsPage() {
   return (
-    <main className="shell-atmosphere relative flex min-h-dvh flex-col items-center px-6 py-24">
+    <div className="shell-atmosphere relative flex min-h-dvh flex-col items-center py-24">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <SiteHeader />
-      <CustomListsPage />
-    </main>
+      <main id="main-content" className="relative z-[1] w-full">
+        <CustomListsPage />
+      </main>
+    </div>
   );
 }

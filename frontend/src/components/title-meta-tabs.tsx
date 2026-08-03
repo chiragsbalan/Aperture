@@ -39,7 +39,7 @@ function CreditPill({ credit }: { credit: CreditPersonRef }) {
   return (
     <Link
       href={`/people/${credit.id}`}
-      className="group inline-flex max-w-full items-baseline gap-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)]/70 px-2 py-1 text-xs text-foreground transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)] sm:gap-1.5 sm:px-2.5 sm:py-1.5 sm:text-sm"
+      className="group inline-flex max-w-full items-baseline gap-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-2 py-1 text-[length:var(--text-xs)] text-foreground transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] sm:gap-1.5 sm:px-2.5 sm:py-1.5 sm:text-[length:var(--text-sm)]"
       title={detail ? `${credit.name} — ${detail}` : credit.name}
     >
       <span className="truncate">{credit.name}</span>
@@ -127,7 +127,7 @@ function CreditPillList({ credits }: { credits: CreditPersonRef[] }) {
 
 function Pill({ children }: { children: string }) {
   return (
-    <span className="inline-flex max-w-full truncate rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)]/70 px-2 py-1 text-xs text-foreground sm:px-2.5 sm:py-1.5 sm:text-sm">
+    <span className="inline-flex max-w-full truncate rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-2 py-1 text-[length:var(--text-xs)] text-foreground sm:px-2.5 sm:py-1.5 sm:text-[length:var(--text-sm)]">
       {children}
     </span>
   );
@@ -344,7 +344,7 @@ function CountryFlag({ code }: { code: string | null | undefined }) {
     return (
       <span
         aria-hidden
-        className="inline-block h-3.5 w-3.5 shrink-0 rounded-full bg-[var(--color-border)] sm:h-4 sm:w-4"
+        className="inline-block h-3.5 w-3.5 shrink-0 rounded-[var(--radius-pill)] bg-[var(--color-border)] sm:h-4 sm:w-4"
       />
     );
   }
@@ -356,7 +356,7 @@ function CountryFlag({ code }: { code: string | null | undefined }) {
       alt=""
       width={16}
       height={16}
-      className="h-3.5 w-3.5 shrink-0 rounded-full object-cover ring-1 ring-[var(--color-border)] sm:h-4 sm:w-4"
+      className="h-3.5 w-3.5 shrink-0 rounded-[var(--radius-pill)] object-cover ring-1 ring-[var(--color-border)] sm:h-4 sm:w-4"
       loading="lazy"
     />
   );
@@ -692,7 +692,7 @@ export function TitleMetaTabs({
                 </span>
               ) : null}
               {release.certification ? (
-                <span className="shrink-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)]/40 px-1 py-px text-[0.65rem] text-muted">
+                <span className="shrink-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)]/40 px-1 py-px text-[length:var(--text-eyebrow)] text-muted">
                   {release.certification}
                 </span>
               ) : null}

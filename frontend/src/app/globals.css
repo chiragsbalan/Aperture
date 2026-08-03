@@ -30,6 +30,146 @@
 }
 
 @layer utilities {
+  /*
+   * App content column — same max width + horizontal padding as title detail.
+   * Do not use on guest landing / login / signup (full-bleed / form-centered).
+   */
+  .layout-content {
+    margin-inline: auto;
+    width: 100%;
+    max-width: var(--layout-content-max);
+    padding-inline: var(--layout-content-pad-x);
+  }
+
+  @media (min-width: 640px) {
+    .layout-content {
+      padding-inline: var(--layout-content-pad-x-sm);
+    }
+  }
+
+  /*
+   * Type roles — font-size/line-height/tracking match pre-token UI exactly
+   * (including breakpoints). Prefer these over ad-hoc text-[…] rem values.
+   */
+  .type-brand {
+    font-family: var(--font-display);
+    font-size: var(--text-brand);
+    font-weight: 600;
+    line-height: var(--leading-none);
+    letter-spacing: var(--tracking-brand);
+  }
+
+  .type-title {
+    font-family: var(--font-display);
+    font-size: var(--text-title);
+    font-weight: 600;
+    line-height: var(--leading-title);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .type-title-person {
+    font-family: var(--font-display);
+    font-size: var(--text-title-person);
+    font-weight: 600;
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .type-page {
+    font-family: var(--font-display);
+    font-size: var(--text-page);
+    font-weight: 600;
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .type-page-lg {
+    font-family: var(--font-display);
+    font-size: var(--text-page-lg);
+    font-weight: 600;
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .type-rail {
+    font-family: var(--font-display);
+    font-size: var(--text-rail);
+    font-weight: 600;
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .type-section {
+    font-family: var(--font-display);
+    font-size: var(--text-section);
+    font-weight: 600;
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .type-subsection {
+    font-family: var(--font-display);
+    font-size: var(--text-subsection);
+    font-weight: 600;
+  }
+
+  .type-card-title {
+    font-family: var(--font-display);
+    font-size: var(--text-card-title);
+    font-weight: 600;
+  }
+
+  .type-eyebrow {
+    font-size: var(--text-eyebrow);
+    font-weight: 600;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+  }
+
+  .type-overview {
+    font-size: var(--text-overview);
+    line-height: var(--leading-relaxed);
+  }
+
+  @media (min-width: 640px) {
+    .type-title {
+      font-size: var(--text-title-at-sm);
+      line-height: var(--leading-none);
+    }
+
+    .type-title-person {
+      font-size: var(--text-title-person-at-sm);
+      line-height: var(--leading-none);
+    }
+
+    .type-page {
+      font-size: var(--text-page-at-sm);
+    }
+
+    .type-rail {
+      font-size: var(--text-rail-at-sm);
+    }
+
+    .type-section {
+      font-size: var(--text-section-at-sm);
+    }
+
+    .type-eyebrow {
+      font-size: var(--text-sm);
+      letter-spacing: var(--tracking-wider);
+    }
+
+    .type-overview {
+      font-size: var(--text-overview-at-sm);
+    }
+  }
+
+  @media (min-width: 768px) {
+    .type-title {
+      font-size: var(--text-title-at-md);
+    }
+
+    .type-title-person {
+      font-size: var(--text-title-person-at-md);
+    }
+  }
+
   /* First focusable in guest shell — visually hidden until focused. */
   .skip-link {
     position: absolute;
@@ -47,7 +187,7 @@
     position: absolute;
     left: var(--space-4);
     top: var(--space-4);
-    z-index: 50;
+    z-index: var(--z-skip);
     width: auto;
     height: auto;
     margin: 0;
@@ -59,7 +199,7 @@
     border-radius: var(--radius-sm);
     background: var(--color-bg-elevated);
     color: var(--color-fg);
-    font-size: 0.875rem;
+    font-size: var(--text-overview);
     text-decoration: none;
   }
 
@@ -440,6 +580,64 @@
     }
   }
 
+  /* Account menu: dropdown from profile icon. */
+  .account-menu-backdrop {
+    background: rgba(12, 11, 9, 0.5);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: search-backdrop-in var(--duration-med) var(--ease-out) both;
+  }
+
+  .account-menu-backdrop.is-leaving {
+    animation: search-backdrop-out var(--duration-med) var(--ease-out) both;
+  }
+
+  .account-menu-panel {
+    animation: account-menu-drop-in var(--duration-med) var(--ease-out) both;
+  }
+
+  .account-menu-panel.is-leaving {
+    animation: account-menu-drop-out var(--duration-med) var(--ease-out) both;
+  }
+
+  .account-menu-surface {
+    background:
+      linear-gradient(
+        165deg,
+        rgba(106, 174, 106, 0.14) 0%,
+        rgba(22, 20, 17, 0.2) 34%,
+        rgba(22, 20, 17, 0.92) 100%
+      ),
+      rgba(22, 20, 17, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 28px 90px rgba(0, 0, 0, 0.55);
+  }
+
+  .account-menu-header::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(106, 174, 106, 0.35),
+      transparent
+    );
+    opacity: 0.7;
+  }
+
+  .account-menu-item {
+    animation: account-menu-item-in var(--duration-med) var(--ease-out) both;
+  }
+
+  .account-menu-panel.is-leaving .account-menu-item {
+    animation: none;
+  }
+
   /* Search overlay: soft veil + springy bar (enter / exit). */
   .search-overlay-backdrop {
     animation: search-backdrop-in var(--duration-med) var(--ease-out) both;
@@ -568,6 +766,42 @@
   }
 }
 
+@keyframes account-menu-drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes account-menu-drop-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-0.35rem) scale(0.98);
+  }
+}
+
+@keyframes account-menu-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes search-backdrop-in {
   from {
     opacity: 0;
@@ -637,7 +871,12 @@
   }
 
   .title-tab-panel-layer.is-outgoing,
-  .title-tab-panel.is-incoming {
+  .title-tab-panel.is-incoming,
+  .account-menu-backdrop,
+  .account-menu-backdrop.is-leaving,
+  .account-menu-panel,
+  .account-menu-panel.is-leaving,
+  .account-menu-item {
     animation: none !important;
     opacity: 1;
     transform: none;

@@ -114,7 +114,7 @@ export function SearchResults({ query }: { query: string }) {
                   {labelForHitType(hit.type)}
                   {hit.year != null ? ` · ${hit.year}` : ''}
                 </p>
-                <p className="font-display text-lg text-foreground">
+                <p className="font-display [font-size:var(--text-subsection)] text-foreground">
                   {hit.title}
                 </p>
               </div>

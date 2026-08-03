@@ -8,9 +8,7 @@ import { ShellHealth } from '@/components/shell-health';
 export function GuestLanding() {
   return (
     <div className="flex flex-col items-center px-1 text-center">
-      <h1 className="motion-fade-rise font-display [font-size:var(--text-brand)] font-semibold leading-none tracking-[var(--tracking-brand)] text-foreground">
-        Aperture
-      </h1>
+      <h1 className="type-brand motion-fade-rise text-foreground">Aperture</h1>
       <p className="motion-fade-rise-delay mt-4 max-w-xl font-display text-lg font-medium text-foreground sm:mt-6 sm:[font-size:var(--text-headline)]">
         Look closer at the films that move you.
       </p>
@@ -22,13 +20,13 @@ export function GuestLanding() {
       <div className="motion-fade-in mt-8 flex w-full max-w-sm flex-col items-stretch gap-3 sm:mt-10 sm:max-w-none sm:flex-row sm:items-center sm:justify-center sm:gap-4">
         <Link
           href="/signup"
-          className="rounded-[var(--radius-md)] bg-[var(--color-accent)] px-5 py-2.5 text-center text-base font-medium text-[var(--color-accent-contrast)] transition hover:brightness-110 sm:text-[0.9375rem]"
+          className="rounded-[var(--radius-md)] bg-[var(--color-primary)] px-5 py-2.5 text-center text-base font-medium text-[var(--color-primary-contrast)] transition hover:brightness-110 sm:[font-size:var(--text-body-sm)]"
         >
           Sign up
         </Link>
         <Link
           href="/login"
-          className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-5 py-2.5 text-center text-base font-medium text-foreground transition hover:border-[var(--color-accent)] sm:text-[0.9375rem]"
+          className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-5 py-2.5 text-center text-base font-medium text-foreground transition hover:border-[var(--color-primary)] sm:[font-size:var(--text-body-sm)]"
         >
           Log in
         </Link>

@@ -22,11 +22,17 @@ export default async function PublicProfilePage({
   const { username } = await params;
 
   return (
-    <main className="shell-atmosphere relative flex min-h-dvh flex-col items-center justify-center px-6 py-24">
+    <div className="shell-atmosphere relative flex min-h-dvh flex-col items-center justify-center py-24">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <SiteHeader />
-      <div className="motion-fade-rise w-full max-w-lg">
+      <main
+        id="main-content"
+        className="layout-content motion-fade-rise relative z-[1]"
+      >
         <PublicProfileView username={username} />
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

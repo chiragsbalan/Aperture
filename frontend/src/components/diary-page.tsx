@@ -161,8 +161,8 @@ export function DiaryPage() {
   }
 
   return (
-    <div className="motion-fade-rise w-full max-w-3xl text-left">
-      <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
+    <div className="layout-content motion-fade-rise text-left">
+      <h1 className="type-page-lg text-foreground">
         Diary
       </h1>
       <p className="mt-2 text-muted">Watches you have logged over time.</p>
@@ -291,7 +291,7 @@ export function DiaryPage() {
         >
           <h2
             id={`${formId}-edit-heading`}
-            className="font-display text-xl font-semibold"
+            className="type-card-title"
           >
             Edit diary entry
           </h2>
@@ -359,7 +359,7 @@ export function DiaryPage() {
       >
         <h2
           id={`${formId}-delete-heading`}
-          className="font-display text-xl font-semibold"
+          className="type-card-title"
         >
           Delete this diary entry?
         </h2>

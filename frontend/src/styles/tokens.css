@@ -1,5 +1,10 @@
 /**
- * Aperture design tokens (P0.5).
+ * Aperture design tokens — source of truth for color, type, space, radius,
+ * elevation, z-index, and motion.
+ *
+ * Prefer these CSS variables (or `.type-*` utilities in globals.css) over raw
+ * hex / rem values. JS duration mirrors: `frontend/src/lib/motion.ts`.
+ *
  * Dark is the default theme; light tokens are defined for future toggle use.
  */
 
@@ -7,20 +12,28 @@
 [data-theme='dark'] {
   color-scheme: dark;
 
-  /* Brand / surfaces — cinematic charcoal, leaf-green accent */
+  /* Surfaces & text */
   --color-bg: #0c0b09;
   --color-bg-elevated: #161411;
+  --color-surface: var(--color-bg-elevated);
   --color-fg: #f3efe6;
   --color-fg-muted: #a39e93;
+  --color-secondary: var(--color-fg-muted);
+
+  /* Brand accent (primary CTA / links) */
   --color-accent: #6aae6a;
   --color-accent-soft: rgba(106, 174, 106, 0.16);
   --color-accent-contrast: #0c0b09;
+  --color-primary: var(--color-accent);
+  --color-primary-soft: var(--color-accent-soft);
+  --color-primary-contrast: var(--color-accent-contrast);
+
   --color-border: rgba(243, 239, 230, 0.12);
   --color-focus: #9fd49f;
   --color-danger: #e07a8a;
   --color-ok: #8fbf9f;
 
-  /* Library action semantics (seed the brand system) */
+  /* Library action semantics */
   --color-action-watchlist: #c9b07a;
   --color-action-favorites: #e07a8a;
   --color-action-lists: #6a9ec9;
@@ -31,16 +44,68 @@
   --bg-glow-2: rgba(80, 110, 140, 0.1);
   --bg-vignette: rgba(0, 0, 0, 0.55);
 
-  /* Typography */
-  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
-  --font-body: var(--font-source-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Typography — families (--font-* from next/font on <html>; fallbacks if unset) */
+  --font-display: var(--font-fraunces, ui-serif), Georgia, serif;
+  --font-body: var(--font-source-sans, ui-sans-serif), system-ui, sans-serif;
+
+  /*
+   * Type scale — sizes match existing UI (Tailwind text-* rem values).
+   * Responsive roles use *-at-sm / *-at-md with .type-* media queries.
+   */
   --text-brand: clamp(2.75rem, 11vw, 7.5rem);
   --text-headline: clamp(1.125rem, 2.5vw, 1.75rem);
+  /* Title detail H1: 1.75rem → sm:text-4xl → md:text-5xl */
+  --text-title: 1.75rem;
+  --text-title-at-sm: 2.25rem;
+  --text-title-at-md: 3rem;
+  /* Person H1: 1.4rem → sm:text-3xl → md:text-4xl */
+  --text-title-person: 1.4rem;
+  --text-title-person-at-sm: 1.875rem;
+  --text-title-person-at-md: 2.25rem;
+  /* Page / auth / nav wordmark: text-2xl → sm:text-3xl */
+  --text-page: 1.5rem;
+  --text-page-at-sm: 1.875rem;
+  /* Standalone page H1 at text-3xl (library, search, diary, …) */
+  --text-page-lg: 1.875rem;
+  /* Home rail H1: text-xl → sm:text-2xl */
+  --text-rail: 1.25rem;
+  --text-rail-at-sm: 1.5rem;
+  /* Section H2 (Similar): text-base → sm:text-lg */
+  --text-section: 1rem;
+  --text-section-at-sm: 1.125rem;
+  /* Subsection (Known for, settings legends): text-lg */
+  --text-subsection: 1.125rem;
+  /* Modal / card titles: text-xl */
+  --text-card-title: 1.25rem;
   --text-body: 1.0625rem;
-  --leading-body: 1.6;
-  --tracking-brand: -0.03em;
+  --text-body-sm: 0.9375rem;
+  /* Overview mobile / desktop (title-overview) */
+  --text-overview: 0.875rem;
+  --text-overview-at-sm: 1.05rem;
+  /* Matches Tailwind text-sm / text-xs */
+  --text-sm: 0.875rem;
+  --text-xs: 0.75rem;
+  --text-caption: 0.8125rem;
+  /* Tagline mobile; sm uses --text-sm via .type-eyebrow */
+  --text-eyebrow: 0.65rem;
+  --text-micro: 0.6875rem;
 
-  /* Space / shape */
+  --leading-none: 1;
+  /* Title detail H1 mobile (custom 1.15) */
+  --leading-title: 1.15;
+  /* Matches Tailwind leading-tight / leading-snug */
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-body: 1.6;
+  --leading-relaxed: 1.625;
+
+  --tracking-brand: -0.03em;
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.12em;
+  --tracking-wider: 0.14em;
+
+  /* Space */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -49,17 +114,36 @@
   --space-6: 2rem;
   --space-7: 3rem;
   --space-8: 4.5rem;
+
+  /*
+   * Content column — matches title detail (movie/TV profile).
+   * Use `.layout-content` everywhere except guest landing / login / signup.
+   * 64rem = Tailwind max-w-5xl.
+   */
+  --layout-content-max: 64rem;
+  --layout-content-pad-x: 1rem;
+  --layout-content-pad-x-sm: 1.5rem;
+
+  /* Radii */
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-pill: 999px;
+
+  /* Elevation */
   --elev-1: 0 1px 0 rgba(255, 255, 255, 0.04);
+  --elev-poster: 0 24px 60px rgba(0, 0, 0, 0.45);
+
+  /* Stacking */
+  --z-base: 1;
+  --z-header: 10;
+  --z-overlay: 50;
+  --z-skip: 50;
 
   /* Motion — keep ms values in sync with frontend/src/lib/motion.ts */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  /* Micro: hover color, icon nudges */
   --duration-fast: 160ms;
-  /* Default UI: tabs, panels, popups/overlays, expand/collapse */
   --duration-med: 450ms;
-  /* Page entrance / large atmospheric reveals */
   --duration-slow: 900ms;
   /* Keep in sync with FLIP_ANIM_MS in poster-mosaic.tsx (special-case) */
   --poster-flip-ms: 640ms;
@@ -70,11 +154,18 @@
 
   --color-bg: #f6f1e8;
   --color-bg-elevated: #fffdf8;
+  --color-surface: var(--color-bg-elevated);
   --color-fg: #1a1712;
   --color-fg-muted: #5c564c;
+  --color-secondary: var(--color-fg-muted);
+
   --color-accent: #3d7a45;
   --color-accent-soft: rgba(61, 122, 69, 0.12);
   --color-accent-contrast: #f6f1e8;
+  --color-primary: var(--color-accent);
+  --color-primary-soft: var(--color-accent-soft);
+  --color-primary-contrast: var(--color-accent-contrast);
+
   --color-border: rgba(26, 23, 18, 0.12);
   --color-focus: #2f6f3e;
   --color-danger: #b42318;
@@ -88,4 +179,7 @@
   --bg-glow-1: rgba(100, 112, 128, 0.1);
   --bg-glow-2: rgba(90, 120, 150, 0.08);
   --bg-vignette: rgba(26, 23, 18, 0.08);
+
+  --elev-1: 0 1px 0 rgba(26, 23, 18, 0.06);
+  --elev-poster: 0 24px 60px rgba(26, 23, 18, 0.18);
 }

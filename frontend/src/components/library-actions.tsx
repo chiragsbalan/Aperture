@@ -556,7 +556,7 @@ export function LibraryActions({
       >
         <h2
           id={`${formId}-lists-heading`}
-          className="font-display text-xl font-semibold"
+          className="type-card-title"
         >
           Add to list
         </h2>
@@ -615,7 +615,7 @@ export function LibraryActions({
         >
           <h2
             id={`${formId}-diary-heading`}
-            className="font-display text-xl font-semibold"
+            className="type-card-title"
           >
             Log watch
           </h2>

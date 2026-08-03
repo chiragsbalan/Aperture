@@ -14,6 +14,20 @@ import {
 import { createPortal } from 'react-dom';
 
 import { MOTION_DURATION_MED_MS } from '@/lib/motion';
+import {
+  applySiblingInert,
+  clearBodyDataAttr,
+  clearSiblingInert,
+  CLOSE_ACCOUNT_EVENT,
+  CLOSE_SEARCH_EVENT,
+  dispatchOverlayClose,
+  type FinishCloseOptions,
+  lockBodyOverflow,
+  restoreBodyOverflow,
+  saveBodyOverflow,
+  SEARCH_OPEN_ATTR,
+  setBodyDataAttr,
+} from '@/lib/overlay_chrome';
 
 type OverlayPhase = 'closed' | 'open' | 'closing';
 
@@ -53,26 +67,6 @@ function CloseIcon({ className }: { className?: string }) {
       <path d="M6 6l12 12M18 6L6 18" />
     </svg>
   );
-}
-
-function applySiblingInert(portalRoot: HTMLElement): HTMLElement[] {
-  const inerted: HTMLElement[] = [];
-  for (const child of Array.from(document.body.children)) {
-    if (child === portalRoot || !(child instanceof HTMLElement)) {
-      continue;
-    }
-    if (!child.inert) {
-      child.inert = true;
-      inerted.push(child);
-    }
-  }
-  return inerted;
-}
-
-function clearSiblingInert(inerted: HTMLElement[]) {
-  for (const el of inerted) {
-    el.inert = false;
-  }
 }
 
 /**
@@ -120,22 +114,30 @@ export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
   const teardownOverlayChrome = useCallback(() => {
     clearSiblingInert(inertedRef.current);
     inertedRef.current = [];
-    document.body.removeAttribute('data-search-open');
+    clearBodyDataAttr(SEARCH_OPEN_ATTR);
     if (chromeActiveRef.current) {
-      document.body.style.overflow = previousOverflowRef.current;
+      restoreBodyOverflow(previousOverflowRef.current);
       chromeActiveRef.current = false;
     }
   }, []);
 
-  const finishClose = useCallback(() => {
-    clearCloseTimer();
-    // B1: clear inert → data-search-open → overflow, then focus trigger.
-    teardownOverlayChrome();
-    if (!navigatedAwayRef.current) {
-      triggerRef.current?.focus();
-    }
-    setPhase('closed');
-  }, [clearCloseTimer, teardownOverlayChrome]);
+  const finishClose = useCallback(
+    (options?: FinishCloseOptions) => {
+      if (phaseRef.current === 'closed') {
+        return;
+      }
+      clearCloseTimer();
+      // clear inert → data-search-open → overflow, then optionally focus trigger.
+      teardownOverlayChrome();
+      const suppress =
+        options?.suppressFocusRestore === true || navigatedAwayRef.current;
+      if (!suppress) {
+        triggerRef.current?.focus();
+      }
+      setPhase('closed');
+    },
+    [clearCloseTimer, teardownOverlayChrome],
+  );
 
   const beginClose = useCallback(() => {
     if (phaseRef.current !== 'open') {
@@ -149,23 +151,52 @@ export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
     }, MOTION_DURATION_MED_MS);
   }, [clearCloseTimer, finishClose]);
 
+  const requestDismiss = useCallback(() => {
+    if (phaseRef.current === 'closing') {
+      finishClose();
+      return;
+    }
+    beginClose();
+  }, [beginClose, finishClose]);
+
+  // B1: peer open → synchronous finishClose (full teardown, no focus steal).
+  useEffect(() => {
+    function onPeerClose() {
+      if (phaseRef.current === 'closed') {
+        return;
+      }
+      finishClose({ suppressFocusRestore: true });
+    }
+    document.addEventListener(CLOSE_SEARCH_EVENT, onPeerClose);
+    return () => {
+      document.removeEventListener(CLOSE_SEARCH_EVENT, onPeerClose);
+    };
+  }, [finishClose]);
+
   // Overlay chrome + Escape/Tab while visible; full cleanup on unmount or close.
   useLayoutEffect(() => {
     if (!isVisible || !portalRoot) {
       return;
     }
 
-    previousOverflowRef.current = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.body.setAttribute('data-search-open', '');
+    previousOverflowRef.current = saveBodyOverflow();
+    lockBodyOverflow();
+    setBodyDataAttr(SEARCH_OPEN_ATTR);
     chromeActiveRef.current = true;
     inertedRef.current = applySiblingInert(portalRoot);
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && phaseRef.current === 'open') {
-        event.preventDefault();
-        beginClose();
-        return;
+      if (event.key === 'Escape') {
+        if (phaseRef.current === 'open') {
+          event.preventDefault();
+          beginClose();
+          return;
+        }
+        if (phaseRef.current === 'closing') {
+          event.preventDefault();
+          finishClose();
+          return;
+        }
       }
 
       if (event.key !== 'Tab') {
@@ -204,6 +235,7 @@ export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
     isVisible,
     portalRoot,
     beginClose,
+    finishClose,
     clearCloseTimer,
     teardownOverlayChrome,
   ]);
@@ -237,6 +269,7 @@ export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
     // Hard abort: skip animated close + focus restore; unmount cleanup tears down chrome.
     navigatedAwayRef.current = true;
     clearCloseTimer();
+    teardownOverlayChrome();
     setPhase('closed');
     if (!cleaned) {
       router.push('/search');
@@ -251,7 +284,7 @@ export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
           <div
             ref={setPortalRoot}
             data-search-portal=""
-            className="fixed inset-0 z-50 flex items-center justify-center px-6"
+            className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center px-6"
           >
             <div
               className={[
@@ -261,7 +294,7 @@ export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
                 .filter(Boolean)
                 .join(' ')}
               role="presentation"
-              onClick={beginClose}
+              onClick={requestDismiss}
             />
             <div
               id={dialogId}
@@ -303,7 +336,7 @@ export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
                   <button
                     ref={closeButtonRef}
                     type="button"
-                    onClick={beginClose}
+                    onClick={requestDismiss}
                     aria-label="Close search"
                     className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-muted transition hover:bg-[var(--color-accent-soft)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
                   >
@@ -323,6 +356,8 @@ export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
         ref={triggerRef}
         type="button"
         onClick={() => {
+          // B1: peer finishClose synchronously before our chrome applies.
+          dispatchOverlayClose(CLOSE_ACCOUNT_EVENT);
           navigatedAwayRef.current = false;
           clearCloseTimer();
           setPhase('open');
@@ -330,7 +365,7 @@ export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
         className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-muted transition hover:bg-[var(--color-accent-soft)] hover:text-foreground sm:h-12 sm:w-12"
         aria-label="Search movies, TV, and people"
         aria-expanded={isVisible}
-        aria-controls={dialogId}
+        aria-controls={isVisible ? dialogId : undefined}
         aria-haspopup="dialog"
       >
         <SearchIcon className="h-6 w-6 sm:h-7 sm:w-7" />

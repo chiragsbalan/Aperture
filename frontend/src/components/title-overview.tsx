@@ -115,7 +115,7 @@ export function TitleOverview({
         id={synopsisId}
         data-title-overview=""
         aria-hidden={interactive && !expanded ? true : undefined}
-        className={`max-w-2xl whitespace-pre-wrap text-[0.875rem] leading-relaxed text-foreground sm:text-[1.05rem] ${
+        className={`type-overview max-w-2xl whitespace-pre-wrap text-foreground ${
           showFade ? 'title-overview-clamped' : ''
         } ${className}`}
         style={{

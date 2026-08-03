@@ -12,7 +12,7 @@ export function TopMoviesRail({ movies }: { movies: TopMovie[] }) {
       <div className="border-b border-[var(--color-border)] pb-2">
         <h1
           id="top-movies-heading"
-          className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
+          className="type-rail text-foreground"
         >
           Top movies
         </h1>

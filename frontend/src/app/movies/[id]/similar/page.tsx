@@ -1,7 +1,8 @@
 import { SiteHeader } from '@/components/site-header';
 import { fetchMovie } from '@/lib/catalog';
+import { parseTmdbIdParam } from '@/lib/content_ids';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 interface MovieSimilarPageProps {
   params: Promise<{ id: string }>;
@@ -14,6 +15,10 @@ export default async function MovieSimilarPage({
   params,
 }: MovieSimilarPageProps) {
   const { id } = await params;
+  const tmdbId = parseTmdbIdParam(id);
+  if (tmdbId != null) {
+    redirect(`/movies/tmdb/${tmdbId}`);
+  }
   const result = await fetchMovie(id);
   if (!result.ok && result.status === 404) {
     notFound();
@@ -22,9 +27,15 @@ export default async function MovieSimilarPage({
   const title = result.ok ? result.data.title : 'This title';
 
   return (
-    <main className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
+    <div className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <SiteHeader />
-      <div className="mx-auto w-full max-w-3xl px-6 pb-24 pt-28 text-left">
+      <main
+        id="main-content"
+        className="layout-content relative z-[1] pb-24 pt-28 text-left"
+      >
         <p className="text-sm text-muted">
           <Link
             href={`/movies/${id}`}
@@ -33,13 +44,11 @@ export default async function MovieSimilarPage({
             ← {title}
           </Link>
         </p>
-        <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight text-foreground">
-          Similar
-        </h1>
+        <h1 className="mt-4 type-page-lg text-foreground">Similar</h1>
         <p className="mt-3 text-sm text-muted">
           Full similar titles for this movie will land here.
         </p>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

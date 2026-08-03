@@ -167,7 +167,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
   }
 
   return (
-    <div className="motion-fade-rise w-full max-w-3xl text-left">
+    <div className="layout-content motion-fade-rise text-left">
       {state.status === 'loading' ? (
         <p className="mt-10 text-muted" role="status">
           Loading…
@@ -190,7 +190,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
               Lists
             </Link>
           </p>
-          <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-foreground">
+          <h1 className="mt-2 type-page-lg text-foreground">
             {state.list.title}
           </h1>
           <p className="mt-2 text-muted">
@@ -321,7 +321,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
             >
               <h2
                 id={`${formId}-edit-title`}
-                className="font-display text-xl font-semibold"
+                className="type-card-title"
               >
                 Edit list
               </h2>
@@ -409,7 +409,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
           >
             <h2
               id={`${formId}-delete-title`}
-              className="font-display text-xl font-semibold"
+              className="type-card-title"
             >
               Delete this list?
             </h2>
