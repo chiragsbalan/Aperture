@@ -60,8 +60,7 @@ def test_extras_cap_studios_networks_and_tv_releases() -> None:
             ],
             'content_ratings': {
                 'results': [
-                    {'iso_3166_1': f'C{i:02d}', 'rating': f'R{i}'}
-                    for i in range(1, 40)
+                    {'iso_3166_1': f'C{i:02d}', 'rating': f'R{i}'} for i in range(1, 40)
                 ],
             },
         },

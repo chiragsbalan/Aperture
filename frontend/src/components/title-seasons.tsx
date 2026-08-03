@@ -271,9 +271,8 @@ export function TitleSeasons({ seasons }: { seasons: SeasonDetail[] }) {
         if (cancelled) {
           return;
         }
-        const incoming = stageRef.current?.querySelector<HTMLElement>(
-          '[role="tabpanel"]',
-        );
+        const incoming =
+          stageRef.current?.querySelector<HTMLElement>('[role="tabpanel"]');
         const toHeight = incoming?.scrollHeight ?? 0;
         if (toHeight > 0) {
           setStageHeight(toHeight);
@@ -368,9 +367,7 @@ export function TitleSeasons({ seasons }: { seasons: SeasonDetail[] }) {
               type="button"
               role="tab"
               aria-selected={selected}
-              aria-label={
-                count != null ? `${label}, ${count} episodes` : label
-              }
+              aria-label={count != null ? `${label}, ${count} episodes` : label}
               tabIndex={selected ? 0 : -1}
               id={`season-tab-${season.id}`}
               aria-controls={panelId}

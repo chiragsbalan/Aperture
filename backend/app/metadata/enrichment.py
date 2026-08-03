@@ -261,9 +261,7 @@ def build_extras_from_tmdb_payload(
         'keywords': keywords,
         'studios': studios,
         'networks': networks if kind == 'tv' else [],
-        'episode_runtime_minutes': (
-            episode_runtime_minutes if kind == 'tv' else None
-        ),
+        'episode_runtime_minutes': (episode_runtime_minutes if kind == 'tv' else None),
         'countries': countries,
         'spoken_languages': spoken_languages,
         'alternative_titles': alternative_titles,

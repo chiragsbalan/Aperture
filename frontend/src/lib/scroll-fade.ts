@@ -38,7 +38,7 @@ export function useScrollFadeX(
     };
 
     sync();
-    element.addEventListener('scroll', sync, {passive: true});
+    element.addEventListener('scroll', sync, { passive: true });
     window.addEventListener('resize', sync);
 
     // Parent ResizeObserver covers most size changes; observe existing and
@@ -61,7 +61,7 @@ export function useScrollFadeX(
         }
       }
     });
-    mutationObserver.observe(element, {childList: true});
+    mutationObserver.observe(element, { childList: true });
 
     return () => {
       element.removeEventListener('scroll', sync);

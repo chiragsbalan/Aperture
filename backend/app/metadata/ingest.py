@@ -138,10 +138,7 @@ def _tv_with_creator_credits(show: TmdbTvShow) -> TmdbTvShow:
     """Merge TMDb ``created_by`` into crew as Creator jobs (deduped)."""
     if not show.created_by:
         return show
-    existing = {
-        (row.id, (row.job or '').strip())
-        for row in show.credits.crew
-    }
+    existing = {(row.id, (row.job or '').strip()) for row in show.credits.crew}
     creators: list[TmdbCrewCredit] = []
     for creator in show.created_by:
         key = (creator.id, 'Creator')
@@ -184,10 +181,7 @@ def _tv_extras_with_show_fields(
             for network in show.networks
             if network.name
         ]
-    if (
-        show.episode_run_time
-        and extras.get('episode_runtime_minutes') is None
-    ):
+    if show.episode_run_time and extras.get('episode_runtime_minutes') is None:
         runtime = next(
             (int(value) for value in show.episode_run_time if int(value) > 0),
             None,
