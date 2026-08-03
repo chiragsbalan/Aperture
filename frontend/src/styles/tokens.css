@@ -53,12 +53,15 @@
   --radius-md: 0.5rem;
   --elev-1: 0 1px 0 rgba(255, 255, 255, 0.04);
 
-  /* Motion */
+  /* Motion — keep ms values in sync with frontend/src/lib/motion.ts */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Micro: hover color, icon nudges */
   --duration-fast: 160ms;
-  --duration-med: 480ms;
+  /* Default UI: tabs, panels, popups/overlays, expand/collapse */
+  --duration-med: 450ms;
+  /* Page entrance / large atmospheric reveals */
   --duration-slow: 900ms;
-  /* Keep in sync with FLIP_ANIM_MS in poster-mosaic.tsx */
+  /* Keep in sync with FLIP_ANIM_MS in poster-mosaic.tsx (special-case) */
   --poster-flip-ms: 640ms;
 }
 

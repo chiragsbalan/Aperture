@@ -13,9 +13,9 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-type OverlayPhase = 'closed' | 'open' | 'closing';
+import { MOTION_DURATION_MED_MS } from '@/lib/motion';
 
-const CLOSE_ANIMATION_MS = 220;
+type OverlayPhase = 'closed' | 'open' | 'closing';
 
 function SearchIcon({ className }: { className?: string }) {
   return (
@@ -146,7 +146,7 @@ export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
     // Fallback if animationend is skipped (reduced motion / interrupted).
     closeTimerRef.current = window.setTimeout(() => {
       finishClose();
-    }, CLOSE_ANIMATION_MS);
+    }, MOTION_DURATION_MED_MS);
   }, [clearCloseTimer, finishClose]);
 
   // Overlay chrome + Escape/Tab while visible; full cleanup on unmount or close.

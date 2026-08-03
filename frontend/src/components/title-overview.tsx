@@ -2,8 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 
+import { MOTION_DURATION_MED_MS } from '@/lib/motion';
+
 const MOBILE_MQ = '(max-width: 639px)';
-const EXPAND_MS = 320;
 
 /**
  * Title synopsis: full text on desktop; on mobile clamps to 3 lines and
@@ -122,7 +123,7 @@ export function TitleOverview({
           overflow: maxHeight != null ? 'hidden' : undefined,
           transition:
             maxHeight != null && !reduceMotion
-              ? `max-height ${EXPAND_MS}ms var(--ease-out)`
+              ? `max-height ${MOTION_DURATION_MED_MS}ms var(--ease-out)`
               : undefined,
         }}
       >

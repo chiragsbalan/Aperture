@@ -14,8 +14,7 @@ import {
 } from 'react';
 
 import type { CreditPersonRef, SeasonDetail, TitleExtras } from '@/lib/catalog';
-
-const PANEL_FADE_MS = 180;
+import { MOTION_DURATION_MED_MS } from '@/lib/motion';
 
 type MetaTab = 'cast' | 'crew' | 'details' | 'genres' | 'releases' | 'seasons';
 
@@ -441,13 +440,15 @@ export function TitleMetaTabs({
     ? tab
     : (tabs[0]?.id ?? 'details');
   const [panelTab, setPanelTab] = useState<MetaTab>(active);
-  const [panelPhase, setPanelPhase] = useState<
-    'active' | 'exiting' | 'entering'
-  >('active');
+  const [outgoingTab, setOutgoingTab] = useState<MetaTab | null>(null);
+  /** Fixed stage height while crossfading so content below eases with the panel. */
+  const [stageHeight, setStageHeight] = useState<number | undefined>();
   const [indicator, setIndicator] = useState({ left: 0, width: 0 });
   const [indicatorReady, setIndicatorReady] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const skipPanelAnimRef = useRef(true);
+  const panelTabRef = useRef<MetaTab>(active);
+  const stageRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -499,38 +500,65 @@ export function TitleMetaTabs({
   useEffect(() => {
     if (skipPanelAnimRef.current) {
       skipPanelAnimRef.current = false;
+      panelTabRef.current = active;
       setPanelTab(active);
-      setPanelPhase('active');
+      setOutgoingTab(null);
+      setStageHeight(undefined);
       return;
     }
     if (reduceMotion) {
+      panelTabRef.current = active;
       setPanelTab(active);
-      setPanelPhase('active');
+      setOutgoingTab(null);
+      setStageHeight(undefined);
+      return;
+    }
+    if (active === panelTabRef.current) {
       return;
     }
 
+    const previous = panelTabRef.current;
+    const fromHeight = stageRef.current?.offsetHeight ?? 0;
+
+    setOutgoingTab(previous);
+    panelTabRef.current = active;
+    setPanelTab(active);
+    if (fromHeight > 0) {
+      setStageHeight(fromHeight);
+    }
+
     let cancelled = false;
-    let enterFrame = 0;
-    setPanelPhase('exiting');
-    const exitTimer = window.setTimeout(() => {
-      if (cancelled) {
-        return;
-      }
-      setPanelTab(active);
-      setPanelPhase('entering');
-      enterFrame = window.requestAnimationFrame(() => {
-        enterFrame = window.requestAnimationFrame(() => {
-          if (!cancelled) {
-            setPanelPhase('active');
+    let settleTimer = 0;
+    let measureFrame = 0;
+
+    // Paint locked height, then measure the incoming panel and ease to it.
+    measureFrame = window.requestAnimationFrame(() => {
+      measureFrame = window.requestAnimationFrame(() => {
+        if (cancelled) {
+          return;
+        }
+        const incoming = stageRef.current?.querySelector<HTMLElement>(
+          '[role="tabpanel"]',
+        );
+        const toHeight = incoming?.scrollHeight ?? 0;
+        if (toHeight > 0) {
+          setStageHeight(toHeight);
+        }
+
+        settleTimer = window.setTimeout(() => {
+          if (cancelled) {
+            return;
           }
-        });
+          setOutgoingTab(null);
+          setStageHeight(undefined);
+        }, MOTION_DURATION_MED_MS);
       });
-    }, PANEL_FADE_MS);
+    });
 
     return () => {
       cancelled = true;
-      window.clearTimeout(exitTimer);
-      window.cancelAnimationFrame(enterFrame);
+      window.cancelAnimationFrame(measureFrame);
+      window.clearTimeout(settleTimer);
     };
   }, [active, reduceMotion]);
 
@@ -709,12 +737,7 @@ export function TitleMetaTabs({
     return null;
   }
 
-  const panelPhaseClass =
-    panelPhase === 'exiting'
-      ? 'is-exiting'
-      : panelPhase === 'entering'
-        ? 'is-entering'
-        : 'is-active';
+  const isCrossfading = outgoingTab != null;
 
   return (
     <section className="mt-5 text-left sm:mt-7">
@@ -748,7 +771,7 @@ export function TitleMetaTabs({
               onKeyDown={(event) => {
                 onTabKeyDown(event, index);
               }}
-              className={`min-w-0 flex-1 whitespace-nowrap pb-1.5 text-center text-xs font-semibold tracking-[0.03em] transition-colors duration-300 sm:flex-none sm:pb-2 sm:text-left sm:text-sm sm:tracking-[0.12em] ${
+              className={`min-w-0 flex-1 whitespace-nowrap pb-1.5 text-center text-xs font-semibold tracking-[0.03em] transition-colors duration-[var(--duration-med)] sm:flex-none sm:pb-2 sm:text-left sm:text-sm sm:tracking-[0.12em] ${
                 selected ? 'text-accent' : 'text-muted hover:text-foreground'
               }`}
             >
@@ -773,14 +796,33 @@ export function TitleMetaTabs({
       </div>
 
       <div
-        role="tabpanel"
-        id={panelId}
-        aria-labelledby={`title-tab-${active}`}
-        aria-hidden={panelPhase !== 'active'}
-        inert={panelPhase !== 'active' ? true : undefined}
-        className={`title-tab-panel mt-5 text-left ${panelPhaseClass}`}
+        ref={stageRef}
+        className={`title-tab-panel-stage relative mt-5 text-left${
+          stageHeight != null ? ' is-resizing' : ''
+        }`}
+        style={stageHeight != null ? { height: stageHeight } : undefined}
       >
-        {renderPanel(panelTab)}
+        {outgoingTab != null ? (
+          <div
+            key={`out-${outgoingTab}`}
+            className="title-tab-panel title-tab-panel-layer is-outgoing"
+            aria-hidden
+            inert
+          >
+            {renderPanel(outgoingTab)}
+          </div>
+        ) : null}
+        <div
+          key={`in-${panelTab}`}
+          role="tabpanel"
+          id={panelId}
+          aria-labelledby={`title-tab-${active}`}
+          className={`title-tab-panel ${
+            isCrossfading ? 'is-incoming' : 'is-active'
+          }`}
+        >
+          {renderPanel(panelTab)}
+        </div>
       </div>
     </section>
   );
