@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import {
+  Fragment,
   type KeyboardEvent,
   type ReactNode,
   useEffect,
@@ -33,8 +34,6 @@ const CREDIT_PREVIEW_DESKTOP = 8;
 /** Themes: 2-col × 5 rows → 9; desktop 3-col × 5 → 14. */
 const THEME_PREVIEW_MOBILE = 9;
 const THEME_PREVIEW_DESKTOP = 14;
-/** Details: 4 content rows + show more on the 5th. */
-const DETAILS_PREVIEW_COUNT = 4;
 
 function CreditPill({ credit }: { credit: CreditPersonRef }) {
   const detail = credit.character ?? credit.job;
@@ -137,15 +136,14 @@ function Pill({ children }: { children: string }) {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[7rem_1fr] gap-2 text-xs sm:grid-cols-[10rem_1fr] sm:gap-3 sm:text-sm">
+    <>
       <dt className="text-muted">{label}</dt>
       <dd className="min-w-0 text-foreground">{value}</dd>
-    </div>
+    </>
   );
 }
 
 function DetailsList({ extras }: { extras: TitleExtras }) {
-  const [expanded, setExpanded] = useState(false);
   const rows: Array<{ key: string; node: ReactNode }> = [];
 
   if (extras.studios.length > 0) {
@@ -217,54 +215,50 @@ function DetailsList({ extras }: { extras: TitleExtras }) {
     rows.push({
       key: 'alts',
       node: (
-        <div>
-          <p className="mb-1.5 text-xs text-muted sm:mb-2 sm:text-sm">
-            Alternative titles
-          </p>
-          <ul className="flex flex-wrap gap-2">
-            {extras.alternative_titles.map((title) => (
-              <li key={`${title.iso_3166_1}-${title.title}`}>
-                <Pill>
-                  {title.iso_3166_1
-                    ? `${title.title} (${title.iso_3166_1})`
-                    : title.title}
-                </Pill>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <>
+          <dt className="text-muted">Alternative titles</dt>
+          <dd className="min-w-0">
+            <ul className="flex flex-wrap gap-2">
+              {extras.alternative_titles.map((title) => (
+                <li key={`${title.iso_3166_1}-${title.title}`}>
+                  <Pill>
+                    {title.iso_3166_1
+                      ? `${title.title} (${title.iso_3166_1})`
+                      : title.title}
+                  </Pill>
+                </li>
+              ))}
+            </ul>
+          </dd>
+        </>
       ),
     });
   }
 
-  const needsToggle = rows.length > DETAILS_PREVIEW_COUNT;
-  const visible =
-    expanded || !needsToggle ? rows : rows.slice(0, DETAILS_PREVIEW_COUNT);
-  const remaining = rows.length - DETAILS_PREVIEW_COUNT;
+  if (rows.length === 0) {
+    return (
+      <p className="text-sm text-muted">No additional details available.</p>
+    );
+  }
 
   return (
-    <dl className="space-y-3 text-left">
-      {visible.map((row) => (
-        <div key={row.key} className="text-left">
-          {row.node}
-        </div>
+    <dl className="grid grid-cols-[7rem_1fr] gap-x-2 gap-y-3 text-left text-xs sm:grid-cols-[10rem_1fr] sm:gap-x-3 sm:text-sm">
+      {rows.map((row) => (
+        <Fragment key={row.key}>{row.node}</Fragment>
       ))}
-      {needsToggle ? (
-        <div className="text-left">
-          <TogglePill
-            expanded={expanded}
-            remaining={remaining}
-            onToggle={() => {
-              setExpanded((value) => !value);
-            }}
-          />
-        </div>
-      ) : null}
     </dl>
   );
 }
 
-function ThemePillList({ keywords }: { keywords: TitleExtras['keywords'] }) {
+function ThemePillList({
+  keywords,
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
+}: {
+  keywords: TitleExtras['keywords'];
+  'aria-label'?: string;
+  'aria-labelledby'?: string;
+}) {
   const [expanded, setExpanded] = useState(false);
   const previewCount = useDesktopPreview(
     THEME_PREVIEW_MOBILE,
@@ -276,7 +270,11 @@ function ThemePillList({ keywords }: { keywords: TitleExtras['keywords'] }) {
   const remaining = keywords.length - previewCount;
 
   return (
-    <ul className="flex flex-wrap justify-start gap-2">
+    <ul
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
+      className="flex flex-wrap justify-start gap-2"
+    >
       {visible.map((keyword) => (
         <li
           key={`${keyword.id}-${keyword.name}`}
@@ -381,7 +379,12 @@ export function TitleMetaTabs({
 }) {
   const seasonList = seasons ?? [];
   const tabs = useMemo(() => {
-    const items: Array<{ id: MetaTab; label: string; count?: number }> = [];
+    const items: Array<{
+      id: MetaTab;
+      label: string;
+      count?: number;
+      ariaLabel?: string;
+    }> = [];
     if (cast.length > 0) {
       items.push({ id: 'cast', label: 'CAST', count: cast.length });
     }
@@ -390,11 +393,27 @@ export function TitleMetaTabs({
     }
     items.push({ id: 'details', label: 'DETAILS' });
     if (extras.genres.length > 0 || extras.keywords.length > 0) {
-      items.push({
-        id: 'genres',
-        label: 'GENRES',
-        count: extras.genres.length + extras.keywords.length,
-      });
+      const genreCount = extras.genres.length;
+      const themeCount = extras.keywords.length;
+      if (genreCount > 0 && themeCount > 0) {
+        items.push({
+          id: 'genres',
+          label: 'GENRES & THEMES',
+          ariaLabel: `Genres and themes, ${genreCount} genres, ${themeCount} themes`,
+        });
+      } else if (genreCount > 0) {
+        items.push({
+          id: 'genres',
+          label: 'GENRES',
+          count: genreCount,
+        });
+      } else {
+        items.push({
+          id: 'genres',
+          label: 'THEMES',
+          count: themeCount,
+        });
+      }
     }
     if (extras.releases.length > 0) {
       items.push({
@@ -414,6 +433,7 @@ export function TitleMetaTabs({
   }, [cast.length, crew.length, extras, seasonList.length]);
 
   const panelId = useId();
+  const themesHeadingId = useId();
   const [tab, setTab] = useState<MetaTab>(tabs[0]?.id ?? 'details');
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const tablistRef = useRef<HTMLDivElement | null>(null);
@@ -581,25 +601,42 @@ export function TitleMetaTabs({
       return <DetailsList extras={extras} />;
     }
     if (panel === 'genres') {
+      const hasGenres = extras.genres.length > 0;
+      const hasThemes = extras.keywords.length > 0;
       return (
         <div className="space-y-5">
-          {extras.genres.length > 0 ? (
-            <div>
-              <p className="mb-2 text-sm text-muted">Genres</p>
-              <ul className="flex flex-wrap justify-start gap-2">
-                {extras.genres.map((genre) => (
-                  <li key={`${genre.id}-${genre.name}`} className="min-w-0">
-                    <Pill>{genre.name}</Pill>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {hasGenres ? (
+            <ul
+              aria-label="Genres"
+              className="flex flex-wrap justify-start gap-2"
+            >
+              {extras.genres.map((genre) => (
+                <li key={`${genre.id}-${genre.name}`} className="min-w-0">
+                  <Pill>{genre.name}</Pill>
+                </li>
+              ))}
+            </ul>
           ) : null}
-          {extras.keywords.length > 0 ? (
-            <div>
-              <p className="mb-2 text-sm text-muted">Themes</p>
-              <ThemePillList keywords={extras.keywords} />
-            </div>
+          {hasThemes ? (
+            hasGenres ? (
+              <div>
+                <h3
+                  id={themesHeadingId}
+                  className="mb-2 text-sm font-normal text-muted"
+                >
+                  Themes
+                </h3>
+                <ThemePillList
+                  keywords={extras.keywords}
+                  aria-labelledby={themesHeadingId}
+                />
+              </div>
+            ) : (
+              <ThemePillList
+                keywords={extras.keywords}
+                aria-label="Themes"
+              />
+            )
           ) : null}
         </div>
       );
@@ -684,13 +721,14 @@ export function TitleMetaTabs({
       <div
         ref={tablistRef}
         role="tablist"
-        aria-label="Title details"
+        aria-label="Title metadata"
         className="relative flex w-full flex-nowrap items-end justify-between gap-0.5 border-b border-[var(--color-border)] sm:justify-start sm:gap-6"
       >
         {tabs.map((item, index) => {
           const selected = active === item.id;
           const ariaLabel =
-            item.count != null ? `${item.label}, ${item.count}` : item.label;
+            item.ariaLabel ??
+            (item.count != null ? `${item.label}, ${item.count}` : item.label);
           return (
             <button
               key={item.id}
@@ -738,6 +776,8 @@ export function TitleMetaTabs({
         role="tabpanel"
         id={panelId}
         aria-labelledby={`title-tab-${active}`}
+        aria-hidden={panelPhase !== 'active'}
+        inert={panelPhase !== 'active' ? true : undefined}
         className={`title-tab-panel mt-5 text-left ${panelPhaseClass}`}
       >
         {renderPanel(panelTab)}
