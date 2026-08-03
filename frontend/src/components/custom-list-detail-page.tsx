@@ -1,11 +1,11 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 
 import { LibraryNav } from '@/components/library-nav';
+import { TitlePosterLink } from '@/components/title-poster-link';
 import {
   deleteCustomList,
   fetchCustomList,
@@ -18,6 +18,7 @@ import {
   type LibraryListItem,
   type ListVisibility,
 } from '@/lib/library';
+import { armTitlePosterMorph } from '@/lib/title-poster-morph';
 
 type LoadState =
   | { status: 'loading' }
@@ -234,31 +235,27 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
             <ol className="mt-10 space-y-6">
               {state.items.map((item, index) => (
                 <li key={item.item_id} className="flex gap-4">
-                  <Link
+                  <TitlePosterLink
                     href={hrefForLibraryContent(item.content)}
+                    contentId={item.content.id}
+                    posterUrl={item.content.poster_url}
+                    posterAlt={`${item.content.title} poster`}
+                    sizes="80px"
+                    posterFrameClassName="w-20"
                     className="shrink-0"
-                  >
-                    {item.content.poster_url ? (
-                      <Image
-                        src={item.content.poster_url}
-                        alt={`${item.content.title} poster`}
-                        width={80}
-                        height={120}
-                        className="h-auto w-20 object-cover"
-                      />
-                    ) : (
-                      <div
-                        aria-hidden
-                        className="flex h-[120px] w-20 items-center justify-center bg-[var(--color-bg-elevated)] text-xs text-muted"
-                      >
-                        No image
-                      </div>
-                    )}
-                  </Link>
+                    ariaLabel={item.content.title}
+                  />
                   <div className="min-w-0 flex-1">
                     <Link
                       href={hrefForLibraryContent(item.content)}
                       className="font-medium text-foreground"
+                      onClick={() => {
+                        armTitlePosterMorph({
+                          contentId: item.content.id,
+                          posterUrl: item.content.poster_url,
+                          alt: `${item.content.title} poster`,
+                        });
+                      }}
                     >
                       {item.content.title}
                     </Link>

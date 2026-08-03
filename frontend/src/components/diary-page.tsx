@@ -1,10 +1,10 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 
 import { LibraryNav } from '@/components/library-nav';
+import { TitlePosterLink } from '@/components/title-poster-link';
 import {
   deleteWatchEntry,
   fetchWatchEntries,
@@ -12,6 +12,7 @@ import {
   patchWatchEntry,
   type WatchEntry,
 } from '@/lib/library';
+import { armTitlePosterMorph } from '@/lib/title-poster-morph';
 
 type LoadState =
   | { status: 'loading' }
@@ -204,31 +205,27 @@ export function DiaryPage() {
           <ul className="mt-10 space-y-6">
             {state.items.map((entry) => (
               <li key={entry.id} className="flex gap-4">
-                <Link
+                <TitlePosterLink
                   href={hrefForLibraryContent(entry.content)}
+                  contentId={entry.content.id}
+                  posterUrl={entry.content.poster_url}
+                  posterAlt={`${entry.content.title} poster`}
+                  sizes="80px"
+                  posterFrameClassName="w-20"
                   className="shrink-0"
-                >
-                  {entry.content.poster_url ? (
-                    <Image
-                      src={entry.content.poster_url}
-                      alt={`${entry.content.title} poster`}
-                      width={80}
-                      height={120}
-                      className="h-auto w-20 object-cover"
-                    />
-                  ) : (
-                    <div
-                      aria-hidden
-                      className="flex h-[120px] w-20 items-center justify-center bg-[var(--color-bg-elevated)] text-xs text-muted"
-                    >
-                      No image
-                    </div>
-                  )}
-                </Link>
+                  ariaLabel={entry.content.title}
+                />
                 <div className="min-w-0 flex-1">
                   <Link
                     href={hrefForLibraryContent(entry.content)}
                     className="font-medium text-foreground"
+                    onClick={() => {
+                      armTitlePosterMorph({
+                        contentId: entry.content.id,
+                        posterUrl: entry.content.poster_url,
+                        alt: `${entry.content.title} poster`,
+                      });
+                    }}
                   >
                     {entry.content.title}
                   </Link>

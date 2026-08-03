@@ -1,11 +1,5 @@
-import { CatalogLoading } from '@/components/catalog-detail';
-import { SiteHeader } from '@/components/site-header';
+import { TitleDetailLoading } from '@/components/title-detail-loading';
 
 export default function MovieTmdbResolveLoading() {
-  return (
-    <main className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
-      <SiteHeader />
-      <CatalogLoading />
-    </main>
-  );
+  return <TitleDetailLoading resolveKind="movie" />;
 }

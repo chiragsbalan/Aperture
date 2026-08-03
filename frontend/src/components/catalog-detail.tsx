@@ -4,10 +4,14 @@ import type { ReactNode } from 'react';
 import { CatalogPoster } from '@/components/catalog-poster';
 import { LibraryActions } from '@/components/library-actions';
 import { MoreLikeThis } from '@/components/more-like-this';
+import { RecordTitlePosterHero } from '@/components/record-title-poster-hero';
+import { SharedTitlePoster } from '@/components/shared-title-poster';
+import { TitlePosterFlightTarget } from '@/components/title-poster-flight-target';
 import { SiteHeader } from '@/components/site-header';
 import { TitleAtmosphere } from '@/components/title-atmosphere';
 import { TitleMetaTabs } from '@/components/title-meta-tabs';
 import { TitleOverview } from '@/components/title-overview';
+import { TitlePosterLink } from '@/components/title-poster-link';
 import { TitleSeasons } from '@/components/title-seasons';
 import { WhereToWatch } from '@/components/where-to-watch';
 import type {
@@ -231,27 +235,40 @@ function TitleDetailShell({
   const seasonList = seasons ?? [];
   return (
     <TitleAtmosphere backdropUrl={backdropUrl}>
+      <RecordTitlePosterHero
+        contentId={contentId}
+        posterUrl={posterUrl}
+        alt={posterAlt}
+      />
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
       <SiteHeader />
       <main id="main-content" className="relative">
-        <article className="layout-content motion-fade-rise pb-16 pt-24 text-left sm:pb-24 sm:pt-28">
+        <article className="layout-content pb-16 pt-24 text-left sm:pb-24 sm:pt-28">
           {/*
             Text left + poster right on mobile and desktop; mobile uses a
             compact poster, then full-width body below the hero row.
             On mobile, title + meta stay grouped and are vertically centered
             in the hero band beside the poster (above the description).
+
+            Entrance motion stays on copy only — never on the poster column —
+            so a list→detail morph does not get a second translateY nudge when
+            the loaded page replaces the loading shell.
           */}
           <div className="grid grid-cols-[minmax(0,1fr)_6.75rem] gap-x-4 gap-y-5 sm:grid-cols-[minmax(0,1fr)_18rem] sm:gap-x-12 sm:gap-y-0">
             <div className="col-start-2 row-span-2 row-start-1 w-full sm:mt-12">
-              <CatalogPoster
-                url={posterUrl}
-                alt={posterAlt}
-                priority
-                sizes="(max-width: 640px) 108px, 288px"
-              />
-              <div className="mt-4 hidden sm:block">
+              <TitlePosterFlightTarget contentId={contentId}>
+                <SharedTitlePoster
+                  key={contentId}
+                  contentId={contentId}
+                  url={posterUrl}
+                  alt={posterAlt}
+                  priority
+                  sizes="(max-width: 640px) 108px, 288px"
+                />
+              </TitlePosterFlightTarget>
+              <div className="mt-4 hidden sm:block motion-fade-rise">
                 <WhereToWatch
                   providers={extras.watch_providers}
                   title={title}
@@ -259,12 +276,12 @@ function TitleDetailShell({
               </div>
             </div>
 
-            <div className="col-start-1 row-span-2 row-start-1 flex min-w-0 flex-col justify-center py-0.5 sm:row-span-1 sm:justify-start sm:py-0">
+            <div className="motion-fade-rise col-start-1 row-span-2 row-start-1 flex min-w-0 flex-col justify-center py-0.5 sm:row-span-1 sm:justify-start sm:py-0">
               {heading}
               {meta}
             </div>
 
-            <div className="col-span-2 col-start-1 row-start-3 min-w-0 sm:col-span-1 sm:row-start-2 sm:mt-1">
+            <div className="motion-fade-rise col-span-2 col-start-1 row-start-3 min-w-0 sm:col-span-1 sm:row-start-2 sm:mt-1">
               {tagline ? (
                 <p className="type-eyebrow text-muted">{tagline}</p>
               ) : null}
@@ -433,26 +450,37 @@ export function PersonDetailView({ person }: { person: PersonDetail }) {
       {person.credits.length > 0 ? (
         <section className="mt-10">
           <h2 className="type-subsection text-foreground">Known for</h2>
-          <ul className="mt-4 space-y-2">
+          <ul className="mt-4 space-y-3">
             {person.credits.map((credit) => {
               const href =
                 credit.type === 'movie'
                   ? `/movies/${credit.id}`
                   : `/tv/${credit.id}`;
+              const creditLabel = `${credit.title} (${credit.character || credit.job || credit.credit_kind})`;
               return (
                 <li
                   key={`${credit.id}-${credit.credit_kind}-${credit.job ?? ''}-${credit.character ?? ''}`}
                 >
-                  <Link
+                  <TitlePosterLink
                     href={href}
-                    className="text-foreground underline-offset-2 hover:underline"
+                    contentId={credit.id}
+                    posterUrl={credit.poster_url}
+                    posterAlt={`${credit.title} poster`}
+                    ariaLabel={creditLabel}
+                    sizes="56px"
+                    posterFrameClassName="w-10 shrink-0"
+                    className="flex items-center gap-3 text-left"
                   >
-                    {credit.title}
-                  </Link>
-                  <span className="text-muted">
-                    {' '}
-                    ({credit.character || credit.job || credit.credit_kind})
-                  </span>
+                    <span className="min-w-0">
+                      <span className="text-foreground underline-offset-2 hover:underline">
+                        {credit.title}
+                      </span>
+                      <span className="text-muted">
+                        {' '}
+                        ({credit.character || credit.job || credit.credit_kind})
+                      </span>
+                    </span>
+                  </TitlePosterLink>
                 </li>
               );
             })}

@@ -1,5 +1,4 @@
-import { CatalogPoster } from '@/components/catalog-poster';
-import { TmdbResolveLink } from '@/components/tmdb-resolve-link';
+import { TitleNavPoster } from '@/components/title-nav-poster';
 import type { TopMovie } from '@/lib/catalog';
 
 /**
@@ -27,8 +26,7 @@ export function TopMoviesRail({ movies }: { movies: TopMovie[] }) {
         <ul className="mt-5 grid grid-cols-2 gap-x-3 gap-y-5 sm:mt-6 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-6 md:grid-cols-4 lg:grid-cols-6">
           {movies.map((movie) => (
             <li key={movie.tmdb_id} className="min-w-0">
-              <TmdbResolveLink
-                href={`/movies/tmdb/${movie.tmdb_id}`}
+              <TitleNavPoster
                 tmdbId={movie.tmdb_id}
                 kind="movie"
                 ariaLabel={
@@ -37,19 +35,17 @@ export function TopMoviesRail({ movies }: { movies: TopMovie[] }) {
                     : movie.title
                 }
                 className="block min-w-0 overflow-hidden transition hover:opacity-90"
+                posterUrl={movie.poster_url}
+                posterAlt=""
+                sizes="(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 140px"
               >
-                <CatalogPoster
-                  url={movie.poster_url}
-                  alt=""
-                  sizes="(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 140px"
-                />
                 <p className="mt-2 block w-full truncate font-display text-sm font-medium text-foreground">
                   {movie.title}
                 </p>
                 {movie.year != null ? (
                   <p className="truncate text-xs text-muted">{movie.year}</p>
                 ) : null}
-              </TmdbResolveLink>
+              </TitleNavPoster>
             </li>
           ))}
         </ul>

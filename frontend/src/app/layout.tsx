@@ -1,4 +1,6 @@
 import { ThemeSync } from '@/components/theme-sync';
+import { TitlePosterBackMorph } from '@/components/title-poster-back-morph';
+import { TitlePosterFlightAbandon } from '@/components/title-poster-flight-abandon';
 import type { Metadata } from 'next';
 import { Fraunces, Source_Sans_3 } from 'next/font/google';
 
@@ -34,6 +36,8 @@ export default function RootLayout({
     >
       <body className="antialiased">
         <ThemeSync />
+        <TitlePosterBackMorph />
+        <TitlePosterFlightAbandon />
         {children}
       </body>
     </html>
