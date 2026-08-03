@@ -69,6 +69,22 @@ async def count_entries(
     return int(result.scalar_one())
 
 
+async def count_distinct_titles_by_type(
+    session: AsyncSession,
+    *,
+    owner_user_id: uuid.UUID,
+    content_type: str,
+) -> int:
+    """Count distinct titles logged in the diary for one content type."""
+    result = await session.execute(
+        select(func.count(func.distinct(WatchEntry.content_id))).where(
+            WatchEntry.owner_user_id == owner_user_id,
+            WatchEntry.content_type == content_type,
+        )
+    )
+    return int(result.scalar_one())
+
+
 async def list_entries_page(
     session: AsyncSession,
     *,

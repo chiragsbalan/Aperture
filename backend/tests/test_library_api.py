@@ -301,7 +301,7 @@ def test_private_list_404_system_mutate_404_bad_token_401(
 
 
 @pytest.mark.integration
-def test_unlisted_and_public_list_read_authz(
+def test_public_private_list_read_authz_and_reject_unlisted(
     api_client: TestClient,
     seeded_ids: dict[str, uuid.UUID],
 ) -> None:
@@ -309,28 +309,21 @@ def test_unlisted_and_public_list_read_authz(
     owner_headers = {'Authorization': f'Bearer {owner}'}
     movie_id = str(seeded_ids['movie'])
 
-    unlisted = api_client.post(
+    rejected = api_client.post(
         '/api/v1/me/lists',
         headers=owner_headers,
         json={'title': 'Unlisted picks', 'visibility': 'unlisted'},
     )
-    assert unlisted.status_code == 201
-    unlisted_id = unlisted.json()['id']
-    assert (
-        api_client.post(
-            f'/api/v1/lists/{unlisted_id}/items',
-            headers=owner_headers,
-            json={'type': 'movie', 'id': movie_id},
-        ).status_code
-        == 200
-    )
+    assert rejected.status_code == 422
 
-    anon_unlisted = api_client.get(f'/api/v1/lists/{unlisted_id}')
-    assert anon_unlisted.status_code == 200
-    assert anon_unlisted.json()['visibility'] == 'unlisted'
-    assert anon_unlisted.json()['is_owner'] is False
-    assert anon_unlisted.json()['owner_user_id'] is None
-    assert api_client.get(f'/api/v1/lists/{unlisted_id}/items').status_code == 200
+    private = api_client.post(
+        '/api/v1/me/lists',
+        headers=owner_headers,
+        json={'title': 'Private picks', 'visibility': 'private'},
+    )
+    assert private.status_code == 201
+    private_id = private.json()['id']
+    assert api_client.get(f'/api/v1/lists/{private_id}').status_code == 404
 
     public = api_client.post(
         '/api/v1/me/lists',
@@ -355,6 +348,34 @@ def test_unlisted_and_public_list_read_authz(
     assert anon_public.status_code == 200
     assert anon_public.json()['is_owner'] is False
     assert anon_public.json()['owner_user_id'] is None
+
+
+@pytest.mark.integration
+def test_system_list_visibility_patch(
+    api_client: TestClient,
+) -> None:
+    owner = _register(api_client, prefix='sysvis')
+    owner_headers = {'Authorization': f'Bearer {owner}'}
+
+    watchlist = api_client.get('/api/v1/me/watchlist', headers=owner_headers)
+    assert watchlist.status_code == 200
+    assert watchlist.json()['visibility'] == 'private'
+
+    patched = api_client.patch(
+        '/api/v1/me/watchlist',
+        headers=owner_headers,
+        json={'visibility': 'public'},
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()['visibility'] == 'public'
+
+    favorites = api_client.patch(
+        '/api/v1/me/favorites',
+        headers=owner_headers,
+        json={'visibility': 'public'},
+    )
+    assert favorites.status_code == 200
+    assert favorites.json()['visibility'] == 'public'
 
 
 @pytest.mark.integration
@@ -502,3 +523,39 @@ def test_custom_list_cap_and_membership_helper(
         json={'type': 'person', 'id': str(seeded_ids['person'])},
     )
     assert person.status_code == 422
+
+
+@pytest.mark.integration
+def test_public_diary_is_readable_without_auth(
+    api_client: TestClient,
+    seeded_ids: dict[str, uuid.UUID],
+) -> None:
+    access = _register(api_client, prefix='pdry')
+    headers = {'Authorization': f'Bearer {access}'}
+    movie_id = str(seeded_ids['movie'])
+    me = api_client.get('/api/v1/users/me', headers=headers)
+    assert me.status_code == 200
+    username = me.json()['username']
+
+    created = api_client.post(
+        '/api/v1/me/watch-entries',
+        headers=headers,
+        json={
+            'type': 'movie',
+            'id': movie_id,
+            'watched_at': '2026-03-15',
+            'note': 'Public wall note',
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    public = api_client.get(f'/api/v1/users/{username}/watch-entries')
+    assert public.status_code == 200, public.text
+    body = public.json()
+    assert body['total'] == 1
+    assert body['items'][0]['watched_at'] == '2026-03-15'
+    assert body['items'][0]['note'] == 'Public wall note'
+    assert body['items'][0]['content']['id'] == movie_id
+
+    missing = api_client.get('/api/v1/users/no_such_user_zzz/watch-entries')
+    assert missing.status_code == 404

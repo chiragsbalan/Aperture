@@ -54,44 +54,6 @@ function UserIcon({ className }: { className?: string }) {
   );
 }
 
-function ProfileGlyph() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <circle cx="12" cy="8" r="3.25" />
-      <path d="M5.5 19.25a6.5 6.5 0 0 1 13 0" />
-    </svg>
-  );
-}
-
-function PublicProfileGlyph() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="8.25" />
-      <path d="M3.75 12h16.5M12 3.75c2.4 2.6 2.4 13.9 0 16.5M12 3.75c-2.4 2.6-2.4 13.9 0 16.5" />
-    </svg>
-  );
-}
-
 function LibraryGlyph() {
   return (
     <svg
@@ -151,8 +113,7 @@ function ChevronGlyph() {
 }
 
 /**
- * Profile icon dropdown: cinematic glass disclosure with Profile / Library /
- * Settings (and Public profile when username is set).
+ * Account icon dropdown: header opens public profile; nav is Library + Settings.
  */
 export function AccountMenu({
   username,
@@ -383,25 +344,6 @@ export function AccountMenu({
     icon: ReactNode;
   }> = [
     {
-      href: '/account',
-      label: 'Profile',
-      hint: ownUsername ? `@${ownUsername}` : 'Your account',
-      current: pathname === '/account',
-      icon: <ProfileGlyph />,
-    },
-    ...(publicProfileHref
-      ? [
-          {
-            href: publicProfileHref,
-            label: 'Public profile',
-            hint: `@${ownUsername}`,
-            // B2: exact own public profile path only.
-            current: pathname === publicProfileHref,
-            icon: <PublicProfileGlyph />,
-          },
-        ]
-      : []),
-    {
       href: '/library',
       label: 'Library',
       hint: 'Watchlist, lists & diary',
@@ -488,36 +430,56 @@ export function AccountMenu({
                     <p className="text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-wider)] text-muted">
                       ACCOUNT
                     </p>
-                    <div className="mt-3 flex items-center gap-3">
-                      {ownUsername ? (
+                    {publicProfileHref ? (
+                      <Link
+                        href={publicProfileHref}
+                        aria-current={
+                          pathname === publicProfileHref ||
+                          pathname.startsWith(`${publicProfileHref}/`)
+                            ? 'page'
+                            : undefined
+                        }
+                        onClick={() => {
+                          finishClose({ suppressFocusRestore: true });
+                        }}
+                        className="group mt-3 flex items-center gap-3 rounded-[var(--radius-sm)] outline-none transition hover:bg-[var(--color-fg)]/[0.06] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+                      >
                         <ProfileAvatar
                           username={ownUsername}
                           displayName={displayName}
                           size="sm"
                         />
-                      ) : (
-                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-pill)] border border-[var(--color-border)] bg-[var(--color-primary-soft)] text-foreground">
-                          <UserIcon className="h-5 w-5" />
-                        </span>
-                      )}
-                      <div className="min-w-0">
-                        <p
-                          id={titleId}
-                          className="truncate font-display text-[length:var(--text-body)] font-semibold leading-tight tracking-[var(--tracking-tight)] text-foreground"
-                        >
-                          {label}
-                        </p>
-                        {ownUsername ? (
+                        <div className="min-w-0 flex-1">
+                          <p
+                            id={titleId}
+                            className="truncate font-display text-[length:var(--text-body)] font-semibold leading-tight tracking-[var(--tracking-tight)] text-foreground"
+                          >
+                            {label}
+                          </p>
                           <p className="mt-0.5 truncate text-[length:var(--text-xs)] text-muted">
                             @{ownUsername}
                           </p>
-                        ) : (
+                        </div>
+                        <ChevronGlyph />
+                      </Link>
+                    ) : (
+                      <div className="mt-3 flex items-center gap-3">
+                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-pill)] border border-[var(--color-border)] bg-[var(--color-primary-soft)] text-foreground">
+                          <UserIcon className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0">
+                          <p
+                            id={titleId}
+                            className="truncate font-display text-[length:var(--text-body)] font-semibold leading-tight tracking-[var(--tracking-tight)] text-foreground"
+                          >
+                            {label}
+                          </p>
                           <p className="mt-0.5 truncate text-[length:var(--text-xs)] text-muted">
                             Signed in
                           </p>
-                        )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   <nav

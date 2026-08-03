@@ -32,6 +32,7 @@ def _clear_settings_cache() -> Iterator[None]:
     from app.metadata import resolve as metadata_resolve
     from app.metadata.rate_limit import reset_metadata_rate_limit_fallback
     from app.search.rate_limit import reset_search_rate_limit_fallback
+    from app.users.rate_limit import reset_users_public_rate_limit_fallback
 
     get_settings.cache_clear()
     reset_cache()
@@ -40,6 +41,7 @@ def _clear_settings_cache() -> Iterator[None]:
     reset_search_rate_limit_fallback()
     reset_lists_rate_limit_fallback()
     reset_metadata_rate_limit_fallback()
+    reset_users_public_rate_limit_fallback()
     yield
     get_settings.cache_clear()
     reset_cache()
@@ -48,6 +50,7 @@ def _clear_settings_cache() -> Iterator[None]:
     reset_search_rate_limit_fallback()
     reset_lists_rate_limit_fallback()
     reset_metadata_rate_limit_fallback()
+    reset_users_public_rate_limit_fallback()
 
 
 @pytest.fixture

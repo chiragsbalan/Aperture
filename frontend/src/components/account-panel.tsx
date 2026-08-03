@@ -2,6 +2,7 @@
 
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { oauthErrorMessage } from '@/lib/google-oauth-errors';
+import { invalidatePublicWatchEntries } from '@/lib/library';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -44,6 +45,7 @@ export function AccountPanel() {
         setLogoutError(`Could not log out (HTTP ${res.status}).`);
         return;
       }
+      invalidatePublicWatchEntries();
       router.push('/login');
       router.refresh();
     } catch {
@@ -146,8 +148,11 @@ export function AccountPanel() {
         </p>
       ) : null}
 
-      {username ? (
-        <div className="flex items-center gap-4">
+      {username && publicProfileHref ? (
+        <Link
+          href={publicProfileHref}
+          className="flex items-center gap-4 rounded-[var(--radius-md)] outline-none transition hover:bg-[var(--color-primary-soft)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+        >
           <ProfileAvatar
             username={username}
             displayName={me.user?.display_name}
@@ -156,9 +161,9 @@ export function AccountPanel() {
             <p className="type-card-title text-foreground">
               {me.user?.display_name?.trim() || username}
             </p>
-            <p className="text-sm text-muted">@{username}</p>
+            <p className="text-sm text-muted">@{username} · View profile</p>
           </div>
-        </div>
+        </Link>
       ) : null}
 
       <dl className="space-y-4">
@@ -185,26 +190,6 @@ export function AccountPanel() {
           Library
           <span className="text-sm text-muted">Watchlist, lists & diary</span>
         </Link>
-        <Link
-          href="/account"
-          aria-current={pathname === '/account' ? 'page' : undefined}
-          className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-primary-soft)] px-4 py-3 text-foreground"
-        >
-          Profile
-          <span className="text-sm text-muted">
-            {username ? `@${username}` : 'This page'}
-          </span>
-        </Link>
-        {publicProfileHref ? (
-          <Link
-            href={publicProfileHref}
-            aria-current={pathname === publicProfileHref ? 'page' : undefined}
-            className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3 text-foreground transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-soft)]"
-          >
-            Public profile
-            <span className="text-sm text-muted">@{username}</span>
-          </Link>
-        ) : null}
         <Link
           href="/settings"
           aria-current={pathname === '/settings' ? 'page' : undefined}

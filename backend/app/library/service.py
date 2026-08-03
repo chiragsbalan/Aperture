@@ -170,22 +170,32 @@ async def create_entry(
     return _entry_response(entry, summaries[0] if summaries else None)
 
 
-async def list_entries(
+async def count_logged_titles_by_type(
     session: AsyncSession,
     *,
-    identity_id: uuid.UUID,
+    owner_user_id: uuid.UUID,
+    content_type: str,
+) -> int:
+    """Count distinct diary titles for ``movie`` or ``tv_show``."""
+    return await library_repository.count_distinct_titles_by_type(
+        session,
+        owner_user_id=owner_user_id,
+        content_type=content_type,
+    )
+
+
+async def list_entries_for_owner(
+    session: AsyncSession,
+    *,
+    owner_user_id: uuid.UUID,
     page: int,
     limit: int,
     year: int | None = None,
     month: int | None = None,
 ) -> WatchEntriesPageResponse:
-    """Return the caller's diary feed (newest first)."""
+    """Return a user's diary feed by profile id (newest first)."""
     if month is not None and year is None:
         raise UnsupportedWatchContentError('year required when month is set')
-    owner_user_id = await _require_owner_user_id(
-        session,
-        identity_id=identity_id,
-    )
     total = await library_repository.count_entries(
         session,
         owner_user_id=owner_user_id,
@@ -216,6 +226,30 @@ async def list_entries(
         limit=limit,
         total=total,
         items=items,
+    )
+
+
+async def list_entries(
+    session: AsyncSession,
+    *,
+    identity_id: uuid.UUID,
+    page: int,
+    limit: int,
+    year: int | None = None,
+    month: int | None = None,
+) -> WatchEntriesPageResponse:
+    """Return the caller's diary feed (newest first)."""
+    owner_user_id = await _require_owner_user_id(
+        session,
+        identity_id=identity_id,
+    )
+    return await list_entries_for_owner(
+        session,
+        owner_user_id=owner_user_id,
+        page=page,
+        limit=limit,
+        year=year,
+        month=month,
     )
 
 

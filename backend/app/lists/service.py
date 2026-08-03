@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 MAX_ITEMS_PER_LIST = 500
 MAX_CUSTOM_LISTS = 50
 SYSTEM_KINDS = frozenset({'watchlist', 'favorites'})
-VISIBILITIES = frozenset({'private', 'public', 'unlisted'})
+VISIBILITIES = frozenset({'private', 'public'})
 
 
 class ProfileRequiredError(Exception):
@@ -248,10 +248,92 @@ async def get_system_list_page(
     return SystemListResponse(
         kind=kind,  # type: ignore[arg-type]
         title=list_row.title,
+        visibility=list_row.visibility,  # type: ignore[arg-type]
         page=page,
         limit=limit,
         total=total,
         items=response_items,
+    )
+
+
+async def patch_system_list_visibility(
+    session: AsyncSession,
+    *,
+    identity_id: uuid.UUID,
+    kind: str,
+    visibility: str,
+) -> SystemListResponse:
+    """Set watchlist/favorites visibility (public|private) for the owner."""
+    if kind not in SYSTEM_KINDS:
+        raise ValueError(f'not a system list kind: {kind}')
+    if visibility not in VISIBILITIES:
+        raise UnsupportedListContentError('invalid visibility')
+    list_row = await get_or_create_system_list(
+        session,
+        identity_id=identity_id,
+        kind=kind,
+    )
+    locked = await lists_repository.lock_list(session, list_id=list_row.id)
+    if locked is None:
+        raise ProfileRequiredError('profile not found')
+    locked.visibility = visibility
+    await session.commit()
+    return await get_system_list_page(
+        session,
+        identity_id=identity_id,
+        kind=kind,
+        page=1,
+        limit=1,
+    )
+
+
+async def system_list_public_summary(
+    session: AsyncSession,
+    *,
+    owner_user_id: uuid.UUID,
+    kind: str,
+) -> tuple[str, int] | None:
+    """Return ``(visibility, item_count)`` for an existing system list.
+
+    Returns ``None`` when the system list has never been created (treat as
+    private empty for visitors).
+    """
+    if kind not in SYSTEM_KINDS:
+        raise ValueError(f'not a system list kind: {kind}')
+    list_row = await lists_repository.get_system_list(
+        session,
+        owner_user_id=owner_user_id,
+        kind=kind,
+    )
+    if list_row is None:
+        return None
+    total = await lists_repository.count_items(session, list_id=list_row.id)
+    return list_row.visibility, total
+
+
+async def count_public_custom_lists(
+    session: AsyncSession,
+    *,
+    owner_user_id: uuid.UUID,
+) -> int:
+    """Count custom lists with public visibility for profile counters."""
+    return await lists_repository.count_custom_lists(
+        session,
+        owner_user_id=owner_user_id,
+        visibility='public',
+    )
+
+
+async def count_custom_lists_for_owner(
+    session: AsyncSession,
+    *,
+    owner_user_id: uuid.UUID,
+) -> int:
+    """Count all custom lists for the owner profile counter."""
+    return await lists_repository.count_custom_lists(
+        session,
+        owner_user_id=owner_user_id,
+        visibility=None,
     )
 
 
@@ -513,7 +595,7 @@ async def _resolve_readable_custom_list(
     if list_row is None or list_row.kind != 'custom':
         raise ListNotFoundError('list not found')
 
-    if list_row.visibility in {'public', 'unlisted'}:
+    if list_row.visibility == 'public':
         return list_row
 
     # private

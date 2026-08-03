@@ -68,13 +68,28 @@ def test_get_patch_me_and_public_profile(api_client: TestClient) -> None:
 
     public = api_client.get(f'/api/v1/users/{username}')
     assert public.status_code == 200, public.text
-    assert public.json() == {
-        'username': username,
-        'display_name': 'Ada Lovelace',
-        'bio': 'Notes on the analytical engine.',
+    body_public = public.json()
+    assert body_public['username'] == username
+    assert body_public['display_name'] == 'Ada Lovelace'
+    assert body_public['bio'] == 'Notes on the analytical engine.'
+    assert body_public['avatar_url'] is None
+    assert body_public['website_url'] is None
+    assert body_public['links'] == []
+    assert body_public['is_owner'] is False
+    assert body_public['counts'] == {
+        'movies': 0,
+        'shows': 0,
+        'followers': 0,
+        'following': 0,
     }
-    assert 'preferences' not in public.json()
-    assert 'email' not in public.json()
+    assert 'surfaces' not in body_public
+    assert 'preferences' not in body_public
+    assert 'email' not in body_public
+
+    owner_view = api_client.get(f'/api/v1/users/{username}', headers=headers)
+    assert owner_view.status_code == 200
+    assert owner_view.json()['is_owner'] is True
+    assert owner_view.json()['counts'] == body_public['counts']
 
 
 @pytest.mark.integration
@@ -225,3 +240,116 @@ def test_username_rename_cooldown(api_client: TestClient) -> None:
 def test_public_profile_missing_is_404(api_client: TestClient) -> None:
     res = api_client.get('/api/v1/users/no_such_user_zzz')
     assert res.status_code == 404
+
+
+@pytest.mark.integration
+def test_profile_patch_rejects_non_https_urls(api_client: TestClient) -> None:
+    access, _username, _email = _register(api_client)
+    headers = {'Authorization': f'Bearer {access}'}
+
+    for field, value in (
+        ('avatar_url', 'http://example.com/avatar.png'),
+        ('avatar_url', 'javascript:alert(1)'),
+        ('website_url', 'http://example.com'),
+        ('website_url', 'javascript:alert(1)'),
+    ):
+        res = api_client.patch(
+            '/api/v1/users/me',
+            headers=headers,
+            json={field: value},
+        )
+        assert res.status_code == 422, (field, value, res.text)
+
+    links_http = api_client.patch(
+        '/api/v1/users/me',
+        headers=headers,
+        json={'links': [{'label': 'Blog', 'url': 'http://example.com/blog'}]},
+    )
+    assert links_http.status_code == 422, links_http.text
+
+    links_js = api_client.patch(
+        '/api/v1/users/me',
+        headers=headers,
+        json={'links': [{'label': 'X', 'url': 'javascript:alert(1)'}]},
+    )
+    assert links_js.status_code == 422, links_js.text
+
+
+@pytest.mark.integration
+def test_soft_deleted_user_public_routes_are_404(api_client: TestClient) -> None:
+    access, username, _email = _register(api_client)
+    headers = {'Authorization': f'Bearer {access}'}
+
+    # Confirm live before soft-delete (profile shell + empty public diary).
+    assert api_client.get(f'/api/v1/users/{username}').status_code == 200
+    live_diary = api_client.get(f'/api/v1/users/{username}/watch-entries')
+    assert live_diary.status_code == 200, live_diary.text
+
+    import asyncio
+
+    import asyncpg
+    from app.core.config import get_settings
+
+    async def _soft_delete() -> None:
+        dsn = get_settings().database_url.replace(
+            'postgresql+asyncpg://',
+            'postgresql://',
+            1,
+        )
+        conn = await asyncpg.connect(dsn)
+        try:
+            await conn.execute(
+                """
+                UPDATE users
+                SET deleted_at = $1
+                WHERE username = $2
+                """,
+                datetime.now(UTC),
+                username,
+            )
+        finally:
+            await conn.close()
+
+    asyncio.run(_soft_delete())
+
+    assert api_client.get(f'/api/v1/users/{username}').status_code == 404
+    assert api_client.get(f'/api/v1/users/{username}/watch-entries').status_code == 404
+    # Owner token must not resurrect a soft-deleted public shell.
+    assert (
+        api_client.get(f'/api/v1/users/{username}', headers=headers).status_code == 404
+    )
+
+
+def _trusted_ip_headers(ip: str, *, secret: str) -> dict[str, str]:
+    return {
+        'X-Aperture-Client-IP': ip,
+        'X-Aperture-BFF-Secret': secret,
+    }
+
+
+@pytest.mark.integration
+def test_public_profile_rate_limit_trusted_ip_returns_429(
+    api_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = 'test-bff-shared-secret'
+    monkeypatch.setenv('AUTH_BFF_SHARED_SECRET', secret)
+    monkeypatch.setenv('USERS_PUBLIC_RATE_LIMIT_MAX_PER_IP', '2')
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+
+    _access, username, _email = _register(api_client)
+    ip = f'203.0.113.{uuid.uuid4().int % 200 + 1}'
+    headers = _trusted_ip_headers(ip, secret=secret)
+
+    for _ in range(2):
+        ok = api_client.get(f'/api/v1/users/{username}', headers=headers)
+        assert ok.status_code == 200, ok.text
+
+    limited = api_client.get(
+        f'/api/v1/users/{username}/watch-entries',
+        headers=headers,
+    )
+    assert limited.status_code == 429
+    assert limited.json()['detail'] == ('Too many profile requests. Try again later.')

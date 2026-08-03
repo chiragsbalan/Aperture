@@ -52,7 +52,7 @@ class List(UuidPrimaryKeyMixin, TimestampMixin, Base):
             name='kind',
         ),
         CheckConstraint(
-            "visibility IN ('private', 'public', 'unlisted')",
+            "visibility IN ('private', 'public')",
             name='visibility',
         ),
         Index('ix_lists_owner_user_id', 'owner_user_id'),

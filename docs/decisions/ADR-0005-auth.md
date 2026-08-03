@@ -76,10 +76,10 @@ Cloud env is provisioned; secrets stay in host dashboards (never git). Local Com
 ### P1.4 Profiles (as implemented)
 
 - **Users owns profile APIs:** `GET/PATCH /api/v1/users/me`, `GET/PATCH /api/v1/users/me/preferences`, `GET /api/v1/users/{username}` (public). Auth `/me` remains identity summary (email, providers, nested user summary).
-- **Editable fields:** username, display name, bio (max 500). Avatar is **initials only** (no URL/upload in P1.4).
+- **Editable fields:** username, display name, bio (max 500), optional HTTPS `avatar_url` / `website_url`, ≤3 profile `links` (see [ADR-0009](ADR-0009-public-profiles.md)). No avatar file upload yet — URL or initials.
 - **Username rename cooldown:** once every **30 days** (`username_changed_at`); first rename after signup/Google seed is allowed immediately; reserved handles (`admin`, `settings`, `u`, …) rejected as unavailable.
-- **Preferences (JSONB):** `theme` (`system|light|dark`), `spoilers` (`show|hide`), `language` (short locale stub). Defaults: system / show / en.
-- **UI:** `/account` overview + Google link; `/settings` edit form; public `/u/[username]`.
+- **Preferences (JSONB):** `theme` (`system|light|dark`), `spoilers` (`show|hide`), `language` (short locale stub). Defaults: system / show / en. Library shelf visibility lives on `lists.visibility`, not preferences.
+- **UI:** `/account` overview + Google link; `/settings` edit form; public `/u/[username]` (profile-complete track).
 
 ### Authorization
 

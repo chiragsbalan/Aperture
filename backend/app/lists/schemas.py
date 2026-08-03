@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 PublicContentType = Literal['movie', 'tv']
 SystemListKind = Literal['watchlist', 'favorites']
-ListVisibility = Literal['private', 'public', 'unlisted']
+ListVisibility = Literal['private', 'public']
 
 
 class ContentRefBody(BaseModel):
@@ -50,10 +50,17 @@ class SystemListResponse(BaseModel):
 
     kind: SystemListKind
     title: str
+    visibility: ListVisibility
     page: int
     limit: int
     total: int
     items: list[ListItemResponse]
+
+
+class PatchSystemListVisibilityBody(BaseModel):
+    """Owner toggle for watchlist / favorites visibility."""
+
+    visibility: ListVisibility
 
 
 class ContainsResponse(BaseModel):

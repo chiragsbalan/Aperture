@@ -4,6 +4,7 @@ import {
   apiErrorMessage,
   type OwnedProfile,
   type Preferences,
+  type ProfileLink,
 } from '@/lib/profile';
 import { applyThemePreference } from '@/lib/theme';
 import Link from 'next/link';
@@ -14,11 +15,15 @@ type LoadState =
   | { status: 'error'; message: string }
   | { status: 'ok'; profile: OwnedProfile };
 
+const MAX_LINKS = 3;
+
 export function SettingsForm() {
   const usernameId = useId();
   const usernameHintId = useId();
   const displayNameId = useId();
   const bioId = useId();
+  const avatarId = useId();
+  const websiteId = useId();
   const themeId = useId();
   const spoilersId = useId();
   const languageId = useId();
@@ -30,6 +35,9 @@ export function SettingsForm() {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [links, setLinks] = useState<ProfileLink[]>([]);
   const [preferences, setPreferences] = useState<Preferences>({
     theme: 'system',
     spoilers: 'show',
@@ -72,6 +80,9 @@ export function SettingsForm() {
         setUsername(profile.username);
         setDisplayName(profile.display_name ?? '');
         setBio(profile.bio ?? '');
+        setAvatarUrl(profile.avatar_url ?? '');
+        setWebsiteUrl(profile.website_url ?? '');
+        setLinks(profile.links ?? []);
         setPreferences(profile.preferences);
         setRenameAvailableAt(profile.username_rename_available_at);
         applyThemePreference(profile.preferences.theme);
@@ -100,9 +111,20 @@ export function SettingsForm() {
     setSuccess(null);
     setPending(true);
 
+    const cleanedLinks = links
+      .map((link) => ({
+        label: link.label.trim(),
+        url: link.url.trim(),
+      }))
+      .filter((link) => link.label && link.url)
+      .slice(0, MAX_LINKS);
+
     const profileBody: Record<string, unknown> = {
       display_name: displayName.trim() ? displayName.trim() : null,
       bio: bio.trim() ? bio.trim() : null,
+      avatar_url: avatarUrl.trim() ? avatarUrl.trim() : null,
+      website_url: websiteUrl.trim() ? websiteUrl.trim() : null,
+      links: cleanedLinks,
       preferences,
     };
     if (username.trim().toLowerCase() !== state.profile.username) {
@@ -126,6 +148,9 @@ export function SettingsForm() {
       setUsername(updated.username);
       setDisplayName(updated.display_name ?? '');
       setBio(updated.bio ?? '');
+      setAvatarUrl(updated.avatar_url ?? '');
+      setWebsiteUrl(updated.website_url ?? '');
+      setLinks(updated.links ?? []);
       setPreferences(updated.preferences);
       setRenameAvailableAt(updated.username_rename_available_at);
       applyThemePreference(updated.preferences.theme);
@@ -254,6 +279,103 @@ export function SettingsForm() {
             rows={4}
             className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
           />
+        </div>
+
+        <div>
+          <label htmlFor={avatarId} className="text-sm text-muted">
+            Avatar URL
+          </label>
+          <input
+            id={avatarId}
+            name="avatar_url"
+            type="url"
+            inputMode="url"
+            placeholder="https://"
+            value={avatarUrl}
+            onChange={(event) => {
+              setAvatarUrl(event.target.value);
+            }}
+            maxLength={512}
+            className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+          />
+          <p className="mt-1 text-xs text-muted">
+            HTTPS image URL only. Leave blank for initials.
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor={websiteId} className="text-sm text-muted">
+            Website
+          </label>
+          <input
+            id={websiteId}
+            name="website_url"
+            type="url"
+            inputMode="url"
+            placeholder="https://"
+            value={websiteUrl}
+            onChange={(event) => {
+              setWebsiteUrl(event.target.value);
+            }}
+            maxLength={512}
+            className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+          />
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-sm text-muted">Links (up to {MAX_LINKS})</p>
+          {links.map((link, index) => (
+            <div
+              key={`link-${index}`}
+              className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]"
+            >
+              <input
+                aria-label={`Link ${index + 1} label`}
+                value={link.label}
+                onChange={(event) => {
+                  const next = [...links];
+                  next[index] = { ...link, label: event.target.value };
+                  setLinks(next);
+                }}
+                placeholder="Label"
+                maxLength={40}
+                className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+              />
+              <input
+                aria-label={`Link ${index + 1} URL`}
+                type="url"
+                value={link.url}
+                onChange={(event) => {
+                  const next = [...links];
+                  next[index] = { ...link, url: event.target.value };
+                  setLinks(next);
+                }}
+                placeholder="https://"
+                maxLength={512}
+                className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+              />
+              <button
+                type="button"
+                className="text-sm text-muted transition hover:text-foreground"
+                onClick={() => {
+                  setLinks(links.filter((_, i) => i !== index));
+                }}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          {links.length < MAX_LINKS ? (
+            <button
+              type="button"
+              className="text-sm text-muted underline-offset-2 hover:text-foreground hover:underline"
+              onClick={() => {
+                setLinks([...links, { label: '', url: '' }]);
+              }}
+            >
+              Add link
+            </button>
+          ) : null}
         </div>
       </fieldset>
 

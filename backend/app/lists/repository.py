@@ -92,6 +92,27 @@ async def lock_custom_lists_for_owner(
     return list(result.scalars().all())
 
 
+async def count_custom_lists(
+    session: AsyncSession,
+    *,
+    owner_user_id: uuid.UUID,
+    visibility: str | None = None,
+) -> int:
+    """Count custom lists for an owner, optionally filtered by visibility."""
+    stmt = (
+        select(func.count())
+        .select_from(List)
+        .where(
+            List.owner_user_id == owner_user_id,
+            List.kind == 'custom',
+        )
+    )
+    if visibility is not None:
+        stmt = stmt.where(List.visibility == visibility)
+    result = await session.execute(stmt)
+    return int(result.scalar_one())
+
+
 async def list_custom_lists(
     session: AsyncSession,
     *,

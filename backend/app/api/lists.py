@@ -23,6 +23,7 @@ from app.lists.schemas import (
     CustomListPageResponse,
     ListItemResponse,
     PatchCustomListBody,
+    PatchSystemListVisibilityBody,
     ReorderItemsBody,
     SystemListResponse,
 )
@@ -229,6 +230,27 @@ async def get_watchlist(
     )
 
 
+@router.patch('/me/watchlist', response_model=SystemListResponse)
+async def patch_watchlist_visibility(
+    body: PatchSystemListVisibilityBody,
+    identity: CurrentIdentityDep,
+    session: DbSessionDep,
+) -> SystemListResponse:
+    """Toggle watchlist visibility (public|private)."""
+    try:
+        return await lists_service.patch_system_list_visibility(
+            session,
+            identity_id=identity.id,
+            kind='watchlist',
+            visibility=body.visibility,
+        )
+    except Exception as exc:
+        mapped = _map_domain_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
 @router.post(
     '/me/watchlist/items',
     response_model=ListItemResponse,
@@ -304,6 +326,27 @@ async def get_favorites(
         page=page,
         limit=limit,
     )
+
+
+@router.patch('/me/favorites', response_model=SystemListResponse)
+async def patch_favorites_visibility(
+    body: PatchSystemListVisibilityBody,
+    identity: CurrentIdentityDep,
+    session: DbSessionDep,
+) -> SystemListResponse:
+    """Toggle favorites visibility (public|private)."""
+    try:
+        return await lists_service.patch_system_list_visibility(
+            session,
+            identity_id=identity.id,
+            kind='favorites',
+            visibility=body.visibility,
+        )
+    except Exception as exc:
+        mapped = _map_domain_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
 
 
 @router.post(

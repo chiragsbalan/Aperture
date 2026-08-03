@@ -94,6 +94,11 @@ class Settings(BaseSettings):
     lists_rate_limit_window_seconds: int = 60
     lists_rate_limit_max_writes: int = 60
 
+    # Public profile + diary reads (pc.1). Shared IP bucket for shell + watch-entries.
+    # Higher than search: shelf pages paginate diary (many GETs per navigation).
+    users_public_rate_limit_window_seconds: int = 60
+    users_public_rate_limit_max_per_ip: int = 120
+
     # Redis (P2.4). Empty = in-memory CacheBackend (tests / local without Redis).
     redis_url: str = ''
     # Metadata detail cache TTL (seconds).
