@@ -328,9 +328,7 @@ export function MovieDetailView({ movie }: { movie: MovieDetail }) {
       crew={movie.crew}
       extras={movie.extras}
       tagline={movie.extras.tagline}
-      heading={
-        <h1 className="type-title text-foreground">{movie.title}</h1>
-      }
+      heading={<h1 className="type-title text-foreground">{movie.title}</h1>}
       meta={
         <TitleMetaRow>
           {releaseLabel ? <span>{releaseLabel}</span> : null}
@@ -375,9 +373,7 @@ export function TvDetailView({ show }: { show: TvDetail }) {
       extras={show.extras}
       seasons={show.seasons}
       tagline={show.extras.tagline}
-      heading={
-        <h1 className="type-title text-foreground">{show.title}</h1>
-      }
+      heading={<h1 className="type-title text-foreground">{show.title}</h1>}
       meta={
         <TitleMetaRow>
           {airLabel ? <span>{airLabel}</span> : null}

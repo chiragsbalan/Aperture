@@ -38,9 +38,7 @@ export function CatalogPoster({
     );
   }
   return (
-    <div
-      className={`relative shadow-[var(--elev-poster)] ${frameClass}`}
-    >
+    <div className={`relative shadow-[var(--elev-poster)] ${frameClass}`}>
       <Image
         src={url}
         alt={alt}

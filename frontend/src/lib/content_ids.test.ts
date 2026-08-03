@@ -15,9 +15,7 @@ describe('isContentUuid', () => {
 
 describe('parseTmdbIdParam', () => {
   it('returns null for content UUIDs', () => {
-    expect(parseTmdbIdParam('550e8400-e29b-41d4-a716-446655440000')).toBe(
-      null,
-    );
+    expect(parseTmdbIdParam('550e8400-e29b-41d4-a716-446655440000')).toBe(null);
   });
 
   it('parses bare numeric TMDb ids', () => {

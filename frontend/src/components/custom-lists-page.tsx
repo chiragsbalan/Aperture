@@ -90,9 +90,7 @@ export function CustomListsPage() {
 
   return (
     <div className="layout-content motion-fade-rise text-left">
-      <h1 className="type-page-lg text-foreground">
-        Lists
-      </h1>
+      <h1 className="type-page-lg text-foreground">Lists</h1>
       <p className="mt-2 text-muted">Curate named collections of titles.</p>
       <LibraryNav />
 

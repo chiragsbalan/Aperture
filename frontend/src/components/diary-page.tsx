@@ -162,9 +162,7 @@ export function DiaryPage() {
 
   return (
     <div className="layout-content motion-fade-rise text-left">
-      <h1 className="type-page-lg text-foreground">
-        Diary
-      </h1>
+      <h1 className="type-page-lg text-foreground">Diary</h1>
       <p className="mt-2 text-muted">Watches you have logged over time.</p>
       <LibraryNav />
 
@@ -289,10 +287,7 @@ export function DiaryPage() {
           }}
           className="space-y-4"
         >
-          <h2
-            id={`${formId}-edit-heading`}
-            className="type-card-title"
-          >
+          <h2 id={`${formId}-edit-heading`} className="type-card-title">
             Edit diary entry
           </h2>
           <div>
@@ -357,10 +352,7 @@ export function DiaryPage() {
         className="w-full max-w-md border border-[var(--color-border)] bg-[var(--color-bg)] p-6 text-foreground backdrop:bg-black/50"
         aria-labelledby={`${formId}-delete-heading`}
       >
-        <h2
-          id={`${formId}-delete-heading`}
-          className="type-card-title"
-        >
+        <h2 id={`${formId}-delete-heading`} className="type-card-title">
           Delete this diary entry?
         </h2>
         <p className="mt-2 text-sm text-muted">

@@ -319,10 +319,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
               }}
               className="space-y-4"
             >
-              <h2
-                id={`${formId}-edit-title`}
-                className="type-card-title"
-              >
+              <h2 id={`${formId}-edit-title`} className="type-card-title">
                 Edit list
               </h2>
               <div>
@@ -407,10 +404,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
             className="w-full max-w-md border border-[var(--color-border)] bg-[var(--color-bg)] p-6 text-foreground backdrop:bg-black/50"
             aria-labelledby={`${formId}-delete-title`}
           >
-            <h2
-              id={`${formId}-delete-title`}
-              className="type-card-title"
-            >
+            <h2 id={`${formId}-delete-title`} className="type-card-title">
               Delete this list?
             </h2>
             <p className="mt-2 text-sm text-muted">

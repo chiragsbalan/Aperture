@@ -132,9 +132,7 @@ export function LibraryListPage({
 
   return (
     <div className="layout-content motion-fade-rise text-left">
-      <h1 className="type-page-lg text-foreground">
-        {title}
-      </h1>
+      <h1 className="type-page-lg text-foreground">{title}</h1>
       <p className="mt-2 text-muted">
         Your personal {kind === 'watchlist' ? 'queue' : 'favorites'}.
       </p>

@@ -198,9 +198,7 @@ export function AccountPanel() {
         {publicProfileHref ? (
           <Link
             href={publicProfileHref}
-            aria-current={
-              pathname === publicProfileHref ? 'page' : undefined
-            }
+            aria-current={pathname === publicProfileHref ? 'page' : undefined}
             className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3 text-foreground transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-soft)]"
           >
             Public profile

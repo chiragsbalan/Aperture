@@ -537,9 +537,8 @@ export function TitleMetaTabs({
         if (cancelled) {
           return;
         }
-        const incoming = stageRef.current?.querySelector<HTMLElement>(
-          '[role="tabpanel"]',
-        );
+        const incoming =
+          stageRef.current?.querySelector<HTMLElement>('[role="tabpanel"]');
         const toHeight = incoming?.scrollHeight ?? 0;
         if (toHeight > 0) {
           setStageHeight(toHeight);
@@ -660,10 +659,7 @@ export function TitleMetaTabs({
                 />
               </div>
             ) : (
-              <ThemePillList
-                keywords={extras.keywords}
-                aria-label="Themes"
-              />
+              <ThemePillList keywords={extras.keywords} aria-label="Themes" />
             )
           ) : null}
         </div>

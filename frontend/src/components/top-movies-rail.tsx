@@ -10,10 +10,7 @@ export function TopMoviesRail({ movies }: { movies: TopMovie[] }) {
   return (
     <section className="w-full text-left" aria-labelledby="top-movies-heading">
       <div className="border-b border-[var(--color-border)] pb-2">
-        <h1
-          id="top-movies-heading"
-          className="type-rail text-foreground"
-        >
+        <h1 id="top-movies-heading" className="type-rail text-foreground">
           Top movies
         </h1>
         {movies.length === 0 ? null : (
