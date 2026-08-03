@@ -65,6 +65,9 @@ class OwnedProfile:
     username: str
     display_name: str | None
     bio: str | None
+    avatar_url: str | None
+    website_url: str | None
+    links: list[dict[str, str]]
     preferences: PreferencesDict
     username_changed_at: datetime | None
     username_rename_available_at: datetime | None
@@ -72,11 +75,16 @@ class OwnedProfile:
 
 @dataclass(frozen=True, slots=True)
 class PublicProfile:
-    """Minimal public profile."""
+    """Public profile shell fields (counts assembled in the API layer)."""
 
+    id: uuid.UUID
+    identity_id: uuid.UUID
     username: str
     display_name: str | None
     bio: str | None
+    avatar_url: str | None
+    website_url: str | None
+    links: list[dict[str, str]]
 
 
 def _display_name_from_parts(
@@ -99,6 +107,20 @@ def _rename_available_at(changed_at: datetime | None) -> datetime | None:
     return changed_at + USERNAME_RENAME_COOLDOWN
 
 
+def _links_as_dicts(raw: object) -> list[dict[str, str]]:
+    if not isinstance(raw, list):
+        return []
+    links: list[dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        label = item.get('label')
+        url = item.get('url')
+        if isinstance(label, str) and isinstance(url, str):
+            links.append({'label': label, 'url': url})
+    return links
+
+
 def _to_owned(user: User) -> OwnedProfile:
     username = user.username
     if not isinstance(username, str) or not username:
@@ -109,6 +131,9 @@ def _to_owned(user: User) -> OwnedProfile:
         username=username,
         display_name=user.display_name,
         bio=user.bio,
+        avatar_url=user.avatar_url,
+        website_url=user.website_url,
+        links=_links_as_dicts(user.links),
         preferences=normalize_preferences(user.preferences),
         username_changed_at=changed_at,
         username_rename_available_at=_rename_available_at(changed_at),
@@ -235,7 +260,7 @@ async def get_public_profile(
     *,
     username: str,
 ) -> PublicProfile:
-    """Load a public profile by username."""
+    """Load a public profile by username (soft-deleted → not found)."""
     normalized = normalize_username(username)
     if not is_valid_username(normalized) or is_reserved_username(normalized):
         raise ProfileNotFoundError('profile not found')
@@ -243,9 +268,14 @@ async def get_public_profile(
     if user is None or user.username is None:
         raise ProfileNotFoundError('profile not found')
     return PublicProfile(
+        id=user.id,
+        identity_id=user.identity_id,
         username=user.username,
         display_name=user.display_name,
         bio=user.bio,
+        avatar_url=user.avatar_url,
+        website_url=user.website_url,
+        links=_links_as_dicts(user.links),
     )
 
 
@@ -256,6 +286,9 @@ async def update_owned_profile(
     username: str | None = None,
     display_name: str | None | object = ...,
     bio: str | None | object = ...,
+    avatar_url: str | None | object = ...,
+    website_url: str | None | object = ...,
+    links: list[dict[str, str]] | object = ...,
     theme: str | None = None,
     spoilers: str | None = None,
     language: str | None = None,
@@ -295,6 +328,9 @@ async def update_owned_profile(
             username=next_username,
             display_name=display_name,
             bio=bio,
+            avatar_url=avatar_url,
+            website_url=website_url,
+            links=links,
             username_changed_at=next_changed_at,
         )
         if update_preferences:

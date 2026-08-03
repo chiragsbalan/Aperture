@@ -8,9 +8,11 @@ import { TitlePosterLink } from '@/components/title-poster-link';
 import {
   fetchSystemList,
   hrefForLibraryContent,
+  patchSystemListVisibility,
   removeLibraryItem,
   type LibraryKind,
   type LibraryListItem,
+  type ListVisibility,
 } from '@/lib/library';
 
 type LoadState =
@@ -23,6 +25,7 @@ type LoadState =
       total: number;
       page: number;
       limit: number;
+      visibility: ListVisibility;
     };
 
 export function LibraryListPage({
@@ -37,7 +40,9 @@ export function LibraryListPage({
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [visibilityPending, setVisibilityPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const visibilityId = `${kind}-visibility`;
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +66,7 @@ export function LibraryListPage({
         total: result.data.total,
         page: result.data.page,
         limit: result.data.limit,
+        visibility: result.data.visibility,
       });
     }
 
@@ -69,6 +75,30 @@ export function LibraryListPage({
       cancelled = true;
     };
   }, [kind]);
+
+  async function handleVisibilityChange(next: ListVisibility) {
+    if (
+      state.status !== 'ready' ||
+      visibilityPending ||
+      next === state.visibility
+    ) {
+      return;
+    }
+    setVisibilityPending(true);
+    setActionError(null);
+    const previous = state.visibility;
+    setState({ ...state, visibility: next });
+    const result = await patchSystemListVisibility(kind, next);
+    setVisibilityPending(false);
+    if (!result.ok) {
+      setActionError(result.error);
+      setState((current) =>
+        current.status === 'ready'
+          ? { ...current, visibility: previous }
+          : current,
+      );
+    }
+  }
 
   async function handleRemove(item: LibraryListItem) {
     if (state.status !== 'ready' || pendingId != null) {
@@ -127,6 +157,7 @@ export function LibraryListPage({
       total: result.data.total,
       page: result.data.page,
       limit: result.data.limit,
+      visibility: result.data.visibility,
     });
   }
 
@@ -137,6 +168,33 @@ export function LibraryListPage({
         Your personal {kind === 'watchlist' ? 'queue' : 'favorites'}.
       </p>
       <LibraryNav />
+
+      {state.status === 'ready' ? (
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <label htmlFor={visibilityId} className="text-sm text-muted">
+            Visibility
+          </label>
+          <select
+            id={visibilityId}
+            name="visibility"
+            value={state.visibility}
+            disabled={visibilityPending}
+            aria-busy={visibilityPending}
+            className="border border-[var(--color-border)] bg-transparent px-3 py-2 text-sm text-foreground"
+            onChange={(event) => {
+              void handleVisibilityChange(event.target.value as ListVisibility);
+            }}
+          >
+            <option value="private">Private</option>
+            <option value="public">Public</option>
+          </select>
+          <p className="text-sm text-muted">
+            {state.visibility === 'public'
+              ? 'Visible on your public profile.'
+              : 'Only you can see this list.'}
+          </p>
+        </div>
+      ) : null}
 
       {state.status === 'loading' ? (
         <p className="mt-10 text-muted" role="status">

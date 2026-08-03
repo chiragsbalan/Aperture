@@ -69,6 +69,9 @@ async def update_user_profile(
     username: str | None = None,
     display_name: str | None | object = ...,
     bio: str | None | object = ...,
+    avatar_url: str | None | object = ...,
+    website_url: str | None | object = ...,
+    links: list[dict[str, str]] | object = ...,
     username_changed_at: datetime | None | object = ...,
 ) -> User:
     """Mutate profile fields on ``user`` and flush."""
@@ -78,6 +81,12 @@ async def update_user_profile(
         user.display_name = display_name  # type: ignore[assignment]
     if bio is not ...:
         user.bio = bio  # type: ignore[assignment]
+    if avatar_url is not ...:
+        user.avatar_url = avatar_url  # type: ignore[assignment]
+    if website_url is not ...:
+        user.website_url = website_url  # type: ignore[assignment]
+    if links is not ...:
+        user.links = links  # type: ignore[assignment]
     if username_changed_at is not ...:
         user.username_changed_at = username_changed_at  # type: ignore[assignment]
     await session.flush()

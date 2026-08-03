@@ -185,7 +185,6 @@ export function CustomListsPage() {
                 className="mt-1 border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
               >
                 <option value="private">Private</option>
-                <option value="unlisted">Unlisted</option>
                 <option value="public">Public</option>
               </select>
             </div>

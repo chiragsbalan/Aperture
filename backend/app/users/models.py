@@ -27,6 +27,13 @@ class User(UuidPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    website_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    links: Mapped[list[Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+    )
     preferences: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,

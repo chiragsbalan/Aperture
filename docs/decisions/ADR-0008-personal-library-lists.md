@@ -62,12 +62,16 @@ Phase 3 ships a personal library on the public product. Watchlist and favorites 
 
 ### AuthZ / visibility
 
+`lists.visibility` is **`private` | `public` only** (pc.1). Existing `unlisted` rows were migrated to `private`; API writes reject `unlisted`.
+
 | Case | Behavior |
 |---|---|
 | Private custom list, non-owner or anon | **404** (no existence leak) |
-| Public / unlisted custom list | Readable by id (OptionalIdentity: missing → anon; invalid token → **401**) |
+| Public custom list | Readable by id (OptionalIdentity: missing → anon; invalid token → **401**) |
 | System kinds via `/lists/{id}*` mutate/contains/GET | **404** (`require_custom_list_mutable` / custom-only read surface) |
+| System watchlist/favorites visibility | Owner toggles via `PATCH /me/watchlist` / `PATCH /me/favorites`; public read by username lands in profile-complete `pc.2` |
 | Shareable list DTO | `is_owner` boolean; `owner_user_id` only for owner (null for others) |
+| Diary | **Always public** on profile (no visibility column / toggle). Public read: `GET /api/v1/users/{username}/watch-entries` (see [ADR-0009](ADR-0009-public-profiles.md)). Owner mutate/list: `/api/v1/me/watch-entries` |
 | Diary PATCH/DELETE other user’s entry | **404** |
 
 ### Reorder
@@ -103,4 +107,5 @@ Title ≤ 100; description ≤ 2000; ≤ **500** items/list; ≤ **50** custom l
 
 - Fractional / sparse reorder if renumber cost becomes measurable beyond the 500-item cap.
 - Optional FK from `list_items.content_id` → `content_items.id` if orphan cleanup becomes painful.
-- Public list discovery / trending; diary privacy on profiles; episode-level diary; Letterboxd import.
+- Public list discovery / trending; episode-level diary; Letterboxd import.
+- Username-scoped public shelf APIs — [ADR-0009](ADR-0009-public-profiles.md) / profile-complete track.

@@ -1,6 +1,6 @@
 export type LibraryKind = 'watchlist' | 'favorites';
 export type LibraryContentType = 'movie' | 'tv';
-export type ListVisibility = 'private' | 'public' | 'unlisted';
+export type ListVisibility = 'private' | 'public';
 
 export interface LibraryContentSummary {
   type: LibraryContentType;
@@ -20,6 +20,7 @@ export interface LibraryListItem {
 export interface SystemListResponse {
   kind: LibraryKind;
   title: string;
+  visibility: ListVisibility;
   page: number;
   limit: number;
   total: number;
@@ -129,6 +130,28 @@ export async function fetchSystemList(
       ok: false,
       status: res.status,
       error: errorForStatus(res.status, 'Could not load this list.'),
+    };
+  }
+  return { ok: true, data: (await res.json()) as SystemListResponse };
+}
+
+export async function patchSystemListVisibility(
+  kind: LibraryKind,
+  visibility: ListVisibility,
+): Promise<
+  | { ok: true; data: SystemListResponse }
+  | { ok: false; status: number; error: string }
+> {
+  const res = await fetch(`/api/proxy/api/v1/me/${kind}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ visibility }),
+  });
+  if (!res.ok) {
+    return {
+      ok: false,
+      status: res.status,
+      error: errorForStatus(res.status, 'Could not update visibility.'),
     };
   }
   return { ok: true, data: (await res.json()) as SystemListResponse };
@@ -434,6 +457,180 @@ export async function fetchWatchEntries(
   return { ok: true, data: (await res.json()) as WatchEntriesPage };
 }
 
+const PUBLIC_DIARY_TTL_MS = 60_000;
+/** Max expired keys removed per opportunistic prune pass. */
+const PUBLIC_DIARY_PRUNE_BUDGET = 32;
+
+type PublicDiaryViewData = {
+  items: WatchEntry[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+const publicDiaryPageCache = new Map<
+  string,
+  { at: number; data: WatchEntriesPage }
+>();
+
+/** Accumulated profile-diary view (includes loaded pages). */
+const publicDiaryViewCache = new Map<
+  string,
+  { at: number; data: PublicDiaryViewData }
+>();
+
+function publicDiaryCacheKey(
+  username: string,
+  page: number,
+  limit: number,
+  filters?: { year?: number; month?: number },
+): string {
+  return [
+    username.toLowerCase(),
+    page,
+    limit,
+    filters?.year ?? '',
+    filters?.month ?? '',
+  ].join(':');
+}
+
+function isPublicDiaryCacheFresh(at: number, now: number): boolean {
+  return now - at <= PUBLIC_DIARY_TTL_MS;
+}
+
+/** Drop a bounded number of expired page/view cache entries. */
+function pruneExpiredPublicDiaryCaches(now = Date.now()): void {
+  let remaining = PUBLIC_DIARY_PRUNE_BUDGET;
+  for (const [key, entry] of publicDiaryPageCache) {
+    if (remaining <= 0) {
+      break;
+    }
+    if (!isPublicDiaryCacheFresh(entry.at, now)) {
+      publicDiaryPageCache.delete(key);
+      remaining -= 1;
+    }
+  }
+  for (const [key, entry] of publicDiaryViewCache) {
+    if (remaining <= 0) {
+      break;
+    }
+    if (!isPublicDiaryCacheFresh(entry.at, now)) {
+      publicDiaryViewCache.delete(key);
+      remaining -= 1;
+    }
+  }
+}
+
+/** Drop cached public diary pages/views (all users, or one username). */
+export function invalidatePublicWatchEntries(username?: string): void {
+  if (username == null) {
+    publicDiaryPageCache.clear();
+    publicDiaryViewCache.clear();
+    return;
+  }
+  const normalized = username.toLowerCase();
+  const prefix = `${normalized}:`;
+  for (const key of publicDiaryPageCache.keys()) {
+    if (key.startsWith(prefix)) {
+      publicDiaryPageCache.delete(key);
+    }
+  }
+  publicDiaryViewCache.delete(normalized);
+}
+
+export function peekPublicDiaryView(
+  username: string,
+): PublicDiaryViewData | null {
+  const key = username.toLowerCase();
+  const hit = publicDiaryViewCache.get(key);
+  if (hit == null) {
+    return null;
+  }
+  if (!isPublicDiaryCacheFresh(hit.at, Date.now())) {
+    publicDiaryViewCache.delete(key);
+    return null;
+  }
+  return hit.data;
+}
+
+export function rememberPublicDiaryView(
+  username: string,
+  data: PublicDiaryViewData,
+): void {
+  pruneExpiredPublicDiaryCaches();
+  publicDiaryViewCache.set(username.toLowerCase(), {
+    at: Date.now(),
+    data,
+  });
+}
+
+/** Sync read of a cached public diary page (for instant remounts). */
+export function peekPublicWatchEntries(
+  username: string,
+  page = 1,
+  limit = 24,
+  filters?: { year?: number; month?: number },
+): WatchEntriesPage | null {
+  const key = publicDiaryCacheKey(username, page, limit, filters);
+  const hit = publicDiaryPageCache.get(key);
+  if (hit == null) {
+    return null;
+  }
+  if (!isPublicDiaryCacheFresh(hit.at, Date.now())) {
+    publicDiaryPageCache.delete(key);
+    return null;
+  }
+  return hit.data;
+}
+
+/** Public diary for a username (always public; no auth required). */
+export async function fetchPublicWatchEntries(
+  username: string,
+  page = 1,
+  limit = 24,
+  filters?: { year?: number; month?: number },
+  options?: { bypassCache?: boolean },
+): Promise<{ ok: true; data: WatchEntriesPage } | ApiError> {
+  const key = publicDiaryCacheKey(username, page, limit, filters);
+  const now = Date.now();
+  if (!options?.bypassCache) {
+    const hit = publicDiaryPageCache.get(key);
+    if (hit != null && isPublicDiaryCacheFresh(hit.at, now)) {
+      publicDiaryPageCache.set(key, { at: now, data: hit.data });
+      return { ok: true, data: hit.data };
+    }
+    if (hit != null) {
+      publicDiaryPageCache.delete(key);
+    }
+  }
+
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  if (filters?.year != null) {
+    params.set('year', String(filters.year));
+  }
+  if (filters?.month != null) {
+    params.set('month', String(filters.month));
+  }
+  const res = await fetch(
+    `/api/proxy/api/v1/users/${encodeURIComponent(username)}/watch-entries?${params.toString()}`,
+    { cache: 'no-store' },
+  );
+  if (!res.ok) {
+    return {
+      ok: false,
+      status: res.status,
+      error: errorForStatus(res.status, 'Could not load diary.'),
+    };
+  }
+  const data = (await res.json()) as WatchEntriesPage;
+  pruneExpiredPublicDiaryCaches();
+  publicDiaryPageCache.set(key, { at: Date.now(), data });
+  return { ok: true, data };
+}
+
 export async function createWatchEntry(input: {
   type: LibraryContentType;
   id: string;
@@ -459,6 +656,7 @@ export async function createWatchEntry(input: {
       error: errorForStatus(res.status, 'Could not log watch.'),
     };
   }
+  invalidatePublicWatchEntries();
   return { ok: true, entry: (await res.json()) as WatchEntry };
 }
 
@@ -478,6 +676,7 @@ export async function patchWatchEntry(
       error: errorForStatus(res.status, 'Could not update diary entry.'),
     };
   }
+  invalidatePublicWatchEntries();
   return { ok: true, entry: (await res.json()) as WatchEntry };
 }
 
@@ -494,6 +693,7 @@ export async function deleteWatchEntry(
       error: errorForStatus(res.status, 'Could not delete diary entry.'),
     };
   }
+  invalidatePublicWatchEntries();
   return { ok: true };
 }
 

@@ -3,6 +3,8 @@ import { initialsFromProfile } from '@/lib/profile';
 interface ProfileAvatarProps {
   username: string;
   displayName?: string | null;
+  /** Ignored for now — remote avatars are blocked by CSP; initials only. */
+  avatarUrl?: string | null;
   size?: 'sm' | 'md' | 'lg';
 }
 
