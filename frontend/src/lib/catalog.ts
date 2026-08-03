@@ -129,6 +129,10 @@ export interface TitleExtras {
   genres: NamedId[];
   keywords: NamedId[];
   studios: StudioRef[];
+  /** Present on TV extras; empty/omitted for movies. */
+  networks?: StudioRef[];
+  /** Typical episode length in minutes (TV). */
+  episode_runtime_minutes?: number | null;
   countries: CountryRef[];
   spoken_languages: LanguageRef[];
   alternative_titles: AlternativeTitle[];

@@ -40,6 +40,26 @@ class TmdbCredits(BaseModel):
     crew: list[TmdbCrewCredit] = Field(default_factory=list)
 
 
+class TmdbCreator(BaseModel):
+    """TV ``created_by`` person stub from TMDb."""
+
+    model_config = ConfigDict(extra='ignore')
+
+    id: int
+    name: str
+    profile_path: str | None = None
+
+
+class TmdbNetwork(BaseModel):
+    """TV network / channel stub from TMDb."""
+
+    model_config = ConfigDict(extra='ignore')
+
+    id: int | None = None
+    name: str
+    origin_country: str | None = None
+
+
 class TmdbEpisode(BaseModel):
     """Episode fixture row."""
 
@@ -103,6 +123,9 @@ class TmdbTvShow(BaseModel):
     status: str | None = None
     number_of_seasons: int | None = None
     number_of_episodes: int | None = None
+    episode_run_time: list[int] = Field(default_factory=list)
+    created_by: list[TmdbCreator] = Field(default_factory=list)
+    networks: list[TmdbNetwork] = Field(default_factory=list)
     credits: TmdbCredits = Field(default_factory=TmdbCredits)
     seasons: list[TmdbSeason] = Field(default_factory=list)
     extras: dict[str, Any] = Field(default_factory=dict)

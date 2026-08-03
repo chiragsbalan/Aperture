@@ -2,8 +2,10 @@
  * Aperture design tokens — source of truth for color, type, space, radius,
  * elevation, z-index, and motion.
  *
- * Prefer these CSS variables (or `.type-*` utilities in globals.css) over raw
- * hex / rem values. JS duration mirrors: `frontend/src/lib/motion.ts`.
+ * Prefer these CSS variables (or `.type-*` / `.motion-*` / `.scroll-fade-x`
+ * utilities in globals.css) over raw hex / rem values.
+ * JS duration mirrors: `frontend/src/lib/motion.ts`.
+ * Horizontal scroll fades: `useScrollFadeX` in `frontend/src/lib/scroll-fade.ts`.
  *
  * Dark is the default theme; light tokens are defined for future toggle use.
  */
@@ -147,6 +149,12 @@
   --duration-slow: 900ms;
   /* Keep in sync with FLIP_ANIM_MS in poster-mosaic.tsx (special-case) */
   --poster-flip-ms: 640ms;
+
+  /*
+   * Horizontal overflow hint — pair with `.scroll-fade-x` + useScrollFadeX.
+   * Soft edge mask length when more content is scrollable that way.
+   */
+  --scroll-fade-size: 1.75rem;
 }
 
 [data-theme='light'] {

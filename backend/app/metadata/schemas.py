@@ -208,6 +208,8 @@ class TitleExtras(BaseModel):
     genres: list[NamedId] = Field(default_factory=list)
     keywords: list[NamedId] = Field(default_factory=list)
     studios: list[StudioRef] = Field(default_factory=list)
+    networks: list[StudioRef] = Field(default_factory=list)
+    episode_runtime_minutes: int | None = None
     countries: list[CountryRef] = Field(default_factory=list)
     spoken_languages: list[LanguageRef] = Field(default_factory=list)
     alternative_titles: list[AlternativeTitle] = Field(default_factory=list)

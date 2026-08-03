@@ -90,6 +90,10 @@ def test_tv_detail_200(
     assert body['title'] == 'Breaking Bad'
     assert len(body['seasons']) >= 1
     assert body['seasons'][0]['episodes']
+    extras = body['extras']
+    assert any(n['name'] == 'AMC' for n in extras['networks'])
+    assert extras['episode_runtime_minutes'] == 47
+    assert any(c['job'] == 'Creator' for c in body['crew'])
 
 
 @pytest.mark.integration

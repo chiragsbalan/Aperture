@@ -1,7 +1,13 @@
+'use client';
+
 import Image from 'next/image';
+import { useState } from 'react';
 
 /**
  * Shared title poster used on detail and “more like this”.
+ *
+ * Failed-load state is owned by an inner wrapper keyed on ``url`` so a new
+ * image remounts clean state without a reset effect.
  */
 export function CatalogPoster({
   url,
@@ -19,6 +25,36 @@ export function CatalogPoster({
   aspectClassName?: string;
   className?: string;
 }) {
+  return (
+    <CatalogPosterInner
+      key={url ?? ''}
+      url={url}
+      alt={alt}
+      priority={priority}
+      sizes={sizes}
+      aspectClassName={aspectClassName}
+      className={className}
+    />
+  );
+}
+
+function CatalogPosterInner({
+  url,
+  alt,
+  priority,
+  sizes,
+  aspectClassName,
+  className,
+}: {
+  url: string | null;
+  alt: string;
+  priority: boolean;
+  sizes: string;
+  aspectClassName: string;
+  className: string;
+}) {
+  const [failed, setFailed] = useState(false);
+
   const frameClass = [
     aspectClassName,
     'w-full overflow-hidden rounded-[var(--radius-sm)] ring-1 ring-[var(--color-border)]',
@@ -27,16 +63,18 @@ export function CatalogPoster({
     .filter(Boolean)
     .join(' ');
 
-  if (!url) {
+  if (!url || failed) {
     return (
       <div
-        aria-hidden
-        className={`flex items-center justify-center bg-[var(--color-bg-elevated)] text-sm text-muted ${frameClass}`}
+        role="img"
+        aria-label={alt}
+        className={`flex items-center justify-center bg-[var(--color-bg-elevated)] text-[length:var(--text-xs)] text-muted sm:text-sm ${frameClass}`}
       >
         No image
       </div>
     );
   }
+
   return (
     <div className={`relative shadow-[var(--elev-poster)] ${frameClass}`}>
       <Image
@@ -46,6 +84,9 @@ export function CatalogPoster({
         priority={priority}
         className="object-cover object-top"
         sizes={sizes}
+        onError={() => {
+          setFailed(true);
+        }}
       />
     </div>
   );
