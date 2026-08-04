@@ -4,6 +4,7 @@
 - **Date:** 2026-08-01
 - **Related:** Domain Model PDF; Database Design PDFs; Metadata LLD; PLAN.md P2.1+; [ADR-0008](ADR-0008-personal-library-lists.md) (list content-ref typing)
 - **Implements in:** P2 (canonical catalog + detail UX); later domains reference these ids
+- **Amended:** 2026-08-05 — signed-in home discovery rails (cold TMDb cards; server-only TMDb)
 
 ## Context
 
@@ -47,9 +48,25 @@ Database Design also models seasons, episodes, and people as first-class tables�
 - **TMDb is server-only:** the API key stays in backend env; browsers receive Aperture UUIDs and CDN image URLs built from relative paths.
 - **Fixture seed is a first-class ship path:** offline JSON under `backend/app/metadata/fixtures/` can populate prod via `make seed-metadata` (or equivalent) against `DATABASE_URL` without a TMDb key; live TMDb ingest remains optional.
 
+### Signed-in home discovery rails (pc.2)
+
+Cold **TMDb-id card** rails for the signed-in home (not Aperture UUID shelves):
+
+| Route | Source |
+|---|---|
+| `GET /api/v1/catalog/now-in-theatres` | TMDb `now_playing` (popularity-sorted pool) |
+| `GET /api/v1/catalog/top-movies` | TMDb top-rated movies (pool + per-request shuffle) |
+| `GET /api/v1/catalog/top-tv-shows` | TMDb top-rated TV (pool + per-request shuffle) |
+
+- Responses are lightweight poster cards keyed by **TMDb id** + kind; clients open titles via existing resolve / morph paths (warm Aperture UUID when known).
+- Pools are Redis-cached with single-flight fill; `Cache-Control: private, no-store` on responses.
+- Shared IP rate-limit bucket (`enforce_top_movies_rate_limit` / related knobs) across the three rails.
+- Empty/degraded pools return empty lists rather than failing the home page.
+
 ## Future evolution
 
 - Additional `source` values (IMDb, manual admin, etc.) without changing the unique key shape.
 - OpenSearch documents (P6) and embeddings (P8+) reference the same canonical ids.
 - If a true merge of two canonical items is ever required, prefer an explicit merge/redirect procedure over silently changing PKs—document in a superseding ADR if needed.
 - Broader alignment of detail DTO `tv_show` with public `tv` across all surfaces may land later; list APIs already normalize per ADR-0008.
+- Optional batched `GET /catalog/home-rails` to collapse the three rail RTTs.

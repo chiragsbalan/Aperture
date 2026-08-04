@@ -51,8 +51,8 @@ Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
 | [ADR-0004](ADR-0004-content-identity.md) | Canonical content identity (`content_items` / `external_ids`) |
 | [ADR-0005](ADR-0005-auth.md) | Auth / sessions (BFF cookies, JWT, Argon2id, email-or-username login, OAuth link rules) |
 | [ADR-0006](ADR-0006-redis-search-staging.md) | Redis at P2; PG FTS → OpenSearch staging |
-| [ADR-0008](ADR-0008-personal-library-lists.md) | Personal library (system + custom lists, dense reorder, diary / `watch_entries`) |
-| [ADR-0009](ADR-0009-public-profiles.md) | Public profiles (always-public shell, counters in API layer, shelf surfaces) |
+| [ADR-0008](ADR-0008-personal-library-lists.md) | Personal library (system + custom lists, newest-first order, diary / ratings / contains) |
+| [ADR-0009](ADR-0009-public-profiles.md) | Public profiles (always-public shell, pc.2 Watchlist/Lists, counters in API layer) |
 
 Reserved / not yet written: **ADR-0007** — OpenSearch hosting (due at P5 exit per PLAN).
 ## Template

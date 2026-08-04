@@ -24,6 +24,8 @@ Browser auth remains same-origin Next.js BFF with `__Host-` cookies (backend coo
 
 **Auth/BFF transport:** same-origin Next.js BFF; cookies `__Host-ap_at` / `__Host-ap_rt`; FastAPI cookie-agnostic. Token lifetimes, hashing, and OAuth link rules are in [ADR-0005](ADR-0005-auth.md).
 
+**Catch-all proxy refresh (pc.2):** `frontend/src/app/api/proxy/[...path]/route.ts` performs a **single** refresh-and-retry on upstream `401` when a refresh cookie is present. Concurrent 401s share one in-flight refresh (module-scoped singleflight keyed by refresh token); each waiter retries its own upstream request, including mutating methods. Residual risk: a non-idempotent POST/PATCH may double-submit if the first attempt already applied after the access token expired — accepted for session reliability; prefer Idempotency-Key on write routes if duplicates become measurable.
+
 **Migrations:** run against Supabase (`DATABASE_URL`; prefer pooler/session settings documented in `.env.example`). Account for Free API sleep and possible Free project pause when automating migrate-on-deploy.
 
 **Supabase TLS (asyncpg):** remote hosts enable TLS with Postgres **`sslmode=require` semantics** — encrypt, do not verify the CA chain (`app/core/db_ssl.py`). Full verify (`ssl=True` / verify-full) fails against the Supabase pooler chain (`CERTIFICATE_VERIFY_FAILED: self-signed certificate in certificate chain`) and breaks Render migrate-on-start. Prefer the **session pooler** URI (port **5432**), not the transaction pooler (6543), for Alembic DDL. Do not rely on `?ssl=require` query params with `postgresql+asyncpg`.
