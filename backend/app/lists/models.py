@@ -52,8 +52,16 @@ class List(UuidPrimaryKeyMixin, TimestampMixin, Base):
             name='kind',
         ),
         CheckConstraint(
-            "visibility IN ('private', 'public')",
+            "visibility IN ('private', 'public', 'unlisted')",
             name='visibility',
+        ),
+        CheckConstraint(
+            "(kind <> 'watchlist') OR (visibility = 'public')",
+            name='watchlist_public',
+        ),
+        CheckConstraint(
+            "(kind <> 'favorites') OR (visibility = 'private')",
+            name='favorites_private',
         ),
         Index('ix_lists_owner_user_id', 'owner_user_id'),
         Index('ix_lists_owner_kind', 'owner_user_id', 'kind'),

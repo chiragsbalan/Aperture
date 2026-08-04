@@ -155,7 +155,8 @@ async def get_or_create_system_list(
         kind=kind,
         title=lists_repository.SYSTEM_TITLES[kind],
         description=None,
-        visibility='private',
+        # DB invariants (e1f2a3b4c5d6): watchlist always public, favorites private.
+        visibility='public' if kind == 'watchlist' else 'private',
     )
     try:
         async with session.begin_nested():
@@ -268,6 +269,15 @@ async def patch_system_list_visibility(
         raise ValueError(f'not a system list kind: {kind}')
     if visibility not in VISIBILITIES:
         raise UnsupportedListContentError('invalid visibility')
+    # Kind-scoped invariants from e1f2a3b4c5d6 (reject before DB check fails).
+    if kind == 'watchlist' and visibility != 'public':
+        raise UnsupportedListContentError(
+            'watchlist visibility is fixed to public',
+        )
+    if kind == 'favorites' and visibility != 'private':
+        raise UnsupportedListContentError(
+            'favorites visibility is fixed to private',
+        )
     list_row = await get_or_create_system_list(
         session,
         identity_id=identity_id,

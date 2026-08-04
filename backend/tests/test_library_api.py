@@ -359,8 +359,9 @@ def test_system_list_visibility_patch(
 
     watchlist = api_client.get('/api/v1/me/watchlist', headers=owner_headers)
     assert watchlist.status_code == 200
-    assert watchlist.json()['visibility'] == 'private'
+    assert watchlist.json()['visibility'] == 'public'
 
+    # Idempotent keep-public is allowed; flipping off public is rejected.
     patched = api_client.patch(
         '/api/v1/me/watchlist',
         headers=owner_headers,
@@ -368,14 +369,33 @@ def test_system_list_visibility_patch(
     )
     assert patched.status_code == 200, patched.text
     assert patched.json()['visibility'] == 'public'
+    assert (
+        api_client.patch(
+            '/api/v1/me/watchlist',
+            headers=owner_headers,
+            json={'visibility': 'private'},
+        ).status_code
+        == 422
+    )
 
-    favorites = api_client.patch(
+    favorites = api_client.get('/api/v1/me/favorites', headers=owner_headers)
+    assert favorites.status_code == 200
+    assert favorites.json()['visibility'] == 'private'
+    assert (
+        api_client.patch(
+            '/api/v1/me/favorites',
+            headers=owner_headers,
+            json={'visibility': 'public'},
+        ).status_code
+        == 422
+    )
+    kept = api_client.patch(
         '/api/v1/me/favorites',
         headers=owner_headers,
-        json={'visibility': 'public'},
+        json={'visibility': 'private'},
     )
-    assert favorites.status_code == 200
-    assert favorites.json()['visibility'] == 'public'
+    assert kept.status_code == 200, kept.text
+    assert kept.json()['visibility'] == 'private'
 
 
 @pytest.mark.integration
