@@ -43,7 +43,7 @@ class List(UuidPrimaryKeyMixin, TimestampMixin, Base):
     items: Mapped[list[ListItem]] = relationship(
         back_populates='list',
         cascade='all, delete-orphan',
-        order_by='ListItem.position',
+        order_by='ListItem.created_at.desc()',
     )
 
     __table_args__ = (

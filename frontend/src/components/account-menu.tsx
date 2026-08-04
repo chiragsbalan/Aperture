@@ -425,8 +425,8 @@ export function AccountMenu({
                   .join(' ')}
                 style={{ top: anchor.top, right: anchor.right }}
               >
-                <div className="account-menu-surface overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
-                  <div className="account-menu-header relative px-4 pb-4 pt-4">
+                <div className="overlay-surface overflow-hidden">
+                  <div className="account-menu-header overlay-header-rule px-4 pb-4 pt-4">
                     <p className="text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-wider)] text-muted">
                       ACCOUNT
                     </p>

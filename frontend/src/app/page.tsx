@@ -2,13 +2,18 @@ import type { Metadata } from 'next';
 import { cookies, headers } from 'next/headers';
 
 import { GuestLanding } from '@/components/guest-landing';
+import { HomeCatalogRail } from '@/components/home-catalog-rail';
 import { PosterMosaic } from '@/components/poster-mosaic';
 import { SiteHeader } from '@/components/site-header';
-import { TopMoviesRail } from '@/components/top-movies-rail';
 import { upstreamApiBaseUrl } from '@/lib/api';
 import { accessCookieName, refreshCookieName } from '@/lib/auth-cookies';
 import { UPSTREAM_FETCH_TIMEOUT_MS } from '@/lib/bff-proxy';
-import { fetchLandingPosterUrls, fetchTopMovies } from '@/lib/catalog';
+import {
+  fetchLandingPosterUrls,
+  fetchNowInTheatres,
+  fetchTopMovies,
+  fetchTopTvShows,
+} from '@/lib/catalog';
 import {
   applyTrustedClientIpHeaders,
   clientIpFromForwardedFor,
@@ -92,23 +97,62 @@ async function shouldShowSignedInHome(): Promise<boolean> {
 }
 
 export default async function HomePage() {
+  const jar = await cookies();
+  const hasAuthCookies = Boolean(
+    jar.get(accessCookieName())?.value || jar.get(refreshCookieName())?.value,
+  );
+
+  // When auth cookies exist, start rail fetches in parallel with the session
+  // probe — do not await auth before kicking off catalogue requests.
+  const railsPromise = hasAuthCookies
+    ? Promise.all([fetchNowInTheatres(), fetchTopMovies(), fetchTopTvShows()])
+    : null;
+
   if (await shouldShowSignedInHome()) {
-    const movies = await fetchTopMovies();
+    const [inTheatres, movies, shows] = await (railsPromise ??
+      Promise.all([fetchNowInTheatres(), fetchTopMovies(), fetchTopTvShows()]));
     return (
-      <div className="shell-atmosphere relative flex min-h-dvh flex-col items-center py-16 sm:py-24">
+      <div className="layout-shell shell-atmosphere relative flex min-h-dvh flex-col items-center">
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
         <SiteHeader />
         <main
           id="main-content"
-          className="layout-content motion-fade-rise relative z-[1] text-left"
+          className="layout-content motion-fade-rise relative z-[1] space-y-12 text-left sm:space-y-16"
         >
-          <TopMoviesRail movies={movies} />
+          <HomeCatalogRail
+            headingId="now-in-theatres-heading"
+            headingLevel="h1"
+            title="Now in theatres"
+            description="The most popular movies playing in theatres right now."
+            emptyMessage="Now in theatres is unavailable right now. Try again shortly."
+            items={inTheatres}
+            kind="movie"
+          />
+          <HomeCatalogRail
+            headingId="top-movies-heading"
+            title="Top movies"
+            description={"A rotating sample from TMDb's all-time top rated."}
+            emptyMessage="Top movies are unavailable right now. Try again shortly."
+            items={movies}
+            kind="movie"
+          />
+          <HomeCatalogRail
+            headingId="top-tv-shows-heading"
+            title="Top TV shows"
+            description={"A rotating sample from TMDb's all-time top rated TV."}
+            emptyMessage="Top TV shows are unavailable right now. Try again shortly."
+            items={shows}
+            kind="tv"
+          />
         </main>
       </div>
     );
   }
+
+  // Guest: ignore any in-flight rail results and show the landing as today.
+  void railsPromise;
 
   const posters = await fetchLandingPosterUrls();
   return (

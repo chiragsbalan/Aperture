@@ -303,7 +303,7 @@ export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
               aria-label="Search"
               aria-describedby={descriptionId}
               className={[
-                'search-overlay-panel relative z-[1] w-full max-w-xl',
+                'search-overlay-panel overlay-panel-motion relative z-[1] w-full max-w-xl',
                 isLeaving ? 'is-leaving' : '',
               ]
                 .filter(Boolean)
@@ -317,7 +317,7 @@ export function SiteSearch({ initialQuery = '' }: { initialQuery?: string }) {
                 <label htmlFor={inputId} className="sr-only">
                   Search movies, TV, and people
                 </label>
-                <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(22,20,17,0.72)] px-4 py-3 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+                <div className="overlay-surface flex items-center gap-3 px-4 py-3">
                   <SearchIcon className="shrink-0 text-muted" />
                   <input
                     ref={inputRef}

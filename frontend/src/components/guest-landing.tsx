@@ -18,15 +18,12 @@ export function GuestLanding() {
       </p>
 
       <div className="motion-fade-in mt-8 flex w-full max-w-sm flex-col items-stretch gap-3 sm:mt-10 sm:max-w-none sm:flex-row sm:items-center sm:justify-center sm:gap-4">
-        <Link
-          href="/signup"
-          className="rounded-[var(--radius-md)] bg-[var(--color-primary)] px-5 py-2.5 text-center text-base font-medium text-[var(--color-primary-contrast)] transition hover:brightness-110 sm:[font-size:var(--text-body-sm)]"
-        >
+        <Link href="/signup" className="btn btn-solid">
           Sign up
         </Link>
         <Link
           href="/login"
-          className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-5 py-2.5 text-center text-base font-medium text-foreground transition hover:border-[var(--color-primary)] sm:[font-size:var(--text-body-sm)]"
+          className="btn btn-lg hover:border-[var(--color-primary)]"
         >
           Log in
         </Link>

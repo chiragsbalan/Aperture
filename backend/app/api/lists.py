@@ -23,10 +23,9 @@ from app.lists.schemas import (
     CustomListPageResponse,
     ListItemResponse,
     PatchCustomListBody,
-    PatchSystemListVisibilityBody,
-    ReorderItemsBody,
     SystemListResponse,
 )
+from app.users.rate_limit import enforce_users_public_rate_limit
 
 router = APIRouter(tags=['lists'])
 
@@ -53,11 +52,6 @@ def _map_domain_error(exc: Exception) -> HTTPException | None:
         return HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc) or 'Unsupported content type for lists',
-        )
-    if isinstance(exc, lists_service.ReorderMismatchError):
-        return HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail='item_ids must match list membership',
         )
     if isinstance(exc, lists_service.ListCapacityError):
         return HTTPException(
@@ -230,27 +224,6 @@ async def get_watchlist(
     )
 
 
-@router.patch('/me/watchlist', response_model=SystemListResponse)
-async def patch_watchlist_visibility(
-    body: PatchSystemListVisibilityBody,
-    identity: CurrentIdentityDep,
-    session: DbSessionDep,
-) -> SystemListResponse:
-    """Toggle watchlist visibility (public|private)."""
-    try:
-        return await lists_service.patch_system_list_visibility(
-            session,
-            identity_id=identity.id,
-            kind='watchlist',
-            visibility=body.visibility,
-        )
-    except Exception as exc:
-        mapped = _map_domain_error(exc)
-        if mapped is not None:
-            raise mapped from exc
-        raise
-
-
 @router.post(
     '/me/watchlist/items',
     response_model=ListItemResponse,
@@ -326,27 +299,6 @@ async def get_favorites(
         page=page,
         limit=limit,
     )
-
-
-@router.patch('/me/favorites', response_model=SystemListResponse)
-async def patch_favorites_visibility(
-    body: PatchSystemListVisibilityBody,
-    identity: CurrentIdentityDep,
-    session: DbSessionDep,
-) -> SystemListResponse:
-    """Toggle favorites visibility (public|private)."""
-    try:
-        return await lists_service.patch_system_list_visibility(
-            session,
-            identity_id=identity.id,
-            kind='favorites',
-            visibility=body.visibility,
-        )
-    except Exception as exc:
-        mapped = _map_domain_error(exc)
-        if mapped is not None:
-            raise mapped from exc
-        raise
 
 
 @router.post(
@@ -497,8 +449,15 @@ async def get_custom_list(
     list_id: uuid.UUID,
     identity: OptionalIdentityDep,
     session: DbSessionDep,
+    settings: SettingsDep,
+    request: Request,
 ) -> CustomListDetailResponse:
     """Return custom list metadata (system kinds → 404)."""
+    await enforce_users_public_rate_limit(
+        get_cache(),
+        settings=settings,
+        client_ip=resolve_client_ip(request, settings),
+    )
     try:
         return await lists_service.get_custom_list(
             session,
@@ -581,10 +540,17 @@ async def get_custom_list_items(
     list_id: uuid.UUID,
     identity: OptionalIdentityDep,
     session: DbSessionDep,
+    settings: SettingsDep,
+    request: Request,
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=500)] = 24,
 ) -> CustomListItemsResponse:
     """Paginated items for a readable custom list (system kinds → 404)."""
+    await enforce_users_public_rate_limit(
+        get_cache(),
+        settings=settings,
+        client_ip=resolve_client_ip(request, settings),
+    )
     try:
         return await lists_service.get_custom_list_items(
             session,
@@ -669,40 +635,6 @@ async def remove_custom_list_item(
             raise mapped from exc
         raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.put(
-    '/lists/{list_id}/items/reorder',
-    response_model=CustomListItemsResponse,
-)
-async def reorder_custom_list_items(
-    list_id: uuid.UUID,
-    body: ReorderItemsBody,
-    identity: CurrentIdentityDep,
-    session: DbSessionDep,
-    settings: SettingsDep,
-    request: Request,
-) -> CustomListItemsResponse:
-    """Reorder items; body.item_ids must be set-equal to membership."""
-    cache = get_cache()
-    await enforce_lists_write_rate_limit(
-        cache,
-        settings=settings,
-        identity_id=identity.id,
-        client_ip=resolve_client_ip(request, settings),
-    )
-    try:
-        return await lists_service.reorder_custom_list_items(
-            session,
-            identity_id=identity.id,
-            list_id=list_id,
-            item_ids=body.item_ids,
-        )
-    except Exception as exc:
-        mapped = _map_domain_error(exc)
-        if mapped is not None:
-            raise mapped from exc
-        raise
 
 
 @router.get('/lists/{list_id}/contains', response_model=ContainsResponse)

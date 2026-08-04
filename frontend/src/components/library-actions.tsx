@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import {
   useEffect,
@@ -10,13 +11,16 @@ import {
   type ReactNode,
 } from 'react';
 
+import { localTodayIsoDate } from '@/lib/iso_date';
 import {
   addCustomListItem,
   addLibraryItem,
   createWatchEntry,
+  DIARY_LOGGED_CHANGED_EVENT,
   fetchCustomListsMembership,
   fetchLibraryContains,
   fetchMyCustomLists,
+  fetchWatchEntriesContains,
   membershipKey,
   removeCustomListItem,
   removeLibraryItem,
@@ -25,12 +29,29 @@ import {
   type LibraryContentType,
 } from '@/lib/library';
 
+const LibraryAddToListSheet = dynamic(
+  () =>
+    import('@/components/library-add-to-list-sheet').then(
+      (mod) => mod.LibraryAddToListSheet,
+    ),
+  { ssr: false },
+);
+
+const LibraryLogWatchSheet = dynamic(
+  () =>
+    import('@/components/library-log-watch-sheet').then(
+      (mod) => mod.LibraryLogWatchSheet,
+    ),
+  { ssr: false },
+);
+
+function prefetchLibrarySheets() {
+  void import('@/components/library-add-to-list-sheet');
+  void import('@/components/library-log-watch-sheet');
+}
+
 type AuthState = 'loading' | 'signed_out' | 'signed_in';
 type MembershipState = 'loading' | 'ready' | 'error';
-
-function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function BookmarkIcon({ filled }: { filled: boolean }) {
   return (
@@ -156,6 +177,7 @@ function ActionIconButton({
   disabled,
   busy,
   onClick,
+  onIntent,
   children,
 }: {
   label: string;
@@ -167,6 +189,8 @@ function ActionIconButton({
   disabled?: boolean;
   busy?: boolean;
   onClick: () => void;
+  /** Prefetch heavy dialog chunks on hover/focus. */
+  onIntent?: () => void;
   children: ReactNode;
 }) {
   return (
@@ -180,6 +204,8 @@ function ActionIconButton({
       aria-busy={busy || undefined}
       disabled={disabled}
       onClick={onClick}
+      onPointerEnter={onIntent}
+      onFocus={onIntent}
       className={`library-action-icon ${ACTION_TONE_CLASS[tone]} inline-flex h-11 w-11 items-center justify-center disabled:opacity-50 sm:h-12 sm:w-12 ${
         active ? 'is-active' : ''
       }`}
@@ -202,16 +228,15 @@ export function LibraryActions({
 }) {
   const libraryType = toLibraryContentType(contentType);
   const formId = useId();
-  const addListDialogRef = useRef<HTMLDialogElement>(null);
-  const logWatchDialogRef = useRef<HTMLDialogElement>(null);
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [membershipState, setMembershipState] =
     useState<MembershipState>('loading');
   const [inWatchlist, setInWatchlist] = useState(false);
   const [inFavorites, setInFavorites] = useState(false);
-  const [inAnyList, setInAnyList] = useState(false);
   const [listsDialogOpen, setListsDialogOpen] = useState(false);
+  const [listsSheetMounted, setListsSheetMounted] = useState(false);
   const [logDialogOpen, setLogDialogOpen] = useState(false);
+  const [logSheetMounted, setLogSheetMounted] = useState(false);
   const [pending, setPending] = useState<
     'watchlist' | 'favorites' | 'lists' | 'diary' | null
   >(null);
@@ -221,11 +246,13 @@ export function LibraryActions({
     {},
   );
   const [listItemIds, setListItemIds] = useState<Record<string, string>>({});
-  const [watchedAt, setWatchedAt] = useState(todayIsoDate);
+  const [watchedAt, setWatchedAt] = useState(localTodayIsoDate);
   const [note, setNote] = useState('');
-  const [removeFromWatchlist, setRemoveFromWatchlist] = useState(false);
+  const [rating, setRating] = useState<number | null>(null);
+  const [hasLogged, setHasLogged] = useState(false);
   const [diaryMessage, setDiaryMessage] = useState<string | null>(null);
   const loadGeneration = useRef(0);
+  const inAnyList = Object.values(listMembership).some(Boolean);
 
   useEffect(() => {
     if (libraryType == null) {
@@ -235,48 +262,63 @@ export function LibraryActions({
     let cancelled = false;
 
     async function load() {
+      setAuthState('loading');
+      setMembershipState('loading');
+      setError(null);
+      // Clear prior title membership so derive(inAnyList) cannot stick.
+      setListMembership({});
+      setListItemIds({});
       try {
-        const me = await fetch('/api/auth/me', { cache: 'no-store' });
-        if (cancelled || generation !== loadGeneration.current) {
-          return;
-        }
-        if (!me.ok) {
-          setAuthState('signed_out');
-          setMembershipState('ready');
-          return;
-        }
-        setAuthState('signed_in');
-        setMembershipState('loading');
         const type = libraryType as LibraryContentType;
-        const [watch, fav, listMembershipResult] = await Promise.all([
+        const [watch, fav, logged, listMembershipResult] = await Promise.all([
           fetchLibraryContains('watchlist', [{ type, id: contentId }]),
           fetchLibraryContains('favorites', [{ type, id: contentId }]),
+          fetchWatchEntriesContains([{ type, id: contentId }]),
           fetchCustomListsMembership(type, contentId),
         ]);
         if (cancelled || generation !== loadGeneration.current) {
           return;
         }
-        if (!watch.ok || !fav.ok) {
+
+        const unauthorized =
+          (!watch.ok && watch.status === 401) ||
+          (!fav.ok && fav.status === 401) ||
+          (!logged.ok && logged.status === 401);
+        if (unauthorized) {
+          setListMembership({});
+          setListItemIds({});
+          setAuthState('signed_out');
+          setMembershipState('ready');
+          return;
+        }
+
+        if (!watch.ok || !fav.ok || !logged.ok) {
+          setListMembership({});
+          setListItemIds({});
+          setAuthState('signed_in');
           setMembershipState('error');
           setError('Could not load library status.');
           return;
         }
+
         const key = membershipKey(type, contentId);
+        setAuthState('signed_in');
         setInWatchlist(Boolean(watch.membership[key]));
         setInFavorites(Boolean(fav.membership[key]));
+        setHasLogged(Boolean(logged.membership[key]));
         if (listMembershipResult.ok) {
           setListMembership(listMembershipResult.membership);
           setListItemIds(listMembershipResult.itemIds);
-          setInAnyList(
-            Object.values(listMembershipResult.membership).some(Boolean),
-          );
         } else {
-          setInAnyList(false);
+          setListMembership({});
+          setListItemIds({});
         }
         setMembershipState('ready');
         setError(null);
       } catch {
         if (!cancelled && generation === loadGeneration.current) {
+          setListMembership({});
+          setListItemIds({});
           setAuthState('signed_out');
           setMembershipState('ready');
         }
@@ -284,55 +326,34 @@ export function LibraryActions({
     }
 
     void load();
+
+    function onDiaryLoggedChanged() {
+      void (async () => {
+        const type = libraryType as LibraryContentType;
+        const logged = await fetchWatchEntriesContains([
+          { type, id: contentId },
+        ]);
+        if (cancelled || generation !== loadGeneration.current || !logged.ok) {
+          return;
+        }
+        setHasLogged(
+          Boolean(logged.membership[membershipKey(type, contentId)]),
+        );
+      })();
+    }
+    window.addEventListener(DIARY_LOGGED_CHANGED_EVENT, onDiaryLoggedChanged);
+
     return () => {
       cancelled = true;
+      window.removeEventListener(
+        DIARY_LOGGED_CHANGED_EVENT,
+        onDiaryLoggedChanged,
+      );
     };
   }, [contentId, libraryType]);
 
-  useEffect(() => {
-    const listDialog = addListDialogRef.current;
-    const logDialog = logWatchDialogRef.current;
-
-    function onListClose() {
-      setListsDialogOpen(false);
-    }
-    function onLogClose() {
-      setLogDialogOpen(false);
-    }
-
-    listDialog?.addEventListener('close', onListClose);
-    listDialog?.addEventListener('cancel', onListClose);
-    logDialog?.addEventListener('close', onLogClose);
-    logDialog?.addEventListener('cancel', onLogClose);
-    return () => {
-      listDialog?.removeEventListener('close', onListClose);
-      listDialog?.removeEventListener('cancel', onListClose);
-      logDialog?.removeEventListener('close', onLogClose);
-      logDialog?.removeEventListener('cancel', onLogClose);
-    };
-  }, [authState, membershipState]);
-
   if (libraryType == null) {
     return null;
-  }
-
-  if (authState === 'loading' || membershipState === 'loading') {
-    return (
-      <div
-        className="mt-4 flex w-full items-center justify-evenly sm:mt-5"
-        role="status"
-        aria-live="polite"
-      >
-        <span className="sr-only">Loading library actions…</span>
-        {Array.from({ length: 4 }, (_, index) => (
-          <span
-            key={index}
-            aria-hidden
-            className="h-11 w-11 rounded-[var(--radius-sm)] bg-[var(--color-bg-elevated)]/50 sm:h-12 sm:w-12"
-          />
-        ))}
-      </div>
-    );
   }
 
   if (authState === 'signed_out') {
@@ -386,9 +407,16 @@ export function LibraryActions({
     setLists(listsResult.lists);
     setListMembership(membershipResult.membership);
     setListItemIds(membershipResult.itemIds);
-    setInAnyList(Object.values(membershipResult.membership).some(Boolean));
-    addListDialogRef.current?.showModal();
+    setListsSheetMounted(true);
     setListsDialogOpen(true);
+  }
+
+  function openLogWatch() {
+    setWatchedAt(localTodayIsoDate());
+    setDiaryMessage(null);
+    setError(null);
+    setLogSheetMounted(true);
+    setLogDialogOpen(true);
   }
 
   async function toggleListMembership(list: CustomListSummary) {
@@ -411,11 +439,7 @@ export function LibraryActions({
         setError(result.error);
         return;
       }
-      setListMembership((current) => {
-        const next = { ...current, [list.id]: false };
-        setInAnyList(Object.values(next).some(Boolean));
-        return next;
-      });
+      setListMembership((current) => ({ ...current, [list.id]: false }));
       setListItemIds((current) => {
         const next = { ...current };
         delete next[list.id];
@@ -433,13 +457,8 @@ export function LibraryActions({
     if (refreshed.ok) {
       setListMembership(refreshed.membership);
       setListItemIds(refreshed.itemIds);
-      setInAnyList(Object.values(refreshed.membership).some(Boolean));
     } else {
-      setListMembership((current) => {
-        const next = { ...current, [list.id]: true };
-        setInAnyList(true);
-        return next;
-      });
+      setListMembership((current) => ({ ...current, [list.id]: true }));
     }
   }
 
@@ -451,40 +470,50 @@ export function LibraryActions({
     setPending('diary');
     setError(null);
     setDiaryMessage(null);
-    const result = await createWatchEntry({
-      type: libraryType,
-      id: contentId,
-      watched_at: watchedAt,
-      note: note.trim() || null,
-      remove_from_watchlist: removeFromWatchlist,
-    });
-    setPending(null);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    if (removeFromWatchlist) {
+    try {
+      const result = await createWatchEntry({
+        type: libraryType,
+        id: contentId,
+        watched_at: watchedAt,
+        note: note.trim() || null,
+        rating,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       setInWatchlist(false);
+      setHasLogged(true);
+      setDiaryMessage('Watch logged.');
+      setNote('');
+      setRating(null);
+      setLogDialogOpen(false);
+    } catch {
+      setError('Could not log watch.');
+    } finally {
+      setPending(null);
     }
-    setDiaryMessage('Watch logged.');
-    setNote('');
-    setRemoveFromWatchlist(false);
-    logWatchDialogRef.current?.close();
-    setLogDialogOpen(false);
   }
 
+  const membershipLoading = membershipState === 'loading';
   const controlsDisabled = membershipState !== 'ready' || pending != null;
-  const watchLogged = diaryMessage != null;
+  const watchLogged = hasLogged;
 
   return (
     <div className="mt-4 space-y-2 sm:mt-5 sm:space-y-3">
-      <div className="flex w-full items-center justify-evenly sm:justify-evenly">
+      <div
+        className="flex w-full items-center justify-evenly sm:justify-evenly"
+        aria-busy={membershipLoading || undefined}
+      >
+        {membershipLoading ? (
+          <span className="sr-only">Loading library actions…</span>
+        ) : null}
         <ActionIconButton
           label={inWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
           tone="watchlist"
           active={inWatchlist}
           pressed={inWatchlist}
-          busy={pending === 'watchlist'}
+          busy={membershipLoading || pending === 'watchlist'}
           disabled={controlsDisabled}
           onClick={() => {
             void toggle('watchlist', inWatchlist, setInWatchlist);
@@ -497,7 +526,7 @@ export function LibraryActions({
           tone="favorites"
           active={inFavorites}
           pressed={inFavorites}
-          busy={pending === 'favorites'}
+          busy={membershipLoading || pending === 'favorites'}
           disabled={controlsDisabled}
           onClick={() => {
             void toggle('favorites', inFavorites, setInFavorites);
@@ -511,11 +540,12 @@ export function LibraryActions({
           active={inAnyList}
           hasPopup="dialog"
           expanded={listsDialogOpen}
-          busy={pending === 'lists'}
+          busy={membershipLoading || pending === 'lists'}
           disabled={controlsDisabled}
           onClick={() => {
             void openAddToList();
           }}
+          onIntent={prefetchLibrarySheets}
         >
           <ListIcon filled={inAnyList} />
         </ActionIconButton>
@@ -525,15 +555,10 @@ export function LibraryActions({
           active={watchLogged}
           hasPopup="dialog"
           expanded={logDialogOpen}
-          busy={pending === 'diary'}
+          busy={membershipLoading || pending === 'diary'}
           disabled={controlsDisabled}
-          onClick={() => {
-            setWatchedAt(todayIsoDate());
-            setDiaryMessage(null);
-            setError(null);
-            logWatchDialogRef.current?.showModal();
-            setLogDialogOpen(true);
-          }}
+          onClick={openLogWatch}
+          onIntent={prefetchLibrarySheets}
         >
           <LoggedIcon filled={watchLogged} />
         </ActionIconButton>
@@ -543,143 +568,55 @@ export function LibraryActions({
           {diaryMessage}
         </p>
       ) : null}
-      {error ? (
+      {error && !logDialogOpen && !listsDialogOpen ? (
         <p className="text-sm text-[var(--color-danger)]" role="alert">
           {error}
         </p>
       ) : null}
 
-      <dialog
-        ref={addListDialogRef}
-        className="w-full max-w-md border border-[var(--color-border)] bg-[var(--color-bg)] p-6 text-foreground backdrop:bg-black/50"
-        aria-labelledby={`${formId}-lists-heading`}
-      >
-        <h2 id={`${formId}-lists-heading`} className="type-card-title">
-          Add to list
-        </h2>
-        {lists.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">
-            No custom lists yet.{' '}
-            <Link href="/library/lists" className="underline">
-              Create one
-            </Link>
-            .
-          </p>
-        ) : (
-          <ul className="mt-4 space-y-2">
-            {lists.map((list) => {
-              const checked = Boolean(listMembership[list.id]);
-              return (
-                <li key={list.id}>
-                  <label className="flex cursor-pointer items-center gap-3 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={pending === 'lists'}
-                      onChange={() => {
-                        void toggleListMembership(list);
-                      }}
-                    />
-                    <span>{list.title}</span>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <button
-          type="button"
-          className="mt-6 border border-[var(--color-border)] px-3 py-2 text-sm"
-          onClick={() => {
-            addListDialogRef.current?.close();
+      {listsSheetMounted ? (
+        <LibraryAddToListSheet
+          open={listsDialogOpen}
+          onDismiss={() => {
             setListsDialogOpen(false);
           }}
-        >
-          Done
-        </button>
-      </dialog>
+          onClose={() => {
+            setListsDialogOpen(false);
+            setListsSheetMounted(false);
+          }}
+          lists={lists}
+          listMembership={listMembership}
+          pending={pending === 'lists'}
+          onToggleList={(list) => {
+            void toggleListMembership(list);
+          }}
+        />
+      ) : null}
 
-      <dialog
-        ref={logWatchDialogRef}
-        className="w-full max-w-md border border-[var(--color-border)] bg-[var(--color-bg)] p-6 text-foreground backdrop:bg-black/50"
-        aria-labelledby={`${formId}-diary-heading`}
-      >
-        <form
+      {logSheetMounted ? (
+        <LibraryLogWatchSheet
+          open={logDialogOpen}
+          onDismiss={() => {
+            setLogDialogOpen(false);
+          }}
+          onClose={() => {
+            setLogDialogOpen(false);
+            setLogSheetMounted(false);
+          }}
+          formId={formId}
+          watchedAt={watchedAt}
+          onWatchedAtChange={setWatchedAt}
+          note={note}
+          onNoteChange={setNote}
+          rating={rating}
+          onRatingChange={setRating}
+          error={error}
+          pending={pending === 'diary'}
           onSubmit={(event) => {
             void handleLogWatch(event);
           }}
-          className="space-y-4"
-        >
-          <h2 id={`${formId}-diary-heading`} className="type-card-title">
-            Log watch
-          </h2>
-          <div>
-            <label
-              htmlFor={`${formId}-watched-at`}
-              className="block text-sm text-muted"
-            >
-              Watched on
-            </label>
-            <input
-              id={`${formId}-watched-at`}
-              type="date"
-              required
-              value={watchedAt}
-              onChange={(event) => {
-                setWatchedAt(event.target.value);
-              }}
-              className="mt-1 border border-[var(--color-border)] bg-transparent px-3 py-2"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor={`${formId}-note`}
-              className="block text-sm text-muted"
-            >
-              Note (optional)
-            </label>
-            <textarea
-              id={`${formId}-note`}
-              maxLength={1000}
-              rows={3}
-              value={note}
-              onChange={(event) => {
-                setNote(event.target.value);
-              }}
-              className="mt-1 w-full border border-[var(--color-border)] bg-transparent px-3 py-2"
-            />
-          </div>
-          <label className="flex items-center gap-3 text-sm">
-            <input
-              type="checkbox"
-              checked={removeFromWatchlist}
-              onChange={(event) => {
-                setRemoveFromWatchlist(event.target.checked);
-              }}
-            />
-            Remove from watchlist
-          </label>
-          <div className="flex gap-3">
-            <button
-              type="submit"
-              disabled={pending === 'diary'}
-              className="border border-[var(--color-border)] bg-[var(--color-accent-soft)] px-3 py-2 text-sm"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              className="border border-[var(--color-border)] px-3 py-2 text-sm"
-              onClick={() => {
-                logWatchDialogRef.current?.close();
-                setLogDialogOpen(false);
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </dialog>
+        />
+      ) : null}
     </div>
   );
 }

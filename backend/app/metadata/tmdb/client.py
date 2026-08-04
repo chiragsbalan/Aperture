@@ -172,6 +172,18 @@ class TmdbClient:
             raise ValueError('page must be >= 1')
         return await self._get('/movie/top_rated', {'page': str(page)})
 
+    async def get_movie_now_playing(self, *, page: int = 1) -> dict[str, Any]:
+        """Fetch one page of TMDb movies currently in theatres."""
+        if page < 1:
+            raise ValueError('page must be >= 1')
+        return await self._get('/movie/now_playing', {'page': str(page)})
+
+    async def get_tv_top_rated(self, *, page: int = 1) -> dict[str, Any]:
+        """Fetch one page of TMDb all-time top-rated TV shows."""
+        if page < 1:
+            raise ValueError('page must be >= 1')
+        return await self._get('/tv/top_rated', {'page': str(page)})
+
     async def _throttle(self) -> None:
         global _last_request_at
         if self._min_interval <= 0:

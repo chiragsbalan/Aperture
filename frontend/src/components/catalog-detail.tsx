@@ -22,6 +22,7 @@ import type {
   TitleExtras,
   TvDetail,
 } from '@/lib/catalog';
+import { POSTER_GRID_SIZES } from '@/lib/poster';
 
 const MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'long',
@@ -118,7 +119,7 @@ function TitleMetaRow({ children }: { children: ReactNode }) {
 
 export function CatalogNotFound({ label }: { label: string }) {
   return (
-    <div className="layout-content motion-fade-rise mt-8 space-y-4 text-center">
+    <div className="layout-content layout-shell-pad-top motion-fade-rise space-y-4 text-center">
       <h1 className="font-display [font-size:var(--text-page)] font-semibold text-foreground">
         {label} not found
       </h1>
@@ -132,7 +133,7 @@ export function CatalogNotFound({ label }: { label: string }) {
 
 export function CatalogUnavailable({ message }: { message?: string }) {
   return (
-    <div className="layout-content motion-fade-rise mt-8 space-y-4 text-center">
+    <div className="layout-content layout-shell-pad-top motion-fade-rise space-y-4 text-center">
       <h1 className="font-display [font-size:var(--text-page)] font-semibold text-foreground">
         Catalog unavailable
       </h1>
@@ -165,7 +166,7 @@ export function CatalogStatusShell({ children }: { children: ReactNode }) {
 export function CatalogLoading() {
   return (
     <div
-      className="layout-content motion-fade-in relative z-[1] pb-16 pt-24 sm:pb-24 sm:pt-28"
+      className="layout-content layout-shell-pad-top motion-fade-in relative z-[1] pb-16 sm:pb-24"
       role="status"
       aria-live="polite"
       aria-busy="true"
@@ -245,7 +246,7 @@ function TitleDetailShell({
       </a>
       <SiteHeader />
       <main id="main-content" className="relative">
-        <article className="layout-content pb-16 pt-24 text-left sm:pb-24 sm:pt-28">
+        <article className="layout-content layout-shell-pad-top pb-16 text-left sm:pb-24">
           {/*
             Text left + poster right on mobile and desktop; mobile uses a
             compact poster, then full-width body below the hero row.
@@ -421,7 +422,7 @@ export function TvDetailView({ show }: { show: TvDetail }) {
 
 export function PersonDetailView({ person }: { person: PersonDetail }) {
   return (
-    <article className="layout-content motion-fade-rise relative z-[1] pb-16 pt-20 text-left sm:pb-24 sm:pt-28">
+    <article className="layout-content layout-shell-pad-top motion-fade-rise relative z-[1] pb-16 text-left sm:pb-24">
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
         <div className="mx-auto w-[7.5rem] shrink-0 sm:mx-0 sm:mt-6 sm:w-full sm:max-w-[14rem]">
           <CatalogPoster
@@ -450,7 +451,7 @@ export function PersonDetailView({ person }: { person: PersonDetail }) {
       {person.credits.length > 0 ? (
         <section className="mt-10">
           <h2 className="type-subsection text-foreground">Known for</h2>
-          <ul className="mt-4 space-y-3">
+          <ul className="poster-grid mt-4">
             {person.credits.map((credit) => {
               const href =
                 credit.type === 'movie'
@@ -460,6 +461,7 @@ export function PersonDetailView({ person }: { person: PersonDetail }) {
               return (
                 <li
                   key={`${credit.id}-${credit.credit_kind}-${credit.job ?? ''}-${credit.character ?? ''}`}
+                  className="min-w-0"
                 >
                   <TitlePosterLink
                     href={href}
@@ -467,19 +469,17 @@ export function PersonDetailView({ person }: { person: PersonDetail }) {
                     posterUrl={credit.poster_url}
                     posterAlt={`${credit.title} poster`}
                     ariaLabel={creditLabel}
-                    sizes="56px"
-                    posterFrameClassName="w-10 shrink-0"
-                    className="flex items-center gap-3 text-left"
+                    sizes={POSTER_GRID_SIZES}
+                    className="block min-w-0 overflow-hidden transition hover:opacity-90"
                   >
-                    <span className="min-w-0">
-                      <span className="text-foreground underline-offset-2 hover:underline">
+                    <div className="poster-meta">
+                      <p className="mt-2 truncate font-display text-sm font-medium text-foreground">
                         {credit.title}
-                      </span>
-                      <span className="text-muted">
-                        {' '}
-                        ({credit.character || credit.job || credit.credit_kind})
-                      </span>
-                    </span>
+                      </p>
+                      <p className="truncate text-xs text-muted">
+                        {credit.character || credit.job || credit.credit_kind}
+                      </p>
+                    </div>
                   </TitlePosterLink>
                 </li>
               );

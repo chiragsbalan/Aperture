@@ -184,6 +184,18 @@ class TopMoviesResponse(BaseModel):
     movies: list[TopMovie] = Field(default_factory=list)
 
 
+class TopTvShowsResponse(BaseModel):
+    """Shuffled sample from the cached TMDb top-rated TV set."""
+
+    shows: list[TopMovie] = Field(default_factory=list)
+
+
+class NowInTheatresResponse(BaseModel):
+    """Most popular movies currently in theatres (TMDb now_playing)."""
+
+    movies: list[TopMovie] = Field(default_factory=list)
+
+
 class ResolveByTmdbRequest(BaseModel):
     """Resolve (and optionally ingest) a title by TMDb id."""
 

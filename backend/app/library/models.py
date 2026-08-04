@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import (
     CheckConstraint,
     Date,
     ForeignKey,
     Index,
+    Numeric,
     String,
     Uuid,
 )
@@ -33,11 +35,20 @@ class WatchEntry(UuidPrimaryKeyMixin, TimestampMixin, Base):
     content_id: Mapped[uuid.UUID] = mapped_column(Uuid(), nullable=False)
     watched_at: Mapped[dt.date] = mapped_column(Date(), nullable=False)
     note: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    rating: Mapped[Decimal | None] = mapped_column(
+        Numeric(2, 1),
+        nullable=True,
+    )
 
     __table_args__ = (
         CheckConstraint(
             "content_type IN ('movie', 'tv_show')",
             name='content_type',
+        ),
+        CheckConstraint(
+            'rating IS NULL OR (rating >= 0.5 AND rating <= 5.0 '
+            'AND (rating * 2) = TRUNC(rating * 2))',
+            name='rating_half_stars',
         ),
         Index(
             'ix_watch_entries_owner_watched_at',

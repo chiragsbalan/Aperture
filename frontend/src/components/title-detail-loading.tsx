@@ -48,7 +48,7 @@ export function TitleDetailLoading({
       <SiteHeader />
       <main id="main-content" className="relative">
         <div
-          className="layout-content pb-16 pt-24 text-left sm:pb-24 sm:pt-28"
+          className="layout-content layout-shell-pad-top pb-16 text-left sm:pb-24"
           role="status"
           aria-live="polite"
           aria-busy="true"

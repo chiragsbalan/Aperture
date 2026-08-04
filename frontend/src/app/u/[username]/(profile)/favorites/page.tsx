@@ -1,10 +1,13 @@
-import { ProfileTabPlaceholder } from '@/components/profile-tab-placeholder';
+import { redirect } from 'next/navigation';
 
-export default function ProfileFavoritesPage() {
-  return (
-    <ProfileTabPlaceholder
-      title="Favorites"
-      description="Favorite titles will appear here when this shelf is public."
-    />
-  );
+interface ProfileFavoritesRedirectProps {
+  params: Promise<{ username: string }>;
+}
+
+/** Favorites left ProfileNav in pc.2 — bookmarks land on Lists. */
+export default async function ProfileFavoritesRedirect({
+  params,
+}: ProfileFavoritesRedirectProps) {
+  const { username } = await params;
+  redirect(`/u/${encodeURIComponent(username)}/lists`);
 }

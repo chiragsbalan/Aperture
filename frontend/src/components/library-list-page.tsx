@@ -3,16 +3,19 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { ActionToast } from '@/components/action-toast';
 import { LibraryNav } from '@/components/library-nav';
-import { TitlePosterLink } from '@/components/title-poster-link';
+import { LibraryPosterCell } from '@/components/library-poster-cell';
 import {
+  CheckOutlineIcon,
+  PencilOutlineIcon,
+} from '@/components/shelf-chrome-icons';
+import {
+  addLibraryItem,
   fetchSystemList,
-  hrefForLibraryContent,
-  patchSystemListVisibility,
   removeLibraryItem,
   type LibraryKind,
   type LibraryListItem,
-  type ListVisibility,
 } from '@/lib/library';
 
 type LoadState =
@@ -25,8 +28,12 @@ type LoadState =
       total: number;
       page: number;
       limit: number;
-      visibility: ListVisibility;
     };
+
+interface UndoState {
+  item: LibraryListItem;
+  previousTotal: number;
+}
 
 export function LibraryListPage({
   kind,
@@ -38,11 +45,11 @@ export function LibraryListPage({
   emptyMessage: string;
 }) {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const [editing, setEditing] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [visibilityPending, setVisibilityPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const visibilityId = `${kind}-visibility`;
+  const [undo, setUndo] = useState<UndoState | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,7 +73,6 @@ export function LibraryListPage({
         total: result.data.total,
         page: result.data.page,
         limit: result.data.limit,
-        visibility: result.data.visibility,
       });
     }
 
@@ -76,29 +82,11 @@ export function LibraryListPage({
     };
   }, [kind]);
 
-  async function handleVisibilityChange(next: ListVisibility) {
-    if (
-      state.status !== 'ready' ||
-      visibilityPending ||
-      next === state.visibility
-    ) {
-      return;
+  useEffect(() => {
+    if (state.status === 'ready' && state.items.length === 0) {
+      setEditing(false);
     }
-    setVisibilityPending(true);
-    setActionError(null);
-    const previous = state.visibility;
-    setState({ ...state, visibility: next });
-    const result = await patchSystemListVisibility(kind, next);
-    setVisibilityPending(false);
-    if (!result.ok) {
-      setActionError(result.error);
-      setState((current) =>
-        current.status === 'ready'
-          ? { ...current, visibility: previous }
-          : current,
-      );
-    }
-  }
+  }, [state]);
 
   async function handleRemove(item: LibraryListItem) {
     if (state.status !== 'ready' || pendingId != null) {
@@ -131,8 +119,56 @@ export function LibraryListPage({
           ...current,
           items: already
             ? current.items
-            : [...current.items, item].sort((a, b) => a.position - b.position),
+            : [item, ...current.items].sort(
+                (a, b) => Date.parse(b.added_at) - Date.parse(a.added_at),
+              ),
           total: previousTotal,
+        };
+      });
+      return;
+    }
+    setUndo({ item, previousTotal });
+  }
+
+  async function handleUndo() {
+    if (undo == null || state.status !== 'ready') {
+      return;
+    }
+    const { item, previousTotal } = undo;
+    setUndo(null);
+    setPendingId(item.item_id);
+    setActionError(null);
+    setState((current) => {
+      if (current.status !== 'ready') {
+        return current;
+      }
+      const already = current.items.some((row) => row.item_id === item.item_id);
+      return {
+        ...current,
+        items: already
+          ? current.items
+          : [item, ...current.items].sort(
+              (a, b) => Date.parse(b.added_at) - Date.parse(a.added_at),
+            ),
+        total: previousTotal,
+      };
+    });
+    const result = await addLibraryItem(
+      kind,
+      item.content.type,
+      item.content.id,
+    );
+    setPendingId(null);
+    if (!result.ok) {
+      setActionError(result.error);
+      setState((current) => {
+        if (current.status !== 'ready') {
+          return current;
+        }
+        return {
+          ...current,
+          items: current.items.filter((row) => row.item_id !== item.item_id),
+          total: Math.max(0, current.total - 1),
         };
       });
     }
@@ -157,44 +193,31 @@ export function LibraryListPage({
       total: result.data.total,
       page: result.data.page,
       limit: result.data.limit,
-      visibility: result.data.visibility,
     });
   }
 
   return (
     <div className="layout-content motion-fade-rise text-left">
-      <h1 className="type-page-lg text-foreground">{title}</h1>
+      <div className="flex items-start justify-between gap-4">
+        <h1 className="type-page-lg text-foreground">{title}</h1>
+        {state.status === 'ready' && state.items.length > 0 ? (
+          <button
+            type="button"
+            aria-label={editing ? 'Done' : 'Edit'}
+            aria-pressed={editing}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-muted transition hover:bg-[var(--color-accent-soft)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+            onClick={() => {
+              setEditing((value) => !value);
+            }}
+          >
+            {editing ? <CheckOutlineIcon /> : <PencilOutlineIcon />}
+          </button>
+        ) : null}
+      </div>
       <p className="mt-2 text-muted">
         Your personal {kind === 'watchlist' ? 'queue' : 'favorites'}.
       </p>
       <LibraryNav />
-
-      {state.status === 'ready' ? (
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <label htmlFor={visibilityId} className="text-sm text-muted">
-            Visibility
-          </label>
-          <select
-            id={visibilityId}
-            name="visibility"
-            value={state.visibility}
-            disabled={visibilityPending}
-            aria-busy={visibilityPending}
-            className="border border-[var(--color-border)] bg-transparent px-3 py-2 text-sm text-foreground"
-            onChange={(event) => {
-              void handleVisibilityChange(event.target.value as ListVisibility);
-            }}
-          >
-            <option value="private">Private</option>
-            <option value="public">Public</option>
-          </select>
-          <p className="text-sm text-muted">
-            {state.visibility === 'public'
-              ? 'Visible on your public profile.'
-              : 'Only you can see this list.'}
-          </p>
-        </div>
-      ) : null}
 
       {state.status === 'loading' ? (
         <p className="mt-10 text-muted" role="status">
@@ -229,43 +252,24 @@ export function LibraryListPage({
 
       {state.status === 'ready' && state.items.length > 0 ? (
         <>
-          <ul className="mt-10 grid grid-cols-2 gap-6 sm:grid-cols-3">
+          <ul className="poster-grid mt-10">
             {state.items.map((item) => (
               <li key={item.item_id} className="min-w-0">
-                <TitlePosterLink
-                  href={hrefForLibraryContent(item.content)}
-                  contentId={item.content.id}
-                  posterUrl={item.content.poster_url}
-                  posterAlt={`${item.content.title} poster`}
-                  sizes="(max-width: 640px) 45vw, 200px"
-                  className="block"
-                >
-                  <p className="mt-2 truncate font-medium text-foreground">
-                    {item.content.title}
-                  </p>
-                  {item.content.year != null ? (
-                    <p className="text-sm text-muted">{item.content.year}</p>
-                  ) : null}
-                </TitlePosterLink>
-                <button
-                  type="button"
-                  aria-label={`Remove ${item.content.title} from ${kind}`}
-                  aria-busy={pendingId === item.item_id}
-                  className="mt-2 text-sm text-muted transition hover:text-foreground"
-                  disabled={pendingId != null}
-                  onClick={() => {
+                <LibraryPosterCell
+                  item={item}
+                  editing={editing}
+                  removePending={pendingId === item.item_id}
+                  onRemove={() => {
                     void handleRemove(item);
                   }}
-                >
-                  Remove
-                </button>
+                />
               </li>
             ))}
           </ul>
           {state.items.length < state.total ? (
             <button
               type="button"
-              className="mt-8 border border-[var(--color-border)] px-4 py-2 text-sm text-foreground transition hover:border-foreground disabled:opacity-60"
+              className="btn btn-lg mt-8"
               disabled={loadingMore}
               aria-busy={loadingMore}
               onClick={() => {
@@ -276,6 +280,19 @@ export function LibraryListPage({
             </button>
           ) : null}
         </>
+      ) : null}
+
+      {undo != null ? (
+        <ActionToast
+          message={`Removed ${undo.item.content.title}`}
+          actionLabel="Undo"
+          onAction={() => {
+            void handleUndo();
+          }}
+          onDismiss={() => {
+            setUndo(null);
+          }}
+        />
       ) : null}
     </div>
   );

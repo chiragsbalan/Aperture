@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { TitleNavPoster } from '@/components/title-nav-poster';
 import type { SimilarTitle } from '@/lib/catalog';
+import { POSTER_GRID_SIZES } from '@/lib/poster';
 
 /**
  * Similar titles row under the main detail column.
@@ -16,7 +17,7 @@ export function MoreLikeThis({
   kind: 'movie' | 'tv_show';
   contentId: string;
 }) {
-  const visible = (items ?? []).slice(0, 4);
+  const visible = (items ?? []).slice(0, 6);
   if (visible.length === 0) {
     return null;
   }
@@ -38,7 +39,7 @@ export function MoreLikeThis({
           See all similar
         </Link>
       </div>
-      <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-4">
+      <ul className="poster-grid mt-4">
         {visible.map((item) => {
           const resolvedType = item.content_type ?? kind;
           const navKind = resolvedType === 'tv_show' ? 'tv' : 'movie';
@@ -51,8 +52,8 @@ export function MoreLikeThis({
                 posterUrl={item.poster_url}
                 posterAlt={item.title}
                 ariaLabel={item.title}
-                className="block transition hover:opacity-90"
-                sizes="(max-width: 640px) 45vw, 140px"
+                className="block min-w-0 overflow-hidden transition hover:opacity-90"
+                sizes={POSTER_GRID_SIZES}
               />
             </li>
           );

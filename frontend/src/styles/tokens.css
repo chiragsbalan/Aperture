@@ -2,10 +2,12 @@
  * Aperture design tokens — source of truth for color, type, space, radius,
  * elevation, z-index, and motion.
  *
- * Prefer these CSS variables (or `.type-*` / `.motion-*` / `.scroll-fade-x`
- * utilities in globals.css) over raw hex / rem values.
+ * Prefer these CSS variables (or `.type-*` / `.btn*` / `.motion-*` /
+ * `.scroll-fade-x` / `.scroll-fade-y` utilities in globals.css) over raw
+ * hex / rem values.
  * JS duration mirrors: `frontend/src/lib/motion.ts`.
- * Horizontal scroll fades: `useScrollFadeX` in `frontend/src/lib/scroll-fade.ts`.
+ * Overflow fades: `useScrollFadeX` / `useScrollFadeY` in
+ * `frontend/src/lib/scroll-fade.ts`.
  *
  * Dark is the default theme; light tokens are defined for future toggle use.
  */
@@ -51,46 +53,60 @@
   --font-body: var(--font-source-sans, ui-sans-serif), system-ui, sans-serif;
 
   /*
-   * Type scale — sizes match existing UI (Tailwind text-* rem values).
+   * Type scale — base rem sizes × --text-scale.
+   * Mobile/tablet stay at 1; desktop (lg+) bumps ~15% for readability on
+   * wide layouts. Poster under-captions (.poster-meta) stay unscaled.
    * Responsive roles use *-at-sm / *-at-md with .type-* media queries.
    */
-  --text-brand: clamp(2.75rem, 11vw, 7.5rem);
-  --text-headline: clamp(1.125rem, 2.5vw, 1.75rem);
+  --text-scale: 1;
+  --text-brand: calc(var(--text-scale) * clamp(2.75rem, 11vw, 7.5rem));
+  --text-headline: calc(var(--text-scale) * clamp(1.125rem, 2.5vw, 1.75rem));
   /* Title detail H1: 1.75rem → sm:text-4xl → md:text-5xl */
-  --text-title: 1.75rem;
-  --text-title-at-sm: 2.25rem;
-  --text-title-at-md: 3rem;
+  --text-title: calc(var(--text-scale) * 1.75rem);
+  --text-title-at-sm: calc(var(--text-scale) * 2.25rem);
+  --text-title-at-md: calc(var(--text-scale) * 3rem);
   /* Person H1: 1.4rem → sm:text-3xl → md:text-4xl */
-  --text-title-person: 1.4rem;
-  --text-title-person-at-sm: 1.875rem;
-  --text-title-person-at-md: 2.25rem;
+  --text-title-person: calc(var(--text-scale) * 1.4rem);
+  --text-title-person-at-sm: calc(var(--text-scale) * 1.875rem);
+  --text-title-person-at-md: calc(var(--text-scale) * 2.25rem);
   /* Page / auth / nav wordmark: text-2xl → sm:text-3xl */
-  --text-page: 1.5rem;
-  --text-page-at-sm: 1.875rem;
+  --text-page: calc(var(--text-scale) * 1.5rem);
+  --text-page-at-sm: calc(var(--text-scale) * 1.875rem);
   /* Standalone page H1 at text-3xl (library, search, diary, …) */
-  --text-page-lg: 1.875rem;
+  --text-page-lg: calc(var(--text-scale) * 1.875rem);
   /* Home rail H1: text-xl → sm:text-2xl */
-  --text-rail: 1.25rem;
-  --text-rail-at-sm: 1.5rem;
+  --text-rail: calc(var(--text-scale) * 1.25rem);
+  --text-rail-at-sm: calc(var(--text-scale) * 1.5rem);
   /* Section H2 (Similar): text-base → sm:text-lg */
-  --text-section: 1rem;
-  --text-section-at-sm: 1.125rem;
+  --text-section: calc(var(--text-scale) * 1rem);
+  --text-section-at-sm: calc(var(--text-scale) * 1.125rem);
   /* Subsection (Known for, settings legends): text-lg */
-  --text-subsection: 1.125rem;
+  --text-subsection: calc(var(--text-scale) * 1.125rem);
   /* Modal / card titles: text-xl */
-  --text-card-title: 1.25rem;
-  --text-body: 1.0625rem;
-  --text-body-sm: 0.9375rem;
+  --text-card-title: calc(var(--text-scale) * 1.25rem);
+  --text-body: calc(var(--text-scale) * 1.0625rem);
+  --text-body-sm: calc(var(--text-scale) * 0.9375rem);
   /* Overview mobile / desktop (title-overview) */
-  --text-overview: 0.875rem;
-  --text-overview-at-sm: 1.05rem;
-  /* Matches Tailwind text-sm / text-xs */
-  --text-sm: 0.875rem;
-  --text-xs: 0.75rem;
-  --text-caption: 0.8125rem;
+  --text-overview: calc(var(--text-scale) * 0.875rem);
+  --text-overview-at-sm: calc(var(--text-scale) * 1.05rem);
+  /* Tailwind text-* steps (also used by utilities via theme) */
+  --text-xs: calc(var(--text-scale) * 0.75rem);
+  --text-sm: calc(var(--text-scale) * 0.875rem);
+  --text-base: calc(var(--text-scale) * 1rem);
+  --text-lg: calc(var(--text-scale) * 1.125rem);
+  --text-xl: calc(var(--text-scale) * 1.25rem);
+  --text-2xl: calc(var(--text-scale) * 1.5rem);
+  --text-3xl: calc(var(--text-scale) * 1.875rem);
+  --text-4xl: calc(var(--text-scale) * 2.25rem);
+  --text-5xl: calc(var(--text-scale) * 3rem);
+  --text-6xl: calc(var(--text-scale) * 3.75rem);
+  --text-7xl: calc(var(--text-scale) * 4.5rem);
+  --text-8xl: calc(var(--text-scale) * 6rem);
+  --text-9xl: calc(var(--text-scale) * 8rem);
+  --text-caption: calc(var(--text-scale) * 0.8125rem);
   /* Tagline mobile; sm uses --text-sm via .type-eyebrow */
-  --text-eyebrow: 0.65rem;
-  --text-micro: 0.6875rem;
+  --text-eyebrow: calc(var(--text-scale) * 0.65rem);
+  --text-micro: calc(var(--text-scale) * 0.6875rem);
 
   --leading-none: 1;
   /* Title detail H1 mobile (custom 1.15) */
@@ -125,6 +141,14 @@
   --layout-content-max: 64rem;
   --layout-content-pad-x: 1rem;
   --layout-content-pad-x-sm: 1.5rem;
+  /*
+   * Navbar → first content. Mobile matches Library Watchlist (`py-24` / 6rem).
+   * Desktop shell pages stay 6rem; title/search-style `.layout-shell-pad-top`
+   * uses *-at-sm (former pt-28).
+   */
+  --layout-shell-pad-y: 6rem;
+  --layout-shell-pad-y-at-sm: 6rem;
+  --layout-shell-pad-top-at-sm: 7rem;
 
   /* Radii */
   --radius-sm: 0.25rem;
@@ -151,10 +175,19 @@
   --poster-flip-ms: 640ms;
 
   /*
-   * Horizontal overflow hint — pair with `.scroll-fade-x` + useScrollFadeX.
-   * Soft edge mask length when more content is scrollable that way.
+   * Overflow edge fades — pair with `.scroll-fade-x` / `.scroll-fade-y` +
+   * useScrollFadeX / useScrollFadeY in `lib/scroll-fade.ts`.
+   *
+   * Strength = mask length on each scrollable edge. Locked defaults — change
+   * here only, not as one-off lengths in components.
+   *
+   * Vertical people rows (Followers / Following sheet): avatar md (3rem) +
+   * py-4 (2rem) ≈ 5rem. Fade reaches halfway through that bottommost row so
+   * overflow is obvious without swallowing the whole item.
    */
-  --scroll-fade-size: 1.75rem;
+  --scroll-fade-size: 1.75rem; /* horizontal (seasons, profile tabs) */
+  --scroll-fade-people-row: 5rem; /* avatar md + py-4 people link row */
+  --scroll-fade-size-y: calc(var(--scroll-fade-people-row) / 2); /* 2.5rem */
 }
 
 [data-theme='light'] {
@@ -190,4 +223,13 @@
 
   --elev-1: 0 1px 0 rgba(26, 23, 18, 0.06);
   --elev-poster: 0 24px 60px rgba(26, 23, 18, 0.18);
+}
+
+/* Desktop type bump — matches product “lg” (poster-meta breakpoint). */
+@media (min-width: 1024px) {
+  :root,
+  [data-theme='dark'],
+  [data-theme='light'] {
+    --text-scale: 1.15;
+  }
 }

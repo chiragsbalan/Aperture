@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from decimal import Decimal
 from typing import Any, cast
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, tuple_
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,7 @@ async def insert_entry(
     content_id: uuid.UUID,
     watched_at: dt.date,
     note: str | None,
+    rating: Decimal | None,
 ) -> WatchEntry:
     """Insert a diary row (rewatches allowed — no unique on content)."""
     entry = WatchEntry(
@@ -29,6 +31,7 @@ async def insert_entry(
         content_id=content_id,
         watched_at=watched_at,
         note=note,
+        rating=rating,
     )
     session.add(entry)
     await session.flush()
@@ -127,6 +130,26 @@ async def delete_entry_for_owner(
         ),
     )
     return (result.rowcount or 0) > 0
+
+
+async def content_refs_with_entries(
+    session: AsyncSession,
+    *,
+    owner_user_id: uuid.UUID,
+    refs: list[tuple[str, uuid.UUID]],
+) -> set[tuple[str, uuid.UUID]]:
+    """Return ``(content_type, content_id)`` pairs that have ≥1 diary row."""
+    if not refs:
+        return set()
+    result = await session.execute(
+        select(WatchEntry.content_type, WatchEntry.content_id)
+        .where(
+            WatchEntry.owner_user_id == owner_user_id,
+            tuple_(WatchEntry.content_type, WatchEntry.content_id).in_(refs),
+        )
+        .distinct()
+    )
+    return {(row[0], row[1]) for row in result.all()}
 
 
 def _apply_date_filters(stmt: Any, *, year: int | None, month: int | None) -> Any:

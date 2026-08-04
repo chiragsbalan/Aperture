@@ -25,3 +25,13 @@ def landing_top_posters_key(*, count: int) -> str:
 def top_movies_key(*, count: int) -> str:
     """Shared cache key for the signed-in home top-movies set."""
     return f'meta:top-movies:{count}'
+
+
+def top_tv_shows_key(*, count: int) -> str:
+    """Shared cache key for the signed-in home top-TV set."""
+    return f'meta:top-tv-shows:{count}'
+
+
+def now_in_theatres_key(*, count: int) -> str:
+    """Shared cache key for the signed-in home now-in-theatres set."""
+    return f'meta:now-in-theatres:{count}'

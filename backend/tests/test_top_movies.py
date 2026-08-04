@@ -408,3 +408,97 @@ def test_top_movies_rate_limit_charges_warm_hit(
 
     rl_key = f'metadata:rl:top-movies:ip:{hash_rate_limit_subject(unique_ip)}'
     assert run_coro_sync(get_cache().get(rl_key)) is not None
+
+
+class _FakeTvTopRatedClient:
+    def __init__(self, pages: dict[int, list[dict[str, Any]]]) -> None:
+        self._pages = pages
+
+    async def get_tv_top_rated(self, *, page: int = 1) -> dict[str, Any]:
+        return {'results': self._pages.get(page, [])}
+
+
+class _FakeNowPlayingClient:
+    def __init__(self, pages: dict[int, list[dict[str, Any]]]) -> None:
+        self._pages = pages
+
+    async def get_movie_now_playing(self, *, page: int = 1) -> dict[str, Any]:
+        return {
+            'results': self._pages.get(page, []),
+            'total_pages': max(self._pages.keys()) if self._pages else 1,
+        }
+
+
+@pytest.mark.asyncio
+async def test_fetch_top_tv_shows_pool_uses_name_and_air_date() -> None:
+    client = _FakeTvTopRatedClient(
+        {
+            1: [
+                {
+                    'id': 42,
+                    'name': 'Great Show',
+                    'poster_path': '/tv.jpg',
+                    'first_air_date': '2018-06-01',
+                }
+            ]
+        }
+    )
+    result = await metadata_service.fetch_top_tv_shows_pool(
+        get_settings(),
+        count=10,
+        client=cast(TmdbClient, client),
+    )
+    assert len(result.shows) == 1
+    assert result.shows[0].tmdb_id == 42
+    assert result.shows[0].title == 'Great Show'
+    assert result.shows[0].year == 2018
+
+
+@pytest.mark.asyncio
+async def test_fetch_now_in_theatres_pool_orders_by_popularity() -> None:
+    client = _FakeNowPlayingClient(
+        {
+            1: [
+                {
+                    'id': 1,
+                    'title': 'Quiet Hit',
+                    'poster_path': '/a.jpg',
+                    'release_date': '2026-01-01',
+                    'popularity': 10.0,
+                },
+                {
+                    'id': 2,
+                    'title': 'Blockbuster',
+                    'poster_path': '/b.jpg',
+                    'release_date': '2026-02-01',
+                    'popularity': 99.0,
+                },
+            ]
+        }
+    )
+    result = await metadata_service.fetch_now_in_theatres_pool(
+        get_settings(),
+        count=10,
+        client=cast(TmdbClient, client),
+    )
+    assert [movie.title for movie in result.movies] == [
+        'Blockbuster',
+        'Quiet Hit',
+    ]
+
+
+def test_top_tv_and_theatres_empty_without_tmdb_key(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv('TMDB_API_KEY', '')
+    get_settings.cache_clear()
+    init_cache('')
+
+    tv = client.get('/api/v1/catalog/top-tv-shows')
+    assert tv.status_code == 200, tv.text
+    assert tv.json() == {'shows': []}
+
+    theatres = client.get('/api/v1/catalog/now-in-theatres')
+    assert theatres.status_code == 200, theatres.text
+    assert theatres.json() == {'movies': []}

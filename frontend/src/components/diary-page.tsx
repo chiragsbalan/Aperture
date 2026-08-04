@@ -1,18 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 
+import { DiaryEntryCard } from '@/components/diary-entry-card';
+import { DiaryEntrySheet } from '@/components/diary-entry-sheet';
 import { LibraryNav } from '@/components/library-nav';
-import { TitlePosterLink } from '@/components/title-poster-link';
 import {
-  deleteWatchEntry,
-  fetchWatchEntries,
-  hrefForLibraryContent,
-  patchWatchEntry,
-  type WatchEntry,
-} from '@/lib/library';
-import { armTitlePosterMorph } from '@/lib/title-poster-morph';
+  compareWatchEntriesNewestFirst,
+  groupDiaryEntriesByMonth,
+} from '@/lib/diary';
+import { fetchWatchEntries, type WatchEntry } from '@/lib/library';
+import { MOTION_DURATION_MED_MS } from '@/lib/motion';
 
 type LoadState =
   | { status: 'loading' }
@@ -27,16 +26,13 @@ type LoadState =
     };
 
 export function DiaryPage() {
-  const formId = useId();
-  const editDialogRef = useRef<HTMLDialogElement>(null);
-  const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const [state, setState] = useState<LoadState>({ status: 'loading' });
-  const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<WatchEntry | null>(null);
-  const [editDate, setEditDate] = useState('');
-  const [editNote, setEditNote] = useState('');
-  const [deleting, setDeleting] = useState<WatchEntry | null>(null);
+  const [selected, setSelected] = useState<WatchEntry | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [leavingIds, setLeavingIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
@@ -70,73 +66,51 @@ export function DiaryPage() {
     };
   }, []);
 
-  function openEdit(entry: WatchEntry) {
-    setEditing(entry);
-    setEditDate(entry.watched_at);
-    setEditNote(entry.note ?? '');
-    editDialogRef.current?.showModal();
-  }
-
-  function openDelete(entry: WatchEntry) {
-    setDeleting(entry);
-    deleteDialogRef.current?.showModal();
-  }
-
-  async function handleSaveEdit(event: FormEvent) {
-    event.preventDefault();
-    if (editing == null || pending) {
-      return;
-    }
-    setPending(true);
+  function openEntry(entry: WatchEntry) {
+    setSelected(entry);
+    setSheetOpen(true);
     setActionError(null);
-    const result = await patchWatchEntry(editing.id, {
-      watched_at: editDate,
-      note: editNote.trim() || null,
-    });
-    setPending(false);
-    if (!result.ok) {
-      setActionError(result.error);
-      return;
-    }
+  }
+
+  function closeSheet() {
+    setSheetOpen(false);
+  }
+
+  function handleUpdated(entry: WatchEntry) {
     setState((current) => {
       if (current.status !== 'ready') {
         return current;
       }
       return {
         ...current,
-        items: current.items.map((row) =>
-          row.id === result.entry.id ? result.entry : row,
-        ),
+        items: current.items
+          .map((row) => (row.id === entry.id ? entry : row))
+          .sort(compareWatchEntriesNewestFirst),
       };
     });
-    editDialogRef.current?.close();
-    setEditing(null);
+    setSelected(entry);
   }
 
-  async function handleDelete() {
-    if (deleting == null || pending) {
-      return;
-    }
-    setPending(true);
-    setActionError(null);
-    const result = await deleteWatchEntry(deleting.id);
-    setPending(false);
-    if (!result.ok) {
-      setActionError(result.error);
-      return;
-    }
-    setState((current) => {
-      if (current.status !== 'ready') {
-        return current;
-      }
-      return {
-        ...current,
-        items: current.items.filter((row) => row.id !== deleting.id),
-        total: Math.max(0, current.total - 1),
-      };
-    });
-    deleteDialogRef.current?.close();
-    setDeleting(null);
+  function handleDeleted(entryId: string) {
+    setLeavingIds((current) => new Set(current).add(entryId));
+    window.setTimeout(() => {
+      setState((current) => {
+        if (current.status !== 'ready') {
+          return current;
+        }
+        return {
+          ...current,
+          items: current.items.filter((row) => row.id !== entryId),
+          total: Math.max(0, current.total - 1),
+        };
+      });
+      setLeavingIds((current) => {
+        const next = new Set(current);
+        next.delete(entryId);
+        return next;
+      });
+      setSelected((current) => (current?.id === entryId ? null : current));
+    }, MOTION_DURATION_MED_MS);
   }
 
   async function handleLoadMore() {
@@ -202,65 +176,36 @@ export function DiaryPage() {
 
       {state.status === 'ready' && state.items.length > 0 ? (
         <>
-          <ul className="mt-10 space-y-6">
-            {state.items.map((entry) => (
-              <li key={entry.id} className="flex gap-4">
-                <TitlePosterLink
-                  href={hrefForLibraryContent(entry.content)}
-                  contentId={entry.content.id}
-                  posterUrl={entry.content.poster_url}
-                  posterAlt={`${entry.content.title} poster`}
-                  sizes="80px"
-                  posterFrameClassName="w-20"
-                  className="shrink-0"
-                  ariaLabel={entry.content.title}
-                />
-                <div className="min-w-0 flex-1">
-                  <Link
-                    href={hrefForLibraryContent(entry.content)}
-                    className="font-medium text-foreground"
-                    onClick={() => {
-                      armTitlePosterMorph({
-                        contentId: entry.content.id,
-                        posterUrl: entry.content.poster_url,
-                        alt: `${entry.content.title} poster`,
-                      });
-                    }}
-                  >
-                    {entry.content.title}
-                  </Link>
-                  <p className="mt-1 text-sm text-muted">{entry.watched_at}</p>
-                  {entry.note ? (
-                    <p className="mt-2 text-sm text-foreground">{entry.note}</p>
-                  ) : null}
-                  <div className="mt-2 flex gap-3 text-sm">
-                    <button
-                      type="button"
-                      className="text-muted transition hover:text-foreground"
-                      onClick={() => {
-                        openEdit(entry);
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="text-muted transition hover:text-foreground"
-                      onClick={() => {
-                        openDelete(entry);
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </li>
+          <div className="mt-10 space-y-10">
+            {groupDiaryEntriesByMonth(state.items).map((group) => (
+              <section
+                key={group.key}
+                aria-labelledby={`library-diary-${group.key}`}
+                className="diary-month-section border-b border-[var(--color-border)] pb-10"
+              >
+                <h2
+                  id={`library-diary-${group.key}`}
+                  className="font-display text-lg font-semibold tracking-tight text-foreground sm:text-xl"
+                >
+                  {group.label}
+                </h2>
+                <ul className="diary-entry-grid mt-5">
+                  {group.entries.map((entry) => (
+                    <DiaryEntryCard
+                      key={entry.id}
+                      entry={entry}
+                      onOpen={openEntry}
+                      leaving={leavingIds.has(entry.id)}
+                    />
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
           {state.items.length < state.total ? (
             <button
               type="button"
-              className="mt-8 border border-[var(--color-border)] px-4 py-2 text-sm text-foreground transition hover:border-foreground disabled:opacity-60"
+              className="btn btn-lg mt-8"
               disabled={loadingMore}
               aria-busy={loadingMore}
               onClick={() => {
@@ -273,112 +218,13 @@ export function DiaryPage() {
         </>
       ) : null}
 
-      <dialog
-        ref={editDialogRef}
-        className="w-full max-w-md border border-[var(--color-border)] bg-[var(--color-bg)] p-6 text-foreground backdrop:bg-black/50"
-        aria-labelledby={`${formId}-edit-heading`}
-      >
-        <form
-          onSubmit={(event) => {
-            void handleSaveEdit(event);
-          }}
-          className="space-y-4"
-        >
-          <h2 id={`${formId}-edit-heading`} className="type-card-title">
-            Edit diary entry
-          </h2>
-          <div>
-            <label
-              htmlFor={`${formId}-date`}
-              className="block text-sm text-muted"
-            >
-              Watched on
-            </label>
-            <input
-              id={`${formId}-date`}
-              type="date"
-              required
-              value={editDate}
-              onChange={(event) => {
-                setEditDate(event.target.value);
-              }}
-              className="mt-1 border border-[var(--color-border)] bg-transparent px-3 py-2"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor={`${formId}-note`}
-              className="block text-sm text-muted"
-            >
-              Note (optional)
-            </label>
-            <textarea
-              id={`${formId}-note`}
-              maxLength={1000}
-              rows={3}
-              value={editNote}
-              onChange={(event) => {
-                setEditNote(event.target.value);
-              }}
-              className="mt-1 w-full border border-[var(--color-border)] bg-transparent px-3 py-2"
-            />
-          </div>
-          <div className="flex gap-3">
-            <button
-              type="submit"
-              disabled={pending}
-              className="border border-[var(--color-border)] bg-[var(--color-accent-soft)] px-3 py-2 text-sm"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              className="border border-[var(--color-border)] px-3 py-2 text-sm"
-              onClick={() => {
-                editDialogRef.current?.close();
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </dialog>
-
-      <dialog
-        ref={deleteDialogRef}
-        className="w-full max-w-md border border-[var(--color-border)] bg-[var(--color-bg)] p-6 text-foreground backdrop:bg-black/50"
-        aria-labelledby={`${formId}-delete-heading`}
-      >
-        <h2 id={`${formId}-delete-heading`} className="type-card-title">
-          Delete this diary entry?
-        </h2>
-        <p className="mt-2 text-sm text-muted">
-          {deleting
-            ? `Remove the watch of ${deleting.content.title} on ${deleting.watched_at}.`
-            : 'This cannot be undone.'}
-        </p>
-        <div className="mt-6 flex gap-3">
-          <button
-            type="button"
-            disabled={pending}
-            className="border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-danger)]"
-            onClick={() => {
-              void handleDelete();
-            }}
-          >
-            Delete
-          </button>
-          <button
-            type="button"
-            className="border border-[var(--color-border)] px-3 py-2 text-sm"
-            onClick={() => {
-              deleteDialogRef.current?.close();
-            }}
-          >
-            Cancel
-          </button>
-        </div>
-      </dialog>
+      <DiaryEntrySheet
+        entry={selected}
+        open={sheetOpen}
+        onClose={closeSheet}
+        onUpdated={handleUpdated}
+        onDeleted={handleDeleted}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { ProfileAvatar } from '@/components/profile-avatar';
 import { TitlePosterLink } from '@/components/title-poster-link';
 import type { LibraryContentType } from '@/lib/library';
 import { hrefForLibraryContent } from '@/lib/library';
+import { POSTER_GRID_SIZES } from '@/lib/poster';
 
 export interface ProfileCollectionTitleItem {
   kind: 'title';
@@ -29,8 +30,6 @@ export type ProfileCollectionItem =
 interface ProfileCollectionViewProps {
   title: string;
   emptyMessage: string;
-  backHref: string;
-  backLabel?: string;
   status: 'loading' | 'error' | 'ready';
   errorMessage?: string;
   items: ProfileCollectionItem[];
@@ -40,8 +39,6 @@ interface ProfileCollectionViewProps {
 export function ProfileCollectionView({
   title,
   emptyMessage,
-  backHref,
-  backLabel = 'Back to profile',
   status,
   errorMessage,
   items,
@@ -55,15 +52,7 @@ export function ProfileCollectionView({
 
   return (
     <div className="layout-content motion-fade-rise text-left">
-      <p className="text-sm text-muted">
-        <Link
-          href={backHref}
-          className="underline-offset-2 transition hover:text-foreground hover:underline"
-        >
-          {backLabel}
-        </Link>
-      </p>
-      <h1 className="mt-2 type-page-lg text-foreground">{title}</h1>
+      <h1 className="type-page-lg text-foreground">{title}</h1>
 
       {status === 'loading' ? (
         <p className="mt-10 text-muted" role="status">
@@ -82,7 +71,7 @@ export function ProfileCollectionView({
       ) : null}
 
       {status === 'ready' && titleItems.length > 0 ? (
-        <ul className="mt-10 grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4">
+        <ul className="poster-grid mt-10">
           {titleItems.map((item) => (
             <li key={`${item.type}:${item.id}`} className="min-w-0">
               <TitlePosterLink
@@ -93,15 +82,22 @@ export function ProfileCollectionView({
                 contentId={item.id}
                 posterUrl={item.posterUrl}
                 posterAlt={`${item.title} poster`}
-                sizes="(max-width: 640px) 45vw, 180px"
-                className="block"
+                ariaLabel={
+                  item.year != null
+                    ? `${item.title} (${item.year})`
+                    : item.title
+                }
+                sizes={POSTER_GRID_SIZES}
+                className="block min-w-0 overflow-hidden transition hover:opacity-90"
               >
-                <p className="mt-2 truncate font-medium text-foreground">
-                  {item.title}
-                </p>
-                {item.year != null ? (
-                  <p className="text-sm text-muted">{item.year}</p>
-                ) : null}
+                <div className="poster-meta">
+                  <p className="mt-2 truncate font-display text-sm font-medium text-foreground">
+                    {item.title}
+                  </p>
+                  {item.year != null ? (
+                    <p className="truncate text-xs text-muted">{item.year}</p>
+                  ) : null}
+                </div>
               </TitlePosterLink>
             </li>
           ))}

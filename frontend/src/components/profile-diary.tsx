@@ -1,18 +1,23 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { TitlePosterLink } from '@/components/title-poster-link';
+import { DiaryEntryCard } from '@/components/diary-entry-card';
+import { DiaryEntrySheet } from '@/components/diary-entry-sheet';
+import { useProfileIsOwner } from '@/components/public-profile';
+import {
+  compareWatchEntriesNewestFirst,
+  groupDiaryEntriesByMonth,
+} from '@/lib/diary';
 import {
   fetchPublicWatchEntries,
-  hrefForLibraryContent,
+  invalidatePublicWatchEntries,
   peekPublicDiaryView,
   peekPublicWatchEntries,
   rememberPublicDiaryView,
   type WatchEntry,
 } from '@/lib/library';
-import { armTitlePosterMorph } from '@/lib/title-poster-morph';
+import { MOTION_DURATION_MED_MS } from '@/lib/motion';
 
 type ReadyState = {
   status: 'ready';
@@ -27,53 +32,6 @@ type LoadState =
 
 interface ProfileDiaryProps {
   username: string;
-}
-
-interface DiaryMonthGroup {
-  key: string;
-  label: string;
-  entries: WatchEntry[];
-}
-
-function formatMonthLabel(yearMonth: string): string {
-  const [yearText, monthText] = yearMonth.split('-');
-  const year = Number(yearText);
-  const month = Number(monthText);
-  if (!Number.isFinite(year) || !Number.isFinite(month)) {
-    return yearMonth;
-  }
-  const date = new Date(Date.UTC(year, month - 1, 1));
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(date);
-}
-
-function formatDayLabel(isoDate: string): string {
-  const day = Number(isoDate.slice(8, 10));
-  if (!Number.isFinite(day)) {
-    return isoDate;
-  }
-  return String(day);
-}
-
-function groupEntriesByMonth(entries: WatchEntry[]): DiaryMonthGroup[] {
-  const groups: DiaryMonthGroup[] = [];
-  let current: DiaryMonthGroup | null = null;
-  for (const entry of entries) {
-    const key = entry.watched_at.slice(0, 7);
-    if (current == null || current.key !== key) {
-      current = {
-        key,
-        label: formatMonthLabel(key),
-        entries: [],
-      };
-      groups.push(current);
-    }
-    current.entries.push(entry);
-  }
-  return groups;
 }
 
 function initialDiaryState(username: string): LoadState {
@@ -95,13 +53,19 @@ function initialDiaryState(username: string): LoadState {
   return { status: 'loading' };
 }
 
-/** Public diary wall for a profile (read-only). */
+/** Profile diary wall — owner can open/edit/delete logs; visitors read-only. */
 export function ProfileDiary({ username }: ProfileDiaryProps) {
+  const isOwner = useProfileIsOwner();
   const [state, setState] = useState<LoadState>(() =>
     initialDiaryState(username),
   );
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<WatchEntry | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [leavingIds, setLeavingIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -117,6 +81,7 @@ export function ProfileDiary({ username }: ProfileDiaryProps) {
       if (cancelled) {
         return;
       }
+
       if (!result.ok) {
         if (!hasView) {
           setState({ status: 'error', message: result.error });
@@ -125,7 +90,6 @@ export function ProfileDiary({ username }: ProfileDiaryProps) {
       }
 
       setState((previous) => {
-        // Keep an expanded "load more" view; only refresh total.
         if (previous.status === 'ready' && previous.page > 1) {
           const next = { ...previous, total: result.data.total };
           rememberPublicDiaryView(username, {
@@ -159,6 +123,63 @@ export function ProfileDiary({ username }: ProfileDiaryProps) {
     };
   }, [username]);
 
+  function syncView(next: ReadyState) {
+    rememberPublicDiaryView(username, {
+      items: next.items,
+      total: next.total,
+      page: next.page,
+      limit: next.limit,
+    });
+  }
+
+  function openEntry(entry: WatchEntry) {
+    setSelected(entry);
+    setSheetOpen(true);
+  }
+
+  function handleUpdated(entry: WatchEntry) {
+    invalidatePublicWatchEntries(username);
+    setState((current) => {
+      if (current.status !== 'ready') {
+        return current;
+      }
+      const next = {
+        ...current,
+        items: current.items
+          .map((row) => (row.id === entry.id ? entry : row))
+          .sort(compareWatchEntriesNewestFirst),
+      };
+      syncView(next);
+      return next;
+    });
+    setSelected(entry);
+  }
+
+  function handleDeleted(entryId: string) {
+    setLeavingIds((current) => new Set(current).add(entryId));
+    window.setTimeout(() => {
+      invalidatePublicWatchEntries(username);
+      setState((current) => {
+        if (current.status !== 'ready') {
+          return current;
+        }
+        const next = {
+          ...current,
+          items: current.items.filter((row) => row.id !== entryId),
+          total: Math.max(0, current.total - 1),
+        };
+        syncView(next);
+        return next;
+      });
+      setLeavingIds((current) => {
+        const next = new Set(current);
+        next.delete(entryId);
+        return next;
+      });
+      setSelected((current) => (current?.id === entryId ? null : current));
+    }, MOTION_DURATION_MED_MS);
+  }
+
   async function handleLoadMore() {
     if (state.status !== 'ready' || loadingMore) {
       return;
@@ -173,7 +194,6 @@ export function ProfileDiary({ username }: ProfileDiaryProps) {
     );
     setLoadingMore(false);
     if (!result.ok) {
-      // Keep already-visible entries; surface failure near Load more.
       setLoadMoreError(result.error);
       return;
     }
@@ -184,18 +204,13 @@ export function ProfileDiary({ username }: ProfileDiaryProps) {
       page: result.data.page,
       limit: result.data.limit,
     };
-    rememberPublicDiaryView(username, {
-      items: next.items,
-      total: next.total,
-      page: next.page,
-      limit: next.limit,
-    });
+    syncView(next);
     setLoadMoreError(null);
     setState(next);
   }
 
   const monthGroups =
-    state.status === 'ready' ? groupEntriesByMonth(state.items) : [];
+    state.status === 'ready' ? groupDiaryEntriesByMonth(state.items) : [];
 
   return (
     <section className="mt-10 text-left">
@@ -222,56 +237,22 @@ export function ProfileDiary({ username }: ProfileDiaryProps) {
               <section
                 key={group.key}
                 aria-labelledby={`diary-${group.key}`}
-                className="border-b border-[var(--color-border)] pb-10"
+                className="diary-month-section border-b border-[var(--color-border)] pb-10"
               >
                 <h2
                   id={`diary-${group.key}`}
-                  className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
+                  className="font-display text-lg font-semibold tracking-tight text-foreground sm:text-xl"
                 >
                   {group.label}
                 </h2>
-                <ul className="mt-5 space-y-6">
+                <ul className="diary-entry-grid mt-5">
                   {group.entries.map((entry) => (
-                    <li key={entry.id} className="flex gap-4">
-                      <TitlePosterLink
-                        href={hrefForLibraryContent(entry.content)}
-                        contentId={entry.content.id}
-                        posterUrl={entry.content.poster_url}
-                        posterAlt={`${entry.content.title} poster`}
-                        sizes="80px"
-                        posterFrameClassName="w-20"
-                        className="shrink-0"
-                        ariaLabel={entry.content.title}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                          <Link
-                            href={hrefForLibraryContent(entry.content)}
-                            className="font-medium text-foreground"
-                            onClick={() => {
-                              armTitlePosterMorph({
-                                contentId: entry.content.id,
-                                posterUrl: entry.content.poster_url,
-                                alt: `${entry.content.title} poster`,
-                              });
-                            }}
-                          >
-                            {entry.content.title}
-                          </Link>
-                          <time
-                            dateTime={entry.watched_at}
-                            className="text-sm text-muted"
-                          >
-                            {formatDayLabel(entry.watched_at)}
-                          </time>
-                        </div>
-                        {entry.note ? (
-                          <p className="mt-2 text-sm text-foreground">
-                            {entry.note}
-                          </p>
-                        ) : null}
-                      </div>
-                    </li>
+                    <DiaryEntryCard
+                      key={entry.id}
+                      entry={entry}
+                      onOpen={isOwner ? openEntry : undefined}
+                      leaving={leavingIds.has(entry.id)}
+                    />
                   ))}
                 </ul>
               </section>
@@ -281,7 +262,7 @@ export function ProfileDiary({ username }: ProfileDiaryProps) {
             <div className="mt-8">
               <button
                 type="button"
-                className="border border-[var(--color-border)] px-4 py-2 text-sm text-foreground transition hover:border-foreground disabled:opacity-60"
+                className="btn btn-lg"
                 disabled={loadingMore}
                 aria-busy={loadingMore}
                 onClick={() => {
@@ -301,6 +282,18 @@ export function ProfileDiary({ username }: ProfileDiaryProps) {
             </div>
           ) : null}
         </>
+      ) : null}
+
+      {isOwner ? (
+        <DiaryEntrySheet
+          entry={selected}
+          open={sheetOpen}
+          onClose={() => {
+            setSheetOpen(false);
+          }}
+          onUpdated={handleUpdated}
+          onDeleted={handleDeleted}
+        />
       ) : null}
     </section>
   );
