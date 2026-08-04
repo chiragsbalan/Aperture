@@ -3,6 +3,7 @@ phases/
 .cursor/
 PLAN.md
 CONTRIBUTING.md
+FUTURE.md
 
 # Optional agent skill installs (local / npx skills)
 .agents/

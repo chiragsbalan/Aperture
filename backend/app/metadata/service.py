@@ -24,6 +24,7 @@ from app.metadata.schemas import (
     MediaGallery,
     MovieDetail,
     NamedId,
+    NowInTheatresResponse,
     PersonCreditRef,
     PersonDetail,
     ReleaseEvent,
@@ -33,6 +34,7 @@ from app.metadata.schemas import (
     TitleExtras,
     TopMovie,
     TopMoviesResponse,
+    TopTvShowsResponse,
     TvDetail,
     VideoRef,
     WatchProvider,
@@ -51,6 +53,14 @@ class LandingPostersUnavailableError(Exception):
 
 class TopMoviesUnavailableError(Exception):
     """TMDb top-rated movie pool could not be fetched."""
+
+
+class TopTvShowsUnavailableError(Exception):
+    """TMDb top-rated TV pool could not be fetched."""
+
+
+class NowInTheatresUnavailableError(Exception):
+    """TMDb now-playing theatre pool could not be fetched."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +153,57 @@ def _year_from_release_date(value: object) -> int | None:
     return year
 
 
+def _home_rail_movie_from_row(row: dict[str, Any]) -> TopMovie | None:
+    """Parse a TMDb movie list row into a home-rail card, or skip."""
+    raw_id = row.get('id')
+    if not isinstance(raw_id, int) or raw_id <= 0:
+        return None
+    title = row.get('title')
+    if not isinstance(title, str) or not title.strip():
+        return None
+    url = _image_url(
+        row.get('poster_path') if isinstance(row.get('poster_path'), str) else None,
+        size='w500',
+    )
+    if url is None:
+        return None
+    return TopMovie(
+        tmdb_id=raw_id,
+        title=title.strip(),
+        poster_url=url,
+        year=_year_from_release_date(row.get('release_date')),
+    )
+
+
+def _home_rail_tv_from_row(row: dict[str, Any]) -> TopMovie | None:
+    """Parse a TMDb TV list row into a home-rail card, or skip."""
+    raw_id = row.get('id')
+    if not isinstance(raw_id, int) or raw_id <= 0:
+        return None
+    title = row.get('name')
+    if not isinstance(title, str) or not title.strip():
+        return None
+    url = _image_url(
+        row.get('poster_path') if isinstance(row.get('poster_path'), str) else None,
+        size='w500',
+    )
+    if url is None:
+        return None
+    return TopMovie(
+        tmdb_id=raw_id,
+        title=title.strip(),
+        poster_url=url,
+        year=_year_from_release_date(row.get('first_air_date')),
+    )
+
+
+def _row_popularity(row: dict[str, Any]) -> float:
+    value = row.get('popularity')
+    if isinstance(value, (int, float)):
+        return float(value)
+    return 0.0
+
+
 async def fetch_top_movies_pool(
     settings: Settings,
     *,
@@ -175,28 +236,10 @@ async def fetch_top_movies_pool(
             for row in results:
                 if not isinstance(row, dict):
                     continue
-                raw_id = row.get('id')
-                if not isinstance(raw_id, int) or raw_id <= 0:
+                card = _home_rail_movie_from_row(row)
+                if card is None:
                     continue
-                title = row.get('title')
-                if not isinstance(title, str) or not title.strip():
-                    continue
-                url = _image_url(
-                    row.get('poster_path')
-                    if isinstance(row.get('poster_path'), str)
-                    else None,
-                    size='w500',
-                )
-                if url is None:
-                    continue
-                movies.append(
-                    TopMovie(
-                        tmdb_id=raw_id,
-                        title=title.strip(),
-                        poster_url=url,
-                        year=_year_from_release_date(row.get('release_date')),
-                    )
-                )
+                movies.append(card)
                 if len(movies) >= limit:
                     break
             page += 1
@@ -204,6 +247,91 @@ async def fetch_top_movies_pool(
         raise TopMoviesUnavailableError(str(exc)) from exc
 
     return TopMoviesResponse(movies=movies)
+
+
+async def fetch_top_tv_shows_pool(
+    settings: Settings,
+    *,
+    count: int | None = None,
+    client: TmdbClient | None = None,
+) -> TopTvShowsResponse:
+    """Return TMDb all-time top-rated TV shows for the home rail pool."""
+    limit = count if count is not None else settings.top_movies_pool_count
+    if limit < 1:
+        return TopTvShowsResponse(shows=[])
+
+    try:
+        tmdb = client or TmdbClient.from_settings(settings)
+    except TmdbConfigError as exc:
+        raise TopTvShowsUnavailableError(str(exc)) from exc
+
+    shows: list[TopMovie] = []
+    page = 1
+    max_pages = max(1, (limit + 19) // 20)
+    try:
+        while len(shows) < limit and page <= max_pages:
+            payload = await tmdb.get_tv_top_rated(page=page)
+            results = payload.get('results')
+            if not isinstance(results, list) or not results:
+                break
+            for row in results:
+                if not isinstance(row, dict):
+                    continue
+                card = _home_rail_tv_from_row(row)
+                if card is None:
+                    continue
+                shows.append(card)
+                if len(shows) >= limit:
+                    break
+            page += 1
+    except TmdbUnavailableError as exc:
+        raise TopTvShowsUnavailableError(str(exc)) from exc
+
+    return TopTvShowsResponse(shows=shows)
+
+
+async def fetch_now_in_theatres_pool(
+    settings: Settings,
+    *,
+    count: int | None = None,
+    client: TmdbClient | None = None,
+) -> NowInTheatresResponse:
+    """Return TMDb now-playing movies, most popular first, for the home rail."""
+    limit = count if count is not None else settings.top_movies_pool_count
+    if limit < 1:
+        return NowInTheatresResponse(movies=[])
+
+    try:
+        tmdb = client or TmdbClient.from_settings(settings)
+    except TmdbConfigError as exc:
+        raise NowInTheatresUnavailableError(str(exc)) from exc
+
+    scored: list[tuple[float, TopMovie]] = []
+    page = 1
+    max_pages = max(1, (limit + 19) // 20)
+    try:
+        while page <= max_pages:
+            payload = await tmdb.get_movie_now_playing(page=page)
+            results = payload.get('results')
+            if not isinstance(results, list) or not results:
+                break
+            for row in results:
+                if not isinstance(row, dict):
+                    continue
+                card = _home_rail_movie_from_row(row)
+                if card is None:
+                    continue
+                scored.append((_row_popularity(row), card))
+            total_pages = payload.get('total_pages')
+            if isinstance(total_pages, int) and page >= total_pages:
+                break
+            page += 1
+    except TmdbUnavailableError as exc:
+        raise NowInTheatresUnavailableError(str(exc)) from exc
+
+    scored.sort(key=lambda item: item[0], reverse=True)
+    movies = [card for _, card in scored[:limit]]
+    return NowInTheatresResponse(movies=movies)
 
 
 def _title_extras(raw: dict[str, Any] | None) -> TitleExtras:

@@ -88,7 +88,6 @@ export function ProfileCollectionPage({
 }: ProfileCollectionPageProps) {
   const meta = PROFILE_COLLECTIONS[collection];
   const [state, setState] = useState<LoadState>({ status: 'loading' });
-  const backHref = `/u/${encodeURIComponent(username)}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -160,8 +159,6 @@ export function ProfileCollectionPage({
     <ProfileCollectionView
       title={meta.title}
       emptyMessage={emptyMessage}
-      backHref={backHref}
-      backLabel={`@${username}`}
       status={state.status}
       errorMessage={state.status === 'error' ? state.message : undefined}
       items={state.status === 'ready' ? state.items : []}

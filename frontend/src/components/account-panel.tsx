@@ -225,7 +225,7 @@ export function AccountPanel() {
           void handleLogout();
         }}
         disabled={loggingOut}
-        className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-2.5 text-foreground transition hover:border-[var(--color-accent)] disabled:opacity-60"
+        className="btn btn-lg hover:border-[var(--color-accent)]"
       >
         {loggingOut ? 'Logging out…' : 'Log out'}
       </button>

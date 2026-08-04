@@ -10,6 +10,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.lists.models import List, ListItem
+from app.users.models import User
 
 SYSTEM_TITLES: dict[str, str] = {
     'watchlist': 'Watchlist',
@@ -40,9 +41,21 @@ async def get_list_by_id(
     *,
     list_id: uuid.UUID,
     for_update: bool = False,
+    require_active_owner: bool = False,
 ) -> List | None:
-    """Return a list row by id."""
-    stmt = select(List).where(List.id == list_id)
+    """Return a list row by id.
+
+    When ``require_active_owner`` is true, soft-deleted owners yield ``None``
+    (same as missing) so public by-id reads cannot outlive the profile.
+    """
+    stmt = select(List)
+    if require_active_owner:
+        stmt = stmt.join(User, User.id == List.owner_user_id).where(
+            List.id == list_id,
+            User.deleted_at.is_(None),
+        )
+    else:
+        stmt = stmt.where(List.id == list_id)
     if for_update:
         stmt = stmt.with_for_update()
     result = await session.execute(stmt)
@@ -117,6 +130,7 @@ async def list_custom_lists(
     session: AsyncSession,
     *,
     owner_user_id: uuid.UUID,
+    visibilities: frozenset[str] | None = None,
 ) -> list[tuple[List, int]]:
     """Return custom lists for an owner with item counts (newest first)."""
     item_count = (
@@ -126,11 +140,14 @@ async def list_custom_lists(
         .correlate(List)
         .scalar_subquery()
     )
-    result = await session.execute(
-        select(List, item_count)
-        .where(List.owner_user_id == owner_user_id, List.kind == 'custom')
-        .order_by(List.updated_at.desc(), List.created_at.desc())
+    stmt = select(List, item_count).where(
+        List.owner_user_id == owner_user_id,
+        List.kind == 'custom',
     )
+    if visibilities is not None:
+        stmt = stmt.where(List.visibility.in_(visibilities))
+    stmt = stmt.order_by(List.updated_at.desc(), List.created_at.desc())
+    result = await session.execute(stmt)
     rows: list[tuple[List, int]] = []
     for list_row, count in result.all():
         rows.append((list_row, int(count or 0)))
@@ -226,11 +243,11 @@ async def list_items_page(
     offset: int,
     limit: int,
 ) -> list[ListItem]:
-    """Return ordered items for a page."""
+    """Return items newest-added first (watchlist, favorites, custom)."""
     result = await session.execute(
         select(ListItem)
         .where(ListItem.list_id == list_id)
-        .order_by(ListItem.position.asc(), ListItem.created_at.asc())
+        .order_by(ListItem.created_at.desc(), ListItem.id.desc())
         .offset(offset)
         .limit(limit)
     )
@@ -242,11 +259,11 @@ async def list_all_item_ids(
     *,
     list_id: uuid.UUID,
 ) -> list[uuid.UUID]:
-    """Return all item ids in position order."""
+    """Return all item ids newest-added first."""
     result = await session.execute(
         select(ListItem.id)
         .where(ListItem.list_id == list_id)
-        .order_by(ListItem.position.asc(), ListItem.created_at.asc())
+        .order_by(ListItem.created_at.desc(), ListItem.id.desc())
     )
     return list(result.scalars().all())
 

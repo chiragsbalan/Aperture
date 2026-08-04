@@ -77,7 +77,7 @@ export function estimateDetailHeroRect(): Rect {
   const sm = window.matchMedia('(min-width: 640px)').matches;
   const posterW = (sm ? 18 : 6.75) * rootFs;
   const posterH = posterW * 1.5;
-  // Fixed header; content uses pt-24/sm:pt-28 and poster sm:mt-12.
+  // Absolute header; content uses .layout-shell-pad-top and poster sm:mt-12.
   const top = (sm ? 7 : 6) * rootFs + (sm ? 3 : 0) * rootFs;
 
   // Prefer the real content column — geometric centering can be ~½ scrollbar

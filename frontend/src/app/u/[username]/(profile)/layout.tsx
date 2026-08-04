@@ -1,6 +1,6 @@
 import { PublicProfileView } from '@/components/public-profile';
 import { SiteHeader } from '@/components/site-header';
-import type { ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
 
 interface ProfileShellLayoutProps {
   children: ReactNode;
@@ -14,7 +14,7 @@ export default async function ProfileShellLayout({
   const { username } = await params;
 
   return (
-    <div className="shell-atmosphere relative flex min-h-dvh flex-col py-16 sm:py-24">
+    <div className="layout-shell shell-atmosphere relative flex min-h-dvh flex-col">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
@@ -23,7 +23,11 @@ export default async function ProfileShellLayout({
         id="main-content"
         className="layout-content motion-fade-rise relative z-[1] w-full"
       >
-        <PublicProfileView username={username}>{children}</PublicProfileView>
+        <Suspense
+          fallback={<p className="mt-8 text-muted">Loading profile…</p>}
+        >
+          <PublicProfileView username={username}>{children}</PublicProfileView>
+        </Suspense>
       </main>
     </div>
   );

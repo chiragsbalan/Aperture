@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from dataclasses import dataclass
+from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +18,7 @@ from app.library import repository as library_repository
 from app.library.models import WatchEntry
 from app.library.schemas import (
     ContentSummary,
+    WatchEntriesContainsResponse,
     WatchEntriesPageResponse,
     WatchEntryResponse,
 )
@@ -115,6 +117,7 @@ def _entry_response(
         id=entry.id,
         watched_at=entry.watched_at,
         note=entry.note,
+        rating=float(entry.rating) if entry.rating is not None else None,
         created_at=entry.created_at,
         updated_at=entry.updated_at,
         content=content,
@@ -132,6 +135,12 @@ def _normalize_note(note: str | None) -> str | None:
     return cleaned
 
 
+def _normalize_rating(rating: float | None) -> Decimal | None:
+    if rating is None:
+        return None
+    return Decimal(str(rating))
+
+
 async def create_entry(
     session: AsyncSession,
     *,
@@ -140,6 +149,7 @@ async def create_entry(
     content_id: uuid.UUID,
     watched_at: dt.date | None,
     note: str | None,
+    rating: float | None = None,
     commit: bool = True,
 ) -> WatchEntryResponse:
     """Create a diary entry. Pass ``commit=False`` for composed transactions."""
@@ -157,6 +167,7 @@ async def create_entry(
         content_id=ref.content_id,
         watched_at=day,
         note=_normalize_note(note),
+        rating=_normalize_rating(rating),
     )
     if commit:
         await session.commit()
@@ -182,6 +193,43 @@ async def count_logged_titles_by_type(
         owner_user_id=owner_user_id,
         content_type=content_type,
     )
+
+
+async def contains_logged_titles(
+    session: AsyncSession,
+    *,
+    identity_id: uuid.UUID,
+    refs: list[tuple[str, uuid.UUID]],
+) -> WatchEntriesContainsResponse:
+    """Batch check: owner has ≥1 diary row for each public ``type:id``.
+
+    Unsupported content types are answered as ``false`` (not omitted) so
+    clients always see a key per well-formed request token. Malformed tokens
+    are rejected earlier by the API parser (422).
+    """
+    owner_user_id = await _require_owner_user_id(
+        session,
+        identity_id=identity_id,
+    )
+    membership: dict[str, bool] = {}
+    parsed: list[tuple[str, str, uuid.UUID]] = []
+    for content_type, content_id in refs:
+        try:
+            ref = _parse_ref(content_type=content_type, content_id=content_id)
+        except UnsupportedWatchContentError:
+            membership[f'{content_type}:{content_id}'] = False
+            continue
+        parsed.append((ref.public_type, ref.db_type, ref.content_id))
+
+    present = await library_repository.content_refs_with_entries(
+        session,
+        owner_user_id=owner_user_id,
+        refs=[(db_type, content_id) for _, db_type, content_id in parsed],
+    )
+    for public_type, db_type, content_id in parsed:
+        key = f'{public_type}:{content_id}'
+        membership[key] = (db_type, content_id) in present
+    return WatchEntriesContainsResponse(membership=membership)
 
 
 async def list_entries_for_owner(
@@ -261,8 +309,10 @@ async def patch_entry(
     watched_at: dt.date | None,
     note: str | None,
     note_set: bool,
+    rating: float | None = None,
+    rating_set: bool = False,
 ) -> WatchEntryResponse:
-    """Update watched_at and/or note on an owned entry."""
+    """Update watched_at, note, and/or rating on an owned entry."""
     owner_user_id = await _require_owner_user_id(
         session,
         identity_id=identity_id,
@@ -278,6 +328,8 @@ async def patch_entry(
         entry.watched_at = watched_at
     if note_set:
         entry.note = _normalize_note(note)
+    if rating_set:
+        entry.rating = _normalize_rating(rating)
     await session.commit()
     await session.refresh(entry)
     summaries = await metadata_service.get_content_summaries(

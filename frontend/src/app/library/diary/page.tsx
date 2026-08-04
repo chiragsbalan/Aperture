@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function LibraryDiaryPage() {
   return (
-    <div className="shell-atmosphere relative flex min-h-dvh flex-col items-center py-24">
+    <div className="layout-shell shell-atmosphere relative flex min-h-dvh flex-col items-center">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>

@@ -2,6 +2,25 @@ export type LibraryKind = 'watchlist' | 'favorites';
 export type LibraryContentType = 'movie' | 'tv';
 export type ListVisibility = 'private' | 'public';
 
+/** Form / a11y wording for visibility (not shown next to list names). */
+export function listVisibilityLabel(visibility: ListVisibility): string {
+  if (visibility === 'public') {
+    return 'Anyone';
+  }
+  return 'Private';
+}
+
+export interface ProfileListIndexEntry {
+  kind: 'custom';
+  id: string;
+  title: string;
+  description: string | null;
+  visibility: ListVisibility;
+  item_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 export interface LibraryContentSummary {
   type: LibraryContentType;
   id: string;
@@ -66,6 +85,8 @@ export interface WatchEntry {
   id: string;
   watched_at: string;
   note: string | null;
+  /** Optional 0.5–5.0 half-star rating. */
+  rating: number | null;
   created_at: string;
   updated_at: string;
   content: LibraryContentSummary;
@@ -80,8 +101,18 @@ export interface WatchEntriesPage {
 
 type ApiError = { ok: false; status: number; error: string };
 
-function membershipKey(type: LibraryContentType, id: string): string {
+export function membershipKey(type: LibraryContentType, id: string): string {
   return `${type}:${id}`;
+}
+
+/** Fired when diary create/delete may change title “logged” state. */
+export const DIARY_LOGGED_CHANGED_EVENT = 'aperture:diary-logged-changed';
+
+export function notifyDiaryLoggedChanged(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.dispatchEvent(new Event(DIARY_LOGGED_CHANGED_EVENT));
 }
 
 /** Map detail DTO types (`tv_show`) to library API public types (`tv`). */
@@ -135,26 +166,51 @@ export async function fetchSystemList(
   return { ok: true, data: (await res.json()) as SystemListResponse };
 }
 
-export async function patchSystemListVisibility(
-  kind: LibraryKind,
-  visibility: ListVisibility,
+export async function fetchPublicWatchlist(
+  username: string,
+  page = 1,
+  limit = 24,
 ): Promise<
   | { ok: true; data: SystemListResponse }
   | { ok: false; status: number; error: string }
 > {
-  const res = await fetch(`/api/proxy/api/v1/me/${kind}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ visibility }),
-  });
+  const res = await fetch(
+    `/api/proxy/api/v1/users/${encodeURIComponent(username)}/watchlist?page=${page}&limit=${limit}`,
+    { cache: 'no-store' },
+  );
   if (!res.ok) {
     return {
       ok: false,
       status: res.status,
-      error: errorForStatus(res.status, 'Could not update visibility.'),
+      error:
+        res.status === 404
+          ? 'Profile not found.'
+          : 'Could not load this watchlist.',
     };
   }
   return { ok: true, data: (await res.json()) as SystemListResponse };
+}
+
+export async function fetchProfileLists(
+  username: string,
+): Promise<
+  | { ok: true; lists: ProfileListIndexEntry[] }
+  | { ok: false; status: number; error: string }
+> {
+  const res = await fetch(
+    `/api/proxy/api/v1/users/${encodeURIComponent(username)}/lists`,
+    { cache: 'no-store' },
+  );
+  if (!res.ok) {
+    return {
+      ok: false,
+      status: res.status,
+      error:
+        res.status === 404 ? 'Profile not found.' : 'Could not load lists.',
+    };
+  }
+  const data = (await res.json()) as { lists: ProfileListIndexEntry[] };
+  return { ok: true, lists: data.lists };
 }
 
 export async function addLibraryItem(
@@ -222,6 +278,31 @@ export async function fetchLibraryContains(
   return { ok: true, membership: body.membership };
 }
 
+/** True when the caller has ≥1 diary row for each title. */
+export async function fetchWatchEntriesContains(
+  refs: Array<{ type: LibraryContentType; id: string }>,
+): Promise<
+  | { ok: true; membership: Record<string, boolean> }
+  | { ok: false; status: number }
+> {
+  if (refs.length === 0) {
+    return { ok: true, membership: {} };
+  }
+  const params = new URLSearchParams();
+  for (const ref of refs) {
+    params.append('ids', membershipKey(ref.type, ref.id));
+  }
+  const res = await fetch(
+    `/api/proxy/api/v1/me/watch-entries/contains?${params.toString()}`,
+    { cache: 'no-store' },
+  );
+  if (!res.ok) {
+    return { ok: false, status: res.status };
+  }
+  const body = (await res.json()) as ContainsResponse;
+  return { ok: true, membership: body.membership };
+}
+
 export async function fetchMyCustomLists(): Promise<
   | { ok: true; lists: CustomListSummary[] }
   | { ok: false; status: number; error: string }
@@ -249,7 +330,7 @@ export async function createCustomList(input: {
     body: JSON.stringify({
       title: input.title,
       description: input.description ?? null,
-      visibility: input.visibility ?? 'private',
+      visibility: input.visibility ?? 'public',
     }),
   });
   if (!res.ok) {
@@ -346,7 +427,7 @@ export async function addCustomListItem(
   listId: string,
   type: LibraryContentType,
   id: string,
-): Promise<{ ok: true } | ApiError> {
+): Promise<{ ok: true; item: LibraryListItem } | ApiError> {
   const res = await fetch(`/api/proxy/api/v1/lists/${listId}/items`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -359,7 +440,7 @@ export async function addCustomListItem(
       error: errorForStatus(res.status, 'Could not add to list.'),
     };
   }
-  return { ok: true };
+  return { ok: true, item: (await res.json()) as LibraryListItem };
 }
 
 export async function removeCustomListItem(
@@ -377,25 +458,6 @@ export async function removeCustomListItem(
     };
   }
   return { ok: true };
-}
-
-export async function reorderCustomListItems(
-  listId: string,
-  itemIds: string[],
-): Promise<{ ok: true; data: CustomListItemsResponse } | ApiError> {
-  const res = await fetch(`/api/proxy/api/v1/lists/${listId}/items/reorder`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ item_ids: itemIds }),
-  });
-  if (!res.ok) {
-    return {
-      ok: false,
-      status: res.status,
-      error: errorForStatus(res.status, 'Could not reorder list.'),
-    };
-  }
-  return { ok: true, data: (await res.json()) as CustomListItemsResponse };
 }
 
 export async function fetchCustomListsMembership(
@@ -636,7 +698,7 @@ export async function createWatchEntry(input: {
   id: string;
   watched_at?: string;
   note?: string | null;
-  remove_from_watchlist?: boolean;
+  rating?: number | null;
 }): Promise<{ ok: true; entry: WatchEntry } | ApiError> {
   const res = await fetch('/api/proxy/api/v1/me/watch-entries', {
     method: 'POST',
@@ -646,7 +708,7 @@ export async function createWatchEntry(input: {
       id: input.id,
       watched_at: input.watched_at ?? null,
       note: input.note ?? null,
-      remove_from_watchlist: input.remove_from_watchlist ?? false,
+      rating: input.rating ?? null,
     }),
   });
   if (!res.ok) {
@@ -657,12 +719,17 @@ export async function createWatchEntry(input: {
     };
   }
   invalidatePublicWatchEntries();
+  notifyDiaryLoggedChanged();
   return { ok: true, entry: (await res.json()) as WatchEntry };
 }
 
 export async function patchWatchEntry(
   entryId: string,
-  body: { watched_at?: string; note?: string | null },
+  body: {
+    watched_at?: string;
+    note?: string | null;
+    rating?: number | null;
+  },
 ): Promise<{ ok: true; entry: WatchEntry } | ApiError> {
   const res = await fetch(`/api/proxy/api/v1/me/watch-entries/${entryId}`, {
     method: 'PATCH',
@@ -694,7 +761,6 @@ export async function deleteWatchEntry(
     };
   }
   invalidatePublicWatchEntries();
+  notifyDiaryLoggedChanged();
   return { ok: true };
 }
-
-export { membershipKey };

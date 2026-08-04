@@ -12,9 +12,11 @@ from app.core.cache import get_cache
 from app.core.deps import DbSessionDep, SettingsDep
 from app.core.trusted_client import resolve_client_ip
 from app.library import service as library_service
+from app.library.rate_limit import enforce_watch_entries_contains_rate_limit
 from app.library.schemas import (
     CreateWatchEntryBody,
     PatchWatchEntryBody,
+    WatchEntriesContainsResponse,
     WatchEntriesPageResponse,
     WatchEntryResponse,
 )
@@ -62,6 +64,36 @@ def _map_lists_error(exc: Exception) -> HTTPException | None:
     return None
 
 
+_MAX_CONTAINS_IDS = 50
+
+
+def _parse_contains_ids(raw: list[str]) -> list[tuple[str, uuid.UUID]]:
+    """Parse ``type:uuid`` tokens from the contains query."""
+    if len(raw) > _MAX_CONTAINS_IDS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f'At most {_MAX_CONTAINS_IDS} ids are allowed',
+        )
+    refs: list[tuple[str, uuid.UUID]] = []
+    for token in raw:
+        cleaned = token.strip()
+        if not cleaned or ':' not in cleaned:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail='ids must be type:uuid pairs (e.g. movie:<uuid>)',
+            )
+        type_part, id_part = cleaned.split(':', 1)
+        try:
+            content_id = uuid.UUID(id_part)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail='ids must be type:uuid pairs (e.g. movie:<uuid>)',
+            ) from exc
+        refs.append((type_part, content_id))
+    return refs
+
+
 @router.get('/me/watch-entries', response_model=WatchEntriesPageResponse)
 async def list_watch_entries(
     identity: CurrentIdentityDep,
@@ -88,6 +120,36 @@ async def list_watch_entries(
         raise
 
 
+@router.get(
+    '/me/watch-entries/contains',
+    response_model=WatchEntriesContainsResponse,
+)
+async def watch_entries_contains(
+    identity: CurrentIdentityDep,
+    session: DbSessionDep,
+    settings: SettingsDep,
+    ids: Annotated[list[str], Query(min_length=1)],
+) -> WatchEntriesContainsResponse:
+    """Batch check whether the caller has logged each title at least once."""
+    await enforce_watch_entries_contains_rate_limit(
+        get_cache(),
+        settings=settings,
+        identity_id=identity.id,
+    )
+    refs = _parse_contains_ids(ids)
+    try:
+        return await library_service.contains_logged_titles(
+            session,
+            identity_id=identity.id,
+            refs=refs,
+        )
+    except Exception as exc:
+        mapped = _map_library_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
 @router.post(
     '/me/watch-entries',
     response_model=WatchEntryResponse,
@@ -100,7 +162,7 @@ async def create_watch_entry(
     settings: SettingsDep,
     request: Request,
 ) -> WatchEntryResponse:
-    """Log a watch. Optionally remove the title from watchlist in one commit."""
+    """Log a watch and remove the title from watchlist in one commit."""
     cache = get_cache()
     await enforce_lists_write_rate_limit(
         cache,
@@ -109,7 +171,7 @@ async def create_watch_entry(
         client_ip=resolve_client_ip(request, settings),
     )
     try:
-        # Create first, then optional watchlist remove — never remove-before-create.
+        # Create first, then watchlist remove — never remove-before-create.
         entry = await library_service.create_entry(
             session,
             identity_id=identity.id,
@@ -117,19 +179,18 @@ async def create_watch_entry(
             content_id=body.id,
             watched_at=body.watched_at,
             note=body.note,
+            rating=body.rating,
             commit=False,
         )
-        owner_user_id: uuid.UUID | None = None
-        if body.remove_from_watchlist:
-            owner_user_id = await lists_service.remove_system_list_item(
-                session,
-                cache=cache,
-                identity_id=identity.id,
-                kind='watchlist',
-                content_type=body.type,
-                content_id=body.id,
-                commit=False,
-            )
+        owner_user_id = await lists_service.remove_system_list_item(
+            session,
+            cache=cache,
+            identity_id=identity.id,
+            kind='watchlist',
+            content_type=body.type,
+            content_id=body.id,
+            commit=False,
+        )
         await session.commit()
         if owner_user_id is not None:
             await lists_service.invalidate_system_list_cache_for_user(
@@ -158,7 +219,7 @@ async def patch_watch_entry(
     settings: SettingsDep,
     request: Request,
 ) -> WatchEntryResponse:
-    """Edit watched_at and/or note on a diary entry."""
+    """Edit watched_at, note, and/or rating on a diary entry."""
     cache = get_cache()
     await enforce_lists_write_rate_limit(
         cache,
@@ -174,6 +235,8 @@ async def patch_watch_entry(
             watched_at=body.watched_at,
             note=body.note,
             note_set='note' in body.model_fields_set,
+            rating=body.rating,
+            rating_set='rating' in body.model_fields_set,
         )
     except Exception as exc:
         mapped = _map_library_error(exc)

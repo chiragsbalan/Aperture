@@ -470,7 +470,7 @@ export function AuthForm({ mode, initialError = null }: AuthFormProps) {
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-[var(--radius-md)] bg-[var(--color-primary)] px-4 py-2.5 text-base font-medium text-[var(--color-primary-contrast)] transition hover:brightness-110 disabled:opacity-60 sm:[font-size:var(--text-body-sm)]"
+          className="btn btn-solid btn-block"
         >
           {pending ? 'Please wait…' : submitLabel}
         </button>
@@ -485,7 +485,7 @@ export function AuthForm({ mode, initialError = null }: AuthFormProps) {
       <div className="mt-5">
         <a
           href="/api/auth/google/start?intent=sign_in"
-          className="flex w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-muted transition hover:border-[var(--color-primary)] hover:text-foreground"
+          className="btn btn-lg btn-block text-muted hover:border-[var(--color-primary)] hover:text-foreground"
         >
           Continue with Google
         </a>

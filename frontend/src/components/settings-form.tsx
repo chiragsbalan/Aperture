@@ -356,7 +356,7 @@ export function SettingsForm() {
               />
               <button
                 type="button"
-                className="text-sm text-muted transition hover:text-foreground"
+                className="btn btn-ghost"
                 onClick={() => {
                   setLinks(links.filter((_, i) => i !== index));
                 }}
@@ -368,7 +368,7 @@ export function SettingsForm() {
           {links.length < MAX_LINKS ? (
             <button
               type="button"
-              className="text-sm text-muted underline-offset-2 hover:text-foreground hover:underline"
+              className="btn btn-ghost underline-offset-2 hover:underline"
               onClick={() => {
                 setLinks([...links, { label: '', url: '' }]);
               }}
@@ -449,11 +449,7 @@ export function SettingsForm() {
       </fieldset>
 
       <div className="flex flex-wrap items-center gap-4">
-        <button
-          ref={submitRef}
-          type="submit"
-          className="rounded-[var(--radius-sm)] border border-[var(--color-accent)] bg-[var(--color-accent-soft)] px-4 py-2 text-foreground transition hover:border-[var(--color-accent)] disabled:opacity-60"
-        >
+        <button ref={submitRef} type="submit" className="btn btn-primary">
           {pending ? 'Saving…' : 'Save settings'}
         </button>
         <Link

@@ -12,6 +12,11 @@ from app.core.deps import DbSessionDep, SettingsDep
 from app.core.trusted_client import resolve_client_ip
 from app.library import service as library_service
 from app.library.schemas import WatchEntriesPageResponse
+from app.lists import service as lists_service
+from app.lists.schemas import (
+    ProfileListsPageResponse,
+    SystemListResponse,
+)
 from app.users import service as users_service
 from app.users.rate_limit import enforce_users_public_rate_limit
 from app.users.schemas import (
@@ -204,6 +209,81 @@ async def patch_me_preferences(
             detail='Profile not found',
         ) from exc
     return _profile_response(profile).preferences
+
+
+@router.get(
+    '/{username}/lists',
+    response_model=ProfileListsPageResponse,
+)
+async def list_public_profile_lists(
+    request: Request,
+    username: str,
+    session: DbSessionDep,
+    settings: SettingsDep,
+    identity: OptionalIdentityDep,
+) -> ProfileListsPageResponse:
+    """Return Lists-tab custom lists (AuthZ filtered).
+
+    Owners see every custom list; everyone else sees public customs only.
+    Watchlist is ``GET /users/{username}/watchlist``, not this index.
+    """
+    await enforce_users_public_rate_limit(
+        get_cache(),
+        settings=settings,
+        client_ip=resolve_client_ip(request, settings),
+    )
+    try:
+        profile = await users_service.get_public_profile(
+            session,
+            username=username,
+        )
+        lists = await lists_service.list_profile_lists(
+            session,
+            owner_user_id=profile.id,
+            viewer_identity_id=identity.id if identity is not None else None,
+        )
+        return ProfileListsPageResponse(lists=lists)
+    except users_service.ProfileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='Profile not found',
+        ) from exc
+
+
+@router.get(
+    '/{username}/watchlist',
+    response_model=SystemListResponse,
+)
+async def get_public_watchlist(
+    request: Request,
+    username: str,
+    session: DbSessionDep,
+    settings: SettingsDep,
+    page: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(ge=1, le=100)] = 24,
+) -> SystemListResponse:
+    """Return a member's always-public watchlist (empty OK; no lazy-create)."""
+    await enforce_users_public_rate_limit(
+        get_cache(),
+        settings=settings,
+        client_ip=resolve_client_ip(request, settings),
+    )
+    try:
+        profile = await users_service.get_public_profile(
+            session,
+            username=username,
+        )
+        return await lists_service.get_public_watchlist_page(
+            session,
+            owner_user_id=profile.id,
+            page=page,
+            limit=limit,
+        )
+    except users_service.ProfileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='Profile not found',
+        ) from exc
 
 
 @router.get(

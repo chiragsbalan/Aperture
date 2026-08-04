@@ -24,6 +24,7 @@ from app.lists.schemas import (
     CustomListItemsResponse,
     CustomListSummary,
     ListItemResponse,
+    ProfileListIndexEntry,
     SystemListResponse,
 )
 from app.metadata import service as metadata_service
@@ -35,6 +36,8 @@ MAX_ITEMS_PER_LIST = 500
 MAX_CUSTOM_LISTS = 50
 SYSTEM_KINDS = frozenset({'watchlist', 'favorites'})
 VISIBILITIES = frozenset({'private', 'public'})
+CUSTOM_VISIBILITIES = VISIBILITIES
+PUBLIC_INDEX_VISIBILITIES = frozenset({'public'})
 
 
 class ProfileRequiredError(Exception):
@@ -59,10 +62,6 @@ class CustomListCapacityError(Exception):
 
 class ListNotFoundError(Exception):
     """List missing, not custom, or not visible to the caller."""
-
-
-class ReorderMismatchError(Exception):
-    """Reorder body is not set-equal to current membership."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,94 +256,89 @@ async def get_system_list_page(
     )
 
 
-async def patch_system_list_visibility(
-    session: AsyncSession,
-    *,
-    identity_id: uuid.UUID,
-    kind: str,
-    visibility: str,
-) -> SystemListResponse:
-    """Set watchlist/favorites visibility (public|private) for the owner."""
-    if kind not in SYSTEM_KINDS:
-        raise ValueError(f'not a system list kind: {kind}')
-    if visibility not in VISIBILITIES:
-        raise UnsupportedListContentError('invalid visibility')
-    # Kind-scoped invariants from e1f2a3b4c5d6 (reject before DB check fails).
-    if kind == 'watchlist' and visibility != 'public':
-        raise UnsupportedListContentError(
-            'watchlist visibility is fixed to public',
-        )
-    if kind == 'favorites' and visibility != 'private':
-        raise UnsupportedListContentError(
-            'favorites visibility is fixed to private',
-        )
-    list_row = await get_or_create_system_list(
-        session,
-        identity_id=identity_id,
-        kind=kind,
-    )
-    locked = await lists_repository.lock_list(session, list_id=list_row.id)
-    if locked is None:
-        raise ProfileRequiredError('profile not found')
-    locked.visibility = visibility
-    await session.commit()
-    return await get_system_list_page(
-        session,
-        identity_id=identity_id,
-        kind=kind,
-        page=1,
-        limit=1,
-    )
-
-
-async def system_list_public_summary(
+async def get_public_watchlist_page(
     session: AsyncSession,
     *,
     owner_user_id: uuid.UUID,
-    kind: str,
-) -> tuple[str, int] | None:
-    """Return ``(visibility, item_count)`` for an existing system list.
-
-    Returns ``None`` when the system list has never been created (treat as
-    private empty for visitors).
-    """
-    if kind not in SYSTEM_KINDS:
-        raise ValueError(f'not a system list kind: {kind}')
+    page: int,
+    limit: int,
+) -> SystemListResponse:
+    """Return a member's always-public watchlist (read-only; no lazy-create)."""
     list_row = await lists_repository.get_system_list(
         session,
         owner_user_id=owner_user_id,
-        kind=kind,
+        kind='watchlist',
     )
     if list_row is None:
-        return None
+        return SystemListResponse(
+            kind='watchlist',
+            title=lists_repository.SYSTEM_TITLES['watchlist'],
+            visibility='public',
+            page=page,
+            limit=limit,
+            total=0,
+            items=[],
+        )
     total = await lists_repository.count_items(session, list_id=list_row.id)
-    return list_row.visibility, total
-
-
-async def count_public_custom_lists(
-    session: AsyncSession,
-    *,
-    owner_user_id: uuid.UUID,
-) -> int:
-    """Count custom lists with public visibility for profile counters."""
-    return await lists_repository.count_custom_lists(
+    offset = (page - 1) * limit
+    items = await lists_repository.list_items_page(
         session,
-        owner_user_id=owner_user_id,
+        list_id=list_row.id,
+        offset=offset,
+        limit=limit,
+    )
+    response_items = await _items_with_summaries(session, items)
+    return SystemListResponse(
+        kind='watchlist',
+        title=list_row.title,
         visibility='public',
+        page=page,
+        limit=limit,
+        total=total,
+        items=response_items,
     )
 
 
-async def count_custom_lists_for_owner(
+async def list_profile_lists(
     session: AsyncSession,
     *,
     owner_user_id: uuid.UUID,
-) -> int:
-    """Count all custom lists for the owner profile counter."""
-    return await lists_repository.count_custom_lists(
+    viewer_identity_id: uuid.UUID | None,
+) -> list[ProfileListIndexEntry]:
+    """Build the public Lists tab: AuthZ-filtered custom lists only.
+
+    Watchlist is a separate always-public profile tab
+    (``GET /users/{username}/watchlist``). Owners see every custom list;
+    everyone else sees ``public`` customs only.
+    """
+    viewer_user_id = await _viewer_user_id(
+        session,
+        identity_id=viewer_identity_id,
+    )
+    is_owner = viewer_user_id is not None and viewer_user_id == owner_user_id
+
+    custom_visibilities: frozenset[str] | None = (
+        None if is_owner else PUBLIC_INDEX_VISIBILITIES
+    )
+
+    custom_rows = await lists_repository.list_custom_lists(
         session,
         owner_user_id=owner_user_id,
-        visibility=None,
+        visibilities=custom_visibilities,
     )
+    return [
+        ProfileListIndexEntry(
+            kind='custom',
+            id=list_row.id,
+            title=list_row.title,
+            description=list_row.description,
+            visibility=list_row.visibility,  # type: ignore[arg-type]
+            item_count=count,
+            created_at=list_row.created_at,
+            updated_at=list_row.updated_at,
+        )
+        for list_row, count in custom_rows
+    ]
 
 
 async def add_system_list_item(
@@ -600,8 +594,16 @@ async def _resolve_readable_custom_list(
     list_id: uuid.UUID,
     identity_id: uuid.UUID | None,
 ) -> List:
-    """Resolve a custom list for read access under visibility rules."""
-    list_row = await lists_repository.get_list_by_id(session, list_id=list_id)
+    """Resolve a custom list for read access under visibility rules.
+
+    Soft-deleted owners are treated as missing (404) for all by-id reads.
+    ``public`` is readable by anyone with the id; ``private`` is owner-only.
+    """
+    list_row = await lists_repository.get_list_by_id(
+        session,
+        list_id=list_id,
+        require_active_owner=True,
+    )
     if list_row is None or list_row.kind != 'custom':
         raise ListNotFoundError('list not found')
 
@@ -876,53 +878,6 @@ async def remove_custom_list_item(
             ordered_item_ids=remaining,
         )
     await session.commit()
-
-
-async def reorder_custom_list_items(
-    session: AsyncSession,
-    *,
-    identity_id: uuid.UUID,
-    list_id: uuid.UUID,
-    item_ids: list[uuid.UUID],
-) -> CustomListItemsResponse:
-    """Set item order. ``item_ids`` must be set-equal to current membership.
-
-    Positions are renumbered densely to ``0..n-1`` under ``lock_list`` (not
-    fractional indexing). Acceptable while lists are capped at 500 items.
-    """
-    locked = await require_custom_list_mutable(
-        session,
-        identity_id=identity_id,
-        list_id=list_id,
-    )
-    current_ids = await lists_repository.list_all_item_ids(
-        session,
-        list_id=locked.id,
-    )
-    if set(item_ids) != set(current_ids) or len(item_ids) != len(current_ids):
-        raise ReorderMismatchError('item_ids must match list membership')
-
-    await lists_repository.renumber_positions(
-        session,
-        list_id=locked.id,
-        ordered_item_ids=item_ids,
-    )
-    await session.commit()
-
-    items = await lists_repository.list_items_page(
-        session,
-        list_id=locked.id,
-        offset=0,
-        limit=MAX_ITEMS_PER_LIST,
-    )
-    response_items = await _items_with_summaries(session, items)
-    return CustomListItemsResponse(
-        list_id=locked.id,
-        page=1,
-        limit=MAX_ITEMS_PER_LIST,
-        total=len(response_items),
-        items=response_items,
-    )
 
 
 async def custom_list_contains(

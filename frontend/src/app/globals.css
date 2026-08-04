@@ -26,9 +26,155 @@
     outline-offset: 3px;
   }
 
+  /*
+   * Text fields always match :focus-visible in many browsers, so the global
+   * green outline above reads as the whole box “lighting up”. Keep caret /
+   * selection only — no outline or glow ring on type-in controls.
+   */
+  :is(
+    input:not([type='button']):not([type='submit']):not([type='reset']):not(
+        [type='checkbox']
+      ):not([type='radio']):not([type='file']):not([type='range']):not(
+        [type='color']
+      ):not([type='image']),
+    textarea
+  ):focus,
+  :is(
+    input:not([type='button']):not([type='submit']):not([type='reset']):not(
+        [type='checkbox']
+      ):not([type='radio']):not([type='file']):not([type='range']):not(
+        [type='color']
+      ):not([type='image']),
+    textarea
+  ):focus-visible {
+    outline: none;
+    outline-offset: 0;
+    box-shadow: none;
+  }
+
   ::selection {
     background: var(--color-accent-soft);
     color: var(--color-fg);
+  }
+}
+
+@layer components {
+  /*
+   * Shared buttons — form CTAs, sheet actions, load-more, auth/landing.
+   * Prefer these over one-off border/px/py Tailwind on <button> / button-like <a>.
+   * Exempt: icon-only chrome (search, account, back), tab triggers, library-action icons.
+   */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background-color: transparent;
+    padding: 0.5rem 0.75rem;
+    font-family: inherit;
+    font-size: var(--text-body-sm);
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--color-fg);
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      background-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out),
+      filter var(--duration-fast) var(--ease-out),
+      opacity var(--duration-fast) var(--ease-out);
+  }
+
+  .btn:hover:not(:disabled):not([aria-disabled='true']) {
+    border-color: color-mix(in srgb, var(--color-border) 35%, var(--color-fg));
+  }
+
+  .btn:disabled,
+  .btn[aria-disabled='true'] {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* In-app primary CTA (Save, Create, soft accent). */
+  .btn-primary {
+    background-color: var(--color-accent-soft);
+  }
+
+  .btn-primary:hover:not(:disabled):not([aria-disabled='true']) {
+    border-color: color-mix(in srgb, var(--color-border) 35%, var(--color-fg));
+  }
+
+  /* Solid brand fill — auth submit, guest Sign up. */
+  .btn-solid {
+    border-color: transparent;
+    border-radius: var(--radius-md);
+    background-color: var(--color-primary);
+    padding: 0.625rem 1rem;
+    font-size: var(--text-body);
+    color: var(--color-primary-contrast);
+  }
+
+  .btn-solid:hover:not(:disabled):not([aria-disabled='true']) {
+    border-color: transparent;
+    filter: brightness(1.1);
+  }
+
+  @media (min-width: 640px) {
+    .btn-solid {
+      font-size: var(--text-body-sm);
+    }
+  }
+
+  /* Destructive bordered action (Delete confirm). */
+  .btn-danger {
+    color: var(--color-danger);
+  }
+
+  .btn-danger:hover:not(:disabled):not([aria-disabled='true']) {
+    border-color: var(--color-danger);
+  }
+
+  /* Text-style action inside forms (Delete list link, Add link). */
+  .btn-ghost {
+    border-color: transparent;
+    background-color: transparent;
+    padding-inline: 0;
+    font-weight: 400;
+    color: var(--color-fg-muted);
+  }
+
+  .btn-ghost:hover:not(:disabled):not([aria-disabled='true']) {
+    border-color: transparent;
+    color: var(--color-fg);
+  }
+
+  .btn-danger-ghost {
+    border-color: transparent;
+    background-color: transparent;
+    padding-inline: 0;
+    font-weight: 400;
+    color: var(--color-danger);
+  }
+
+  .btn-danger-ghost:hover:not(:disabled):not([aria-disabled='true']) {
+    border-color: transparent;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  /* Larger padded control (Load more, Log out, guest Log in). */
+  .btn-lg {
+    border-radius: var(--radius-md);
+    padding: 0.625rem 1rem;
+  }
+
+  .btn-block {
+    display: flex;
+    width: 100%;
   }
 }
 
@@ -47,6 +193,469 @@
   @media (min-width: 640px) {
     .layout-content {
       padding-inline: var(--layout-content-pad-x-sm);
+    }
+  }
+
+  /*
+   * Navbar clearance — on mobile, same top offset as Library Watchlist for
+   * every authenticated / catalog page. Prefer `.layout-shell` on the shell;
+   * use `.layout-shell-pad-top` when pad lives on `.layout-content` (title,
+   * search, person). Guest landing / login / signup stay exempt.
+   */
+  .layout-shell {
+    padding-block: var(--layout-shell-pad-y);
+  }
+
+  .layout-shell-pad-top {
+    padding-top: var(--layout-shell-pad-y);
+  }
+
+  @media (min-width: 640px) {
+    .layout-shell {
+      padding-block: var(--layout-shell-pad-y-at-sm);
+    }
+
+    .layout-shell-pad-top {
+      padding-top: var(--layout-shell-pad-top-at-sm);
+    }
+  }
+
+  /*
+   * Shared overlay chrome — account menu, search, CollectionSheet, form
+   * selects, and any popup. Gradient wash + glow hairline are mandatory.
+   */
+  .overlay-surface {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background:
+      linear-gradient(
+        165deg,
+        rgba(106, 174, 106, 0.14) 0%,
+        rgba(22, 20, 17, 0.2) 34%,
+        rgba(22, 20, 17, 0.92) 100%
+      ),
+      rgba(22, 20, 17, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 28px 90px rgba(0, 0, 0, 0.55);
+  }
+
+  .overlay-panel-motion {
+    animation: search-panel-in var(--duration-med) var(--ease-out) both;
+    animation-delay: 40ms;
+  }
+
+  .overlay-panel-motion.is-leaving {
+    animation: search-panel-out var(--duration-med) var(--ease-out) both;
+  }
+
+  /* Soft accent hairline under overlay / menu headers (not a hard border). */
+  .overlay-header-rule {
+    position: relative;
+  }
+
+  .overlay-header-rule::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(106, 174, 106, 0.35),
+      transparent
+    );
+    opacity: 0.7;
+  }
+
+  /* Custom listbox trigger — field chrome; open panel uses overlay surface. */
+  .form-select {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    appearance: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background-color: transparent;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a39e93' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+    padding: 0.5rem 2.5rem 0.5rem 0.75rem;
+    text-align: left;
+    color: var(--color-fg);
+    cursor: pointer;
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      background-color var(--duration-fast) var(--ease-out);
+  }
+
+  .form-select:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--color-border) 70%, var(--color-fg));
+  }
+
+  .form-select.is-open {
+    border-color: color-mix(
+      in srgb,
+      var(--color-accent) 55%,
+      var(--color-border)
+    );
+    background-color: rgba(106, 174, 106, 0.06);
+  }
+
+  .form-select:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .form-select:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .form-select-panel {
+    position: fixed;
+    z-index: calc(var(--z-overlay) + 1);
+    margin: 0;
+    list-style: none;
+    overflow: hidden;
+    padding: 0.35rem;
+  }
+
+  .form-select-option {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.65rem;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+    font-size: var(--text-body-sm);
+    color: var(--color-fg);
+    cursor: pointer;
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+
+  .form-select-option:hover,
+  .form-select-option.is-active {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .form-select-option.is-selected {
+    color: var(--color-accent);
+  }
+
+  .form-select-option:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+
+  .form-select-option-check {
+    display: inline-flex;
+    width: 0.9rem;
+    height: 0.9rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-accent);
+  }
+
+  /* Custom date field — same field chrome as FormSelect; calendar icon. */
+  .form-date-root {
+    display: block;
+    width: 100%;
+  }
+
+  .form-date {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background-color: transparent;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    color: var(--color-fg);
+    cursor: pointer;
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      background-color var(--duration-fast) var(--ease-out);
+  }
+
+  .form-date:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--color-border) 70%, var(--color-fg));
+  }
+
+  .form-date.is-open {
+    border-color: color-mix(
+      in srgb,
+      var(--color-accent) 55%,
+      var(--color-border)
+    );
+    background-color: rgba(106, 174, 106, 0.06);
+  }
+
+  .form-date:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .form-date:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .form-date-icon {
+    flex-shrink: 0;
+    color: var(--color-fg-muted);
+  }
+
+  .form-date-panel {
+    position: fixed;
+    z-index: calc(var(--z-overlay) + 1);
+    padding: 0.75rem;
+  }
+
+  .form-date-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .form-date-month {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-body-sm);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-fg);
+  }
+
+  .form-date-nav {
+    display: inline-flex;
+    height: 2rem;
+    width: 2rem;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-fg-muted);
+    cursor: pointer;
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
+  }
+
+  .form-date-nav:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-fg);
+  }
+
+  .form-date-nav:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+
+  .form-date-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    margin-bottom: 0.35rem;
+    text-align: center;
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-fg-muted);
+  }
+
+  .form-date-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.2rem;
+  }
+
+  .form-date-day {
+    display: inline-flex;
+    aspect-ratio: 1;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    padding: 0;
+    font-size: var(--text-body-sm);
+    color: var(--color-fg);
+    cursor: pointer;
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+  }
+
+  .form-date-day:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .form-date-day.is-outside {
+    color: color-mix(in srgb, var(--color-fg-muted) 55%, transparent);
+  }
+
+  .form-date-day.is-today:not(.is-selected) {
+    border-color: color-mix(
+      in srgb,
+      var(--color-accent) 55%,
+      var(--color-border)
+    );
+    color: var(--color-accent);
+  }
+
+  .form-date-day.is-selected {
+    background: var(--color-accent);
+    color: var(--color-accent-contrast);
+  }
+
+  .form-date-day.is-selected:hover {
+    background: var(--color-accent);
+    color: var(--color-accent-contrast);
+  }
+
+  .form-date-day:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 1px;
+  }
+
+  .form-date-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.65rem;
+    padding-top: 0.55rem;
+    border-top: 1px solid
+      color-mix(in srgb, var(--color-border) 80%, transparent);
+  }
+
+  .form-date-today {
+    border: 0;
+    background: transparent;
+    padding: 0.25rem 0.15rem;
+    font-size: var(--text-body-sm);
+    color: var(--color-accent);
+    cursor: pointer;
+  }
+
+  .form-date-today:hover {
+    color: color-mix(in srgb, var(--color-accent) 80%, var(--color-fg));
+  }
+
+  .form-date-today:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /*
+   * Title poster grids — locked density. Mobile / tablet: exactly 4 across;
+   * desktop (lg+): 6 across. Never invent a parallel column count.
+   */
+  .poster-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: 0.5rem;
+    row-gap: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .poster-grid {
+      column-gap: 0.75rem;
+      row-gap: 1.25rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .poster-grid {
+      column-gap: 1rem;
+      row-gap: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .poster-grid {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
+
+  /*
+   * Diary entries — horizontal poster + meta cards (not poster-grid).
+   * One column on narrow viewports; two on sm+.
+   */
+  .diary-entry-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem 1.5rem;
+  }
+
+  @media (min-width: 640px) {
+    .diary-entry-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.5rem 2rem;
+    }
+  }
+
+  /* Diary list reflow — enter fade/rise; leave collapse after delete. */
+  .diary-entry-item {
+    animation: diary-entry-in var(--duration-med) var(--ease-out) both;
+  }
+
+  .diary-entry-item.is-leaving {
+    overflow: hidden;
+    animation: diary-entry-out var(--duration-med) var(--ease-out) both;
+    pointer-events: none;
+  }
+
+  .diary-month-section {
+    transition:
+      opacity var(--duration-med) var(--ease-out),
+      margin var(--duration-med) var(--ease-out);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .diary-entry-item,
+    .diary-entry-item.is-leaving {
+      animation: none;
+    }
+  }
+
+  /*
+   * Title / year (and similar caption) under poster-grid cells — desktop only.
+   * Hidden below lg so 4-across mobile/tablet stays poster-dense. Keep
+   * accessible names via aria-label / posterAlt on the link.
+   */
+  .poster-meta {
+    display: none;
+  }
+
+  @media (min-width: 1024px) {
+    .poster-meta {
+      display: block;
+    }
+
+    /*
+     * Poster name/year captions stay at the pre-scale sizes — desktop type
+     * bump (--text-scale: 1.15) must not enlarge under-poster text.
+     */
+    .poster-meta .text-sm {
+      font-size: 0.875rem;
+    }
+
+    .poster-meta .text-xs {
+      font-size: 0.75rem;
     }
   }
 
@@ -470,13 +1079,12 @@
   }
 
   /*
-   * Horizontal overflow scroller — no visible scrollbar; edge fades when
-   * more content exists that way. Drive `data-fade-start` / `data-fade-end`
-   * with `useScrollFadeX` from `lib/scroll-fade.ts`.
+   * Overflow scrollers — no visible scrollbar; edge fades when more content
+   * exists that way. Drive `data-fade-start` / `data-fade-end` with
+   * `useScrollFadeX` / `useScrollFadeY` from `lib/scroll-fade.ts`.
    */
-  .scroll-fade-x {
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
+  .scroll-fade-x,
+  .scroll-fade-y {
     scrollbar-width: none;
     -ms-overflow-style: none;
     -webkit-mask-size: 100% 100%;
@@ -485,8 +1093,73 @@
     mask-repeat: no-repeat;
   }
 
-  .scroll-fade-x::-webkit-scrollbar {
+  .scroll-fade-x::-webkit-scrollbar,
+  .scroll-fade-y::-webkit-scrollbar {
     display: none;
+  }
+
+  .scroll-fade-x {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .scroll-fade-y {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    /* Vertical sheets use overlay fades (below) — mask is unreliable on
+       overflow scrollers in Chromium and reads as “no fade”. */
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  /*
+   * Vertical edge fades — ::before/::after overlays on `.scroll-fade-y-host`
+   * (z-index above the scroller). Inset box-shadow paints UNDER children so
+   * it never shows; mask-image is unreliable on Chromium overflow scrollers.
+   * Length = --scroll-fade-size-y (half a people row). Soft panel charcoal
+   * (same base as `.overlay-surface`) — not a hard black bar.
+   */
+  .scroll-fade-y-host {
+    position: relative;
+    min-height: 0;
+  }
+
+  .scroll-fade-y-host::before,
+  .scroll-fade-y-host::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    height: var(--scroll-fade-size-y);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--duration-fast) var(--ease-out);
+  }
+
+  .scroll-fade-y-host::before {
+    top: 0;
+    background: linear-gradient(
+      to bottom,
+      rgba(22, 20, 17, 0.72) 0%,
+      rgba(22, 20, 17, 0.32) 55%,
+      transparent 100%
+    );
+  }
+
+  .scroll-fade-y-host::after {
+    bottom: 0;
+    background: linear-gradient(
+      to top,
+      rgba(22, 20, 17, 0.72) 0%,
+      rgba(22, 20, 17, 0.32) 55%,
+      transparent 100%
+    );
+  }
+
+  .scroll-fade-y-host[data-fade-start='true']::before,
+  .scroll-fade-y-host[data-fade-end='true']::after {
+    opacity: 1;
   }
 
   .scroll-fade-x[data-fade-start='true'][data-fade-end='true'] {
@@ -681,36 +1354,6 @@
     animation: account-menu-drop-out var(--duration-med) var(--ease-out) both;
   }
 
-  .account-menu-surface {
-    background:
-      linear-gradient(
-        165deg,
-        rgba(106, 174, 106, 0.14) 0%,
-        rgba(22, 20, 17, 0.2) 34%,
-        rgba(22, 20, 17, 0.92) 100%
-      ),
-      rgba(22, 20, 17, 0.88);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 28px 90px rgba(0, 0, 0, 0.55);
-  }
-
-  .account-menu-header::after {
-    content: '';
-    position: absolute;
-    inset: auto 0 0;
-    height: 1px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(106, 174, 106, 0.35),
-      transparent
-    );
-    opacity: 0.7;
-  }
-
   .account-menu-item {
     animation: account-menu-item-in var(--duration-med) var(--ease-out) both;
   }
@@ -724,17 +1367,24 @@
     animation: search-backdrop-in var(--duration-med) var(--ease-out) both;
   }
 
-  .search-overlay-panel {
-    animation: search-panel-in var(--duration-med) var(--ease-out) both;
-    animation-delay: 40ms;
-  }
-
   .search-overlay-backdrop.is-leaving {
     animation: search-backdrop-out var(--duration-med) var(--ease-out) both;
   }
 
-  .search-overlay-panel.is-leaving {
-    animation: search-panel-out var(--duration-med) var(--ease-out) both;
+  /*
+   * Followers / Following / edit-list sheets — cap height and force the body
+   * row to shrink (grid minmax 0) so overflow + scroll-fade-y can engage.
+   * Flex-only max-height often expands with content and never scrolls.
+   */
+  .collection-sheet-panel {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    max-height: min(85dvh, 52rem);
+    min-height: 0;
+  }
+
+  .collection-sheet-body {
+    min-height: 0;
   }
 
   .status-pulse::before {
@@ -927,15 +1577,45 @@
   }
 }
 
+@keyframes diary-entry-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes diary-entry-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    max-height: 12rem;
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-0.35rem) scale(0.98);
+    max-height: 0;
+    margin: 0;
+    padding: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .motion-fade-rise,
   .motion-fade-rise-delay,
   .motion-fade-in,
   .catalog-backdrop-drift,
   .search-overlay-backdrop,
-  .search-overlay-panel,
   .search-overlay-backdrop.is-leaving,
-  .search-overlay-panel.is-leaving,
+  .overlay-panel-motion,
+  .overlay-panel-motion.is-leaving,
+  .diary-entry-item,
+  .diary-entry-item.is-leaving,
   .status-pulse::before {
     animation: none !important;
   }

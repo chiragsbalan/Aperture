@@ -1,24 +1,35 @@
 'use client';
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useId, useState, type FormEvent } from 'react';
 
-import { LibraryNav } from '@/components/library-nav';
-import { TitlePosterLink } from '@/components/title-poster-link';
+import { ActionToast } from '@/components/action-toast';
+import { CollectionSheet } from '@/components/collection-sheet';
+import { FormSelect } from '@/components/form-select';
+import { LibraryPosterCell } from '@/components/library-poster-cell';
+import { ListTitleWithVisibility } from '@/components/list-title-with-visibility';
 import {
+  CheckOutlineIcon,
+  PencilOutlineIcon,
+  SettingsOutlineIcon,
+} from '@/components/shelf-chrome-icons';
+import {
+  addCustomListItem,
   deleteCustomList,
   fetchCustomList,
   fetchCustomListItems,
-  hrefForLibraryContent,
   patchCustomList,
   removeCustomListItem,
-  reorderCustomListItems,
   type CustomListDetail,
   type LibraryListItem,
   type ListVisibility,
 } from '@/lib/library';
-import { armTitlePosterMorph } from '@/lib/title-poster-morph';
+import { isSafeListReturnPath } from '@/lib/list-nav';
+
+const VISIBILITY_OPTIONS = [
+  { value: 'public' as const, label: 'Anyone' },
+  { value: 'private' as const, label: 'Private' },
+];
 
 type LoadState =
   | { status: 'loading' }
@@ -30,18 +41,43 @@ type LoadState =
       isOwner: boolean;
     };
 
+type ListSheet = 'edit' | 'delete';
+
 export function CustomListDetailPage({ listId }: { listId: string }) {
   const router = useRouter();
-  const editDialogRef = useRef<HTMLDialogElement>(null);
-  const deleteDialogRef = useRef<HTMLDialogElement>(null);
+  const searchParams = useSearchParams();
   const formId = useId();
+  const returnPath = searchParams.get('from');
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const [editingItems, setEditingItems] = useState(false);
   const [pending, setPending] = useState(false);
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<ListSheet | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editVisibility, setEditVisibility] =
     useState<ListVisibility>('private');
+  const [undo, setUndo] = useState<LibraryListItem | null>(null);
+
+  async function goToMyProfile() {
+    try {
+      const res = await fetch('/api/auth/me', { cache: 'no-store' });
+      if (res.ok) {
+        const me = (await res.json()) as {
+          user?: { username?: string | null } | null;
+        };
+        const username = me.user?.username?.trim();
+        if (username) {
+          router.push(`/u/${encodeURIComponent(username)}`);
+          return;
+        }
+      }
+    } catch {
+      // Fall through to history back.
+    }
+    router.back();
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -79,41 +115,20 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
     };
   }, [listId]);
 
-  async function moveItem(index: number, direction: -1 | 1) {
-    if (state.status !== 'ready' || !state.isOwner || pending) {
-      return;
+  useEffect(() => {
+    if (state.status === 'ready' && state.items.length === 0) {
+      setEditingItems(false);
     }
-    const target = index + direction;
-    if (target < 0 || target >= state.items.length) {
-      return;
-    }
-    const next = [...state.items];
-    const [row] = next.splice(index, 1);
-    next.splice(target, 0, row);
-    const previous = state.items;
-    setState({ ...state, items: next });
-    setPending(true);
-    setActionError(null);
-    const result = await reorderCustomListItems(
-      listId,
-      next.map((item) => item.item_id),
-    );
-    setPending(false);
-    if (!result.ok) {
-      setActionError(result.error);
-      setState({ ...state, items: previous });
-      return;
-    }
-    setState({ ...state, items: result.data.items });
-  }
+  }, [state]);
 
   async function handleRemove(item: LibraryListItem) {
-    if (state.status !== 'ready' || !state.isOwner || pending) {
+    if (state.status !== 'ready' || !state.isOwner || pendingRemoveId != null) {
       return;
     }
-    setPending(true);
+    setPendingRemoveId(item.item_id);
     setActionError(null);
     const previous = state.items;
+    const previousCount = state.list.item_count;
     setState({
       ...state,
       items: state.items.filter((row) => row.item_id !== item.item_id),
@@ -123,11 +138,81 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
       },
     });
     const result = await removeCustomListItem(listId, item.item_id);
-    setPending(false);
+    setPendingRemoveId(null);
     if (!result.ok) {
       setActionError(result.error);
-      setState({ ...state, items: previous });
+      setState((current) => {
+        if (current.status !== 'ready') {
+          return current;
+        }
+        return {
+          ...current,
+          items: previous,
+          list: { ...current.list, item_count: previousCount },
+        };
+      });
+      return;
     }
+    setUndo(item);
+  }
+
+  async function handleUndoRemove() {
+    if (undo == null || state.status !== 'ready') {
+      return;
+    }
+    const item = undo;
+    setUndo(null);
+    setPendingRemoveId(item.item_id);
+    setActionError(null);
+    setState((current) => {
+      if (current.status !== 'ready') {
+        return current;
+      }
+      const already = current.items.some((row) => row.item_id === item.item_id);
+      return {
+        ...current,
+        items: already ? current.items : [item, ...current.items],
+        list: {
+          ...current.list,
+          item_count: current.list.item_count + (already ? 0 : 1),
+        },
+      };
+    });
+    const result = await addCustomListItem(
+      listId,
+      item.content.type,
+      item.content.id,
+    );
+    setPendingRemoveId(null);
+    if (!result.ok) {
+      setActionError(result.error);
+      setState((current) => {
+        if (current.status !== 'ready') {
+          return current;
+        }
+        return {
+          ...current,
+          items: current.items.filter((row) => row.item_id !== item.item_id),
+          list: {
+            ...current.list,
+            item_count: Math.max(0, current.list.item_count - 1),
+          },
+        };
+      });
+      return;
+    }
+    setState((current) => {
+      if (current.status !== 'ready') {
+        return current;
+      }
+      return {
+        ...current,
+        items: [
+          result.item,
+          ...current.items.filter((row) => row.item_id !== item.item_id),
+        ],
+      };
+    });
   }
 
   async function handleSaveEdit(event: FormEvent) {
@@ -148,7 +233,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
       return;
     }
     setState({ ...state, list: result.list });
-    editDialogRef.current?.close();
+    setSheet(null);
   }
 
   async function handleDelete() {
@@ -163,7 +248,11 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
       setActionError(result.error);
       return;
     }
-    deleteDialogRef.current?.close();
+    setSheet(null);
+    if (isSafeListReturnPath(returnPath)) {
+      router.push(returnPath);
+      return;
+    }
     router.push('/library/lists');
   }
 
@@ -178,50 +267,71 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
       {state.status === 'error' ? (
         <p className="mt-10 text-[var(--color-danger)]" role="alert">
           {state.error}{' '}
-          <Link href="/library/lists" className="underline">
-            Back to lists
-          </Link>
+          <button
+            type="button"
+            className="text-[var(--color-danger)] transition hover:text-foreground"
+            onClick={() => {
+              void goToMyProfile();
+            }}
+          >
+            Go back to My Account
+          </button>
         </p>
       ) : null}
 
       {state.status === 'ready' ? (
         <>
-          <p className="text-sm text-muted">
-            <Link href="/library/lists" className="underline">
-              Lists
-            </Link>
-          </p>
-          <h1 className="mt-2 type-page-lg text-foreground">
-            {state.list.title}
-          </h1>
-          <p className="mt-2 text-muted">
-            {state.list.visibility}
-            {state.list.description ? ` · ${state.list.description}` : ''}
-          </p>
-          <LibraryNav />
-
-          {state.isOwner ? (
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                type="button"
-                className="border border-[var(--color-border)] px-3 py-2 text-sm text-foreground transition hover:border-foreground"
-                onClick={() => {
-                  editDialogRef.current?.showModal();
-                }}
-              >
-                Edit list
-              </button>
-              <button
-                type="button"
-                className="border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-danger)] transition hover:border-foreground"
-                onClick={() => {
-                  deleteDialogRef.current?.showModal();
-                }}
-              >
-                Delete list
-              </button>
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <h1 className="type-page-lg text-foreground">
+                  <ListTitleWithVisibility
+                    title={state.list.title}
+                    visibility={state.list.visibility}
+                  />
+                </h1>
+                {state.isOwner ? (
+                  <div className="flex shrink-0 items-center gap-1">
+                    {state.items.length > 0 ? (
+                      <button
+                        type="button"
+                        aria-label={editingItems ? 'Done' : 'Edit'}
+                        aria-pressed={editingItems}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] text-muted transition hover:bg-[var(--color-accent-soft)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+                        onClick={() => {
+                          setEditingItems((value) => !value);
+                        }}
+                      >
+                        {editingItems ? (
+                          <CheckOutlineIcon />
+                        ) : (
+                          <PencilOutlineIcon />
+                        )}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      aria-label="List settings"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] text-muted transition hover:bg-[var(--color-accent-soft)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+                      onClick={() => {
+                        setEditTitle(state.list.title);
+                        setEditDescription(state.list.description ?? '');
+                        setEditVisibility(state.list.visibility);
+                        setSheet('edit');
+                      }}
+                    >
+                      <SettingsOutlineIcon />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              {state.list.description ? (
+                <p className="mt-2 text-sm text-muted">
+                  {state.list.description}
+                </p>
+              ) : null}
             </div>
-          ) : null}
+          </div>
 
           {actionError ? (
             <p className="mt-4 text-[var(--color-danger)]" role="alert">
@@ -232,202 +342,160 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
           {state.items.length === 0 ? (
             <p className="mt-10 text-muted">This list is empty.</p>
           ) : (
-            <ol className="mt-10 space-y-6">
-              {state.items.map((item, index) => (
-                <li key={item.item_id} className="flex gap-4">
-                  <TitlePosterLink
-                    href={hrefForLibraryContent(item.content)}
-                    contentId={item.content.id}
-                    posterUrl={item.content.poster_url}
-                    posterAlt={`${item.content.title} poster`}
-                    sizes="80px"
-                    posterFrameClassName="w-20"
-                    className="shrink-0"
-                    ariaLabel={item.content.title}
+            <ol className="poster-grid mt-10">
+              {state.items.map((item) => (
+                <li key={item.item_id} className="min-w-0">
+                  <LibraryPosterCell
+                    item={item}
+                    editing={state.isOwner && editingItems}
+                    removePending={pendingRemoveId === item.item_id}
+                    onRemove={() => {
+                      void handleRemove(item);
+                    }}
                   />
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      href={hrefForLibraryContent(item.content)}
-                      className="font-medium text-foreground"
-                      onClick={() => {
-                        armTitlePosterMorph({
-                          contentId: item.content.id,
-                          posterUrl: item.content.poster_url,
-                          alt: `${item.content.title} poster`,
-                        });
-                      }}
-                    >
-                      {item.content.title}
-                    </Link>
-                    {item.content.year != null ? (
-                      <p className="text-sm text-muted">{item.content.year}</p>
-                    ) : null}
-                    {state.isOwner ? (
-                      <div className="mt-2 flex flex-wrap gap-3 text-sm">
-                        <button
-                          type="button"
-                          disabled={pending || index === 0}
-                          aria-label={`Move ${item.content.title} up`}
-                          className="text-muted transition hover:text-foreground disabled:opacity-40"
-                          onClick={() => {
-                            void moveItem(index, -1);
-                          }}
-                        >
-                          Move up
-                        </button>
-                        <button
-                          type="button"
-                          disabled={pending || index === state.items.length - 1}
-                          aria-label={`Move ${item.content.title} down`}
-                          className="text-muted transition hover:text-foreground disabled:opacity-40"
-                          onClick={() => {
-                            void moveItem(index, 1);
-                          }}
-                        >
-                          Move down
-                        </button>
-                        <button
-                          type="button"
-                          disabled={pending}
-                          aria-label={`Remove ${item.content.title} from list`}
-                          className="text-muted transition hover:text-foreground disabled:opacity-40"
-                          onClick={() => {
-                            void handleRemove(item);
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
                 </li>
               ))}
             </ol>
           )}
 
-          <dialog
-            ref={editDialogRef}
-            className="w-full max-w-md border border-[var(--color-border)] bg-[var(--color-bg)] p-6 text-foreground backdrop:bg-black/50"
-            aria-labelledby={`${formId}-edit-title`}
-          >
-            <form
-              onSubmit={(event) => {
-                void handleSaveEdit(event);
+          {undo != null ? (
+            <ActionToast
+              message={`Removed ${undo.content.title}`}
+              actionLabel="Undo"
+              onAction={() => {
+                void handleUndoRemove();
               }}
-              className="space-y-4"
-            >
-              <h2 id={`${formId}-edit-title`} className="type-card-title">
-                Edit list
-              </h2>
-              <div>
-                <label
-                  htmlFor={`${formId}-title`}
-                  className="block text-sm text-muted"
-                >
-                  Title
-                </label>
-                <input
-                  id={`${formId}-title`}
-                  required
-                  maxLength={100}
-                  value={editTitle}
-                  onChange={(event) => {
-                    setEditTitle(event.target.value);
-                  }}
-                  className="mt-1 w-full border border-[var(--color-border)] bg-transparent px-3 py-2"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor={`${formId}-description`}
-                  className="block text-sm text-muted"
-                >
-                  Description
-                </label>
-                <textarea
-                  id={`${formId}-description`}
-                  maxLength={2000}
-                  rows={3}
-                  value={editDescription}
-                  onChange={(event) => {
-                    setEditDescription(event.target.value);
-                  }}
-                  className="mt-1 w-full border border-[var(--color-border)] bg-transparent px-3 py-2"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor={`${formId}-visibility`}
-                  className="block text-sm text-muted"
-                >
-                  Visibility
-                </label>
-                <select
-                  id={`${formId}-visibility`}
-                  value={editVisibility}
-                  onChange={(event) => {
-                    setEditVisibility(event.target.value as ListVisibility);
-                  }}
-                  className="mt-1 border border-[var(--color-border)] bg-transparent px-3 py-2"
-                >
-                  <option value="private">Private</option>
-                  <option value="public">Public</option>
-                </select>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="border border-[var(--color-border)] bg-[var(--color-accent-soft)] px-3 py-2 text-sm"
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  className="border border-[var(--color-border)] px-3 py-2 text-sm"
-                  onClick={() => {
-                    editDialogRef.current?.close();
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </dialog>
+              onDismiss={() => {
+                setUndo(null);
+              }}
+            />
+          ) : null}
 
-          <dialog
-            ref={deleteDialogRef}
-            className="w-full max-w-md border border-[var(--color-border)] bg-[var(--color-bg)] p-6 text-foreground backdrop:bg-black/50"
-            aria-labelledby={`${formId}-delete-title`}
+          <CollectionSheet
+            open={sheet != null}
+            title={sheet === 'delete' ? 'Delete this list?' : 'List settings'}
+            onClose={() => {
+              setSheet(null);
+            }}
           >
-            <h2 id={`${formId}-delete-title`} className="type-card-title">
-              Delete this list?
-            </h2>
-            <p className="mt-2 text-sm text-muted">
-              This permanently removes the list and its items.
-            </p>
-            <div className="mt-6 flex gap-3">
-              <button
-                type="button"
-                disabled={pending}
-                className="border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-danger)]"
-                onClick={() => {
-                  void handleDelete();
+            {sheet === 'delete' ? (
+              <div className="space-y-6">
+                <p className="text-sm text-muted">
+                  This permanently removes the list and its items.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    disabled={pending}
+                    className="btn btn-danger"
+                    onClick={() => {
+                      void handleDelete();
+                    }}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setSheet('edit');
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form
+                onSubmit={(event) => {
+                  void handleSaveEdit(event);
                 }}
+                className="space-y-4"
               >
-                Delete
-              </button>
-              <button
-                type="button"
-                className="border border-[var(--color-border)] px-3 py-2 text-sm"
-                onClick={() => {
-                  deleteDialogRef.current?.close();
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </dialog>
+                <div>
+                  <label
+                    htmlFor={`${formId}-title`}
+                    className="block text-sm text-muted"
+                  >
+                    Title
+                  </label>
+                  <input
+                    id={`${formId}-title`}
+                    required
+                    maxLength={100}
+                    value={editTitle}
+                    onChange={(event) => {
+                      setEditTitle(event.target.value);
+                    }}
+                    className="mt-1 w-full border border-[var(--color-border)] bg-transparent px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor={`${formId}-description`}
+                    className="block text-sm text-muted"
+                  >
+                    Description
+                  </label>
+                  <textarea
+                    id={`${formId}-description`}
+                    maxLength={2000}
+                    rows={3}
+                    value={editDescription}
+                    onChange={(event) => {
+                      setEditDescription(event.target.value);
+                    }}
+                    className="mt-1 w-full border border-[var(--color-border)] bg-transparent px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <span
+                    id={`${formId}-visibility-label`}
+                    className="block text-sm text-muted"
+                  >
+                    Visibility
+                  </span>
+                  <FormSelect
+                    id={`${formId}-visibility`}
+                    aria-labelledby={`${formId}-visibility-label`}
+                    value={editVisibility}
+                    options={VISIBILITY_OPTIONS}
+                    onChange={setEditVisibility}
+                    className="mt-1"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="submit"
+                    disabled={pending}
+                    className="btn btn-primary"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setSheet(null);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="border-t border-[var(--color-border)] pt-4">
+                  <button
+                    type="button"
+                    className="btn btn-danger-ghost"
+                    onClick={() => {
+                      setSheet('delete');
+                    }}
+                  >
+                    Delete list
+                  </button>
+                </div>
+              </form>
+            )}
+          </CollectionSheet>
         </>
       ) : null}
     </div>

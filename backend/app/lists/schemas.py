@@ -57,12 +57,6 @@ class SystemListResponse(BaseModel):
     items: list[ListItemResponse]
 
 
-class PatchSystemListVisibilityBody(BaseModel):
-    """Owner toggle for watchlist / favorites visibility."""
-
-    visibility: ListVisibility
-
-
 class ContainsResponse(BaseModel):
     """Batch membership flags keyed by ``type:id``."""
 
@@ -74,7 +68,7 @@ class CreateCustomListBody(BaseModel):
 
     title: str = Field(..., min_length=1, max_length=100)
     description: str | None = Field(default=None, max_length=2000)
-    visibility: ListVisibility = 'private'
+    visibility: ListVisibility = 'public'
 
 
 class PatchCustomListBody(BaseModel):
@@ -103,6 +97,25 @@ class CustomListPageResponse(BaseModel):
     lists: list[CustomListSummary]
 
 
+class ProfileListIndexEntry(BaseModel):
+    """One custom list row on a public profile Lists tab."""
+
+    kind: Literal['custom'] = 'custom'
+    id: uuid.UUID
+    title: str
+    description: str | None = None
+    visibility: ListVisibility
+    item_count: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ProfileListsPageResponse(BaseModel):
+    """Username-scoped Lists tab payload (custom lists only)."""
+
+    lists: list[ProfileListIndexEntry]
+
+
 class CustomListDetailResponse(BaseModel):
     """Custom list metadata (items via the items endpoint)."""
 
@@ -126,12 +139,6 @@ class CustomListItemsResponse(BaseModel):
     limit: int
     total: int
     items: list[ListItemResponse]
-
-
-class ReorderItemsBody(BaseModel):
-    """Set exact membership order. Must be set-equal to current item ids."""
-
-    item_ids: list[uuid.UUID] = Field(..., min_length=0, max_length=500)
 
 
 class CustomListMembershipResponse(BaseModel):

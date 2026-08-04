@@ -1,5 +1,6 @@
 interface ProfileTabPlaceholderProps {
-  title: string;
+  /** Optional; omit when ProfileNav already names the active tab. */
+  title?: string;
   description?: string;
 }
 
@@ -10,8 +11,16 @@ export function ProfileTabPlaceholder({
 }: ProfileTabPlaceholderProps) {
   return (
     <section className="mt-10 text-left">
-      <h2 className="type-page-lg text-foreground">{title}</h2>
-      <p className="mt-2 text-muted">{description}</p>
+      {title != null && title !== '' ? (
+        <h2 className="type-page-lg text-foreground">{title}</h2>
+      ) : null}
+      <p
+        className={
+          title != null && title !== '' ? 'mt-2 text-muted' : 'text-muted'
+        }
+      >
+        {description}
+      </p>
     </section>
   );
 }

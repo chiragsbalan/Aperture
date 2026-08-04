@@ -261,6 +261,14 @@ export interface TopMoviesResponse {
   movies: TopMovie[];
 }
 
+export interface TopTvShowsResponse {
+  shows: TopMovie[];
+}
+
+export interface NowInTheatresResponse {
+  movies: TopMovie[];
+}
+
 const TMDB_POSTER_URL_RE = /^https:\/\/image\.tmdb\.org\/t\/p\//;
 
 /** Accept + trusted BFF client-IP headers for SSR → API catalog fetches. */
@@ -311,12 +319,22 @@ export async function fetchLandingPosterUrls(): Promise<string[]> {
   }
 }
 
-/**
- * Shuffled sample from the TMDb top-rated pool for the signed-in home rail.
- * Public/unauthenticated upstream (request-level rate limited); always
- * no-store so each navigation can reshuffle via the API.
- */
-export async function fetchTopMovies(limit = 12): Promise<TopMovie[]> {
+function isHomeRailTitle(item: TopMovie): boolean {
+  return (
+    typeof item.tmdb_id === 'number' &&
+    item.tmdb_id > 0 &&
+    typeof item.title === 'string' &&
+    item.title.length > 0 &&
+    typeof item.poster_url === 'string' &&
+    TMDB_POSTER_URL_RE.test(item.poster_url)
+  );
+}
+
+async function fetchHomeRailTitles(
+  path: string,
+  pick: (body: unknown) => TopMovie[] | undefined,
+  limit = 12,
+): Promise<TopMovie[]> {
   let base: string;
   try {
     base = upstreamApiBaseUrl();
@@ -326,31 +344,54 @@ export async function fetchTopMovies(limit = 12): Promise<TopMovie[]> {
 
   const capped = Math.min(100, Math.max(1, limit));
   try {
-    const res = await fetch(
-      `${base}/api/v1/catalog/top-movies?limit=${capped}`,
-      {
-        cache: 'no-store',
-        headers: await catalogUpstreamHeaders(),
-        signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS),
-      },
-    );
+    const res = await fetch(`${base}${path}?limit=${capped}`, {
+      cache: 'no-store',
+      headers: await catalogUpstreamHeaders(),
+      signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS),
+    });
     if (!res.ok) {
       await res.text().catch(() => undefined);
       return [];
     }
-    const data = (await res.json()) as TopMoviesResponse;
-    return (data.movies ?? []).filter(
-      (movie) =>
-        typeof movie.tmdb_id === 'number' &&
-        movie.tmdb_id > 0 &&
-        typeof movie.title === 'string' &&
-        movie.title.length > 0 &&
-        typeof movie.poster_url === 'string' &&
-        TMDB_POSTER_URL_RE.test(movie.poster_url),
-    );
+    const data: unknown = await res.json();
+    return (pick(data) ?? []).filter(isHomeRailTitle);
   } catch {
     return [];
   }
+}
+
+/**
+ * Shuffled sample from the TMDb top-rated pool for the signed-in home rail.
+ * Public/unauthenticated upstream (request-level rate limited); always
+ * no-store so each navigation can reshuffle via the API.
+ */
+export async function fetchTopMovies(limit = 12): Promise<TopMovie[]> {
+  return fetchHomeRailTitles(
+    '/api/v1/catalog/top-movies',
+    (body) => (body as TopMoviesResponse).movies,
+    limit,
+  );
+}
+
+/** Shuffled sample from TMDb top-rated TV for the signed-in home rail. */
+export async function fetchTopTvShows(limit = 12): Promise<TopMovie[]> {
+  return fetchHomeRailTitles(
+    '/api/v1/catalog/top-tv-shows',
+    (body) => (body as TopTvShowsResponse).shows,
+    limit,
+  );
+}
+
+/**
+ * Most popular movies currently in theatres (TMDb now_playing, popularity
+ * order). Same default count as top movies / top TV.
+ */
+export async function fetchNowInTheatres(limit = 12): Promise<TopMovie[]> {
+  return fetchHomeRailTitles(
+    '/api/v1/catalog/now-in-theatres',
+    (body) => (body as NowInTheatresResponse).movies,
+    limit,
+  );
 }
 
 /** Dedupes generateMetadata + page fetch within one RSC request. */

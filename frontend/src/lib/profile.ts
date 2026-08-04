@@ -45,8 +45,9 @@ export interface PublicProfile {
 /** Diary is the profile wall (index). Other tabs are secondary. */
 export const PROFILE_TABS = [
   { slug: '', label: 'Diary' },
+  { slug: 'watchlist', label: 'Watchlist' },
+  { slug: 'lists', label: 'Lists' },
   { slug: 'activity', label: 'Activity' },
-  { slug: 'favorites', label: 'Favorites' },
   { slug: 'reviews', label: 'Reviews' },
 ] as const;
 

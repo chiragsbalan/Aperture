@@ -24,7 +24,7 @@ export default async function SearchPage({
       <SiteHeader />
       <main
         id="main-content"
-        className="layout-content relative z-[1] pb-16 pt-28 motion-fade-rise"
+        className="layout-content layout-shell-pad-top relative z-[1] pb-16 motion-fade-rise"
       >
         <h1 className="type-page-lg text-foreground">Search</h1>
         <p className="mt-2 text-muted">

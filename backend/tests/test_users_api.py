@@ -284,6 +284,14 @@ def test_soft_deleted_user_public_routes_are_404(api_client: TestClient) -> None
     assert api_client.get(f'/api/v1/users/{username}').status_code == 200
     live_diary = api_client.get(f'/api/v1/users/{username}/watch-entries')
     assert live_diary.status_code == 200, live_diary.text
+    created = api_client.post(
+        '/api/v1/me/lists',
+        headers=headers,
+        json={'title': 'Public before delete', 'visibility': 'public'},
+    )
+    assert created.status_code == 201, created.text
+    list_id = created.json()['id']
+    assert api_client.get(f'/api/v1/lists/{list_id}').status_code == 200
 
     import asyncio
 
@@ -314,6 +322,10 @@ def test_soft_deleted_user_public_routes_are_404(api_client: TestClient) -> None
 
     assert api_client.get(f'/api/v1/users/{username}').status_code == 404
     assert api_client.get(f'/api/v1/users/{username}/watch-entries').status_code == 404
+    assert api_client.get(f'/api/v1/users/{username}/lists').status_code == 404
+    assert api_client.get(f'/api/v1/users/{username}/watchlist').status_code == 404
+    assert api_client.get(f'/api/v1/lists/{list_id}').status_code == 404
+    assert api_client.get(f'/api/v1/lists/{list_id}/items').status_code == 404
     # Owner token must not resurrect a soft-deleted public shell.
     assert (
         api_client.get(f'/api/v1/users/{username}', headers=headers).status_code == 404

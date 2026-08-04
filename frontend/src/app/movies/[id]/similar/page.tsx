@@ -1,7 +1,6 @@
 import { SiteHeader } from '@/components/site-header';
 import { fetchMovie } from '@/lib/catalog';
 import { parseTmdbIdParam } from '@/lib/content_ids';
-import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 
 interface MovieSimilarPageProps {
@@ -24,8 +23,6 @@ export default async function MovieSimilarPage({
     notFound();
   }
 
-  const title = result.ok ? result.data.title : 'This title';
-
   return (
     <div className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
       <a href="#main-content" className="skip-link">
@@ -34,17 +31,9 @@ export default async function MovieSimilarPage({
       <SiteHeader />
       <main
         id="main-content"
-        className="layout-content relative z-[1] pb-24 pt-28 text-left"
+        className="layout-content layout-shell-pad-top relative z-[1] pb-24 text-left"
       >
-        <p className="text-sm text-muted">
-          <Link
-            href={`/movies/${id}`}
-            className="underline-offset-2 hover:underline"
-          >
-            ← {title}
-          </Link>
-        </p>
-        <h1 className="mt-4 type-page-lg text-foreground">Similar</h1>
+        <h1 className="type-page-lg text-foreground">Similar</h1>
         <p className="mt-3 text-sm text-muted">
           Full similar titles for this movie will land here.
         </p>

@@ -28,12 +28,12 @@ P1.4 shipped a minimal public profile (`GET /users/{username}` → username / di
 
 ### Frontend
 
-- Routes under `/u/[username]` with layout shell + ProfileNav tabs: **Diary** (index / wall), **Activity**, **Favorites**, **Reviews**.
+- Routes under `/u/[username]` with layout shell + ProfileNav tabs: **Diary** (index / wall), **Watchlist**, **Lists**, **Activity**, **Reviews**.
 - **pc.1 owns the public diary wall** (`ProfileDiary` on the profile index): read-only paginated entries with client page + accumulated-view caches (`PUBLIC_DIARY_TTL_MS`), clear-all invalidation on diary mutations and on logout.
-- Standalone Movies / Shows collection pages (`/u/{username}/movies|shows`) derive unique titles from the **public** diary for every viewer (not owner-only). Followers/following stay stubs until follows ship. Private watchlists/lists remain gated elsewhere.
-- Account menu: header opens `/u/{username}`; nav is Library + Settings only.
+- **pc.2** adds always-public **Watchlist** tab (`/u/{username}/watchlist`, `GET /users/{username}/watchlist`), **Lists** tab of custom lists only (`GET /users/{username}/lists` — owners see all; visitors see public), and custom-list **public|private** visibility. Favorites are never on the public profile. Activity/Reviews remain stubs until later slices.
+- Standalone Movies / Shows collection pages (`/u/{username}/movies|shows`) derive unique titles from the **public** diary for every viewer (not owner-only). Followers/following stay stubs until follows ship.
+- Account menu: header opens `/u/{username}`; nav is Library + Settings only. Owner Library (`/library/*`) is private workspace only.
 - Owner “Edit profile” → `/settings` (avatar/website/links). Avatar **display** is initials-only until upload/CDN + CSP; URL field may remain for later.
-- Watchlist/favorites visibility toggled on `/library/watchlist` and `/library/favorites` (not on the profile header).
 
 ## Alternatives considered
 
@@ -43,10 +43,12 @@ P1.4 shipped a minimal public profile (`GET /users/{username}` → username / di
 
 ## Consequences
 
-- **pc.1** ships the public diary wall and public Movies/Shows shelves derived from it. Watchlist/favorites public shelves and social surfaces continue in `pc.2`+.
+- **pc.1** ships the public diary wall and public Movies/Shows shelves derived from it.
+- **pc.2** ships public Lists + always-public watchlist; favorites stay private; Activity verbs are documented for pc.7 (no emit in pc.2).
 - Client diary caches are best-effort: TTL expiry plus clear-all on mutate/logout; logout-only clear is not a hard security boundary for previously viewed public pages.
 - Aggressive diary pagination (e.g. Movies/Shows scraping many pages) shares the public IP budget with profile shell GETs — tune `USERS_PUBLIC_RATE_LIMIT_MAX_PER_IP` if legitimate browsing hits 429.
-- ADRs 0010–0013 cover ratings, reviews, follows, activity.
+- Diary half-star ratings on public walls are **[ADR-0008](ADR-0008-personal-library-lists.md) / pc.2** (optional `watch_entries.rating`), not ADR-0010.
+- ADRs 0010–0013 cover dedicated ratings product, reviews, follows, activity.
 
 ## Future evolution
 

@@ -3,13 +3,21 @@
 import Link from 'next/link';
 import { useEffect, useId, useState, type FormEvent } from 'react';
 
+import { FormSelect } from '@/components/form-select';
 import { LibraryNav } from '@/components/library-nav';
+import { ListTitleWithVisibility } from '@/components/list-title-with-visibility';
 import {
   createCustomList,
   fetchMyCustomLists,
   type CustomListSummary,
   type ListVisibility,
 } from '@/lib/library';
+import { listDetailHref } from '@/lib/list-nav';
+
+const VISIBILITY_OPTIONS = [
+  { value: 'public' as const, label: 'Anyone' },
+  { value: 'private' as const, label: 'Private' },
+];
 
 type LoadState =
   | { status: 'loading' }
@@ -22,7 +30,7 @@ export function CustomListsPage() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [visibility, setVisibility] = useState<ListVisibility>('private');
+  const [visibility, setVisibility] = useState<ListVisibility>('public');
   const [creating, setCreating] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -169,30 +177,27 @@ export function CustomListsPage() {
               />
             </div>
             <div>
-              <label
-                htmlFor={`${formId}-visibility`}
+              <span
+                id={`${formId}-visibility-label`}
                 className="block text-sm text-muted"
               >
                 Visibility
-              </label>
-              <select
+              </span>
+              <FormSelect
                 id={`${formId}-visibility`}
                 name="visibility"
+                aria-labelledby={`${formId}-visibility-label`}
                 value={visibility}
-                onChange={(event) => {
-                  setVisibility(event.target.value as ListVisibility);
-                }}
-                className="mt-1 border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-              >
-                <option value="private">Private</option>
-                <option value="public">Public</option>
-              </select>
+                options={VISIBILITY_OPTIONS}
+                onChange={setVisibility}
+                className="mt-1"
+              />
             </div>
             <button
               type="submit"
               disabled={creating || !title.trim()}
               aria-busy={creating}
-              className="border border-[var(--color-border)] bg-[var(--color-accent-soft)] px-4 py-2 text-sm text-foreground transition hover:border-foreground disabled:opacity-60"
+              className="btn btn-primary"
             >
               {creating ? 'Creating…' : 'Create list'}
             </button>
@@ -213,16 +218,22 @@ export function CustomListsPage() {
               {state.lists.map((list) => (
                 <li key={list.id}>
                   <Link
-                    href={`/lists/${list.id}`}
+                    href={listDetailHref(list.id, '/library/lists')}
                     className="block border-b border-[var(--color-border)] pb-4 transition hover:border-foreground"
                   >
-                    <span className="font-medium text-foreground">
-                      {list.title}
-                    </span>
+                    <ListTitleWithVisibility
+                      className="font-medium text-foreground"
+                      title={list.title}
+                      visibility={list.visibility}
+                    />
+                    {list.description ? (
+                      <span className="mt-1 block text-sm text-muted">
+                        {list.description}
+                      </span>
+                    ) : null}
                     <span className="mt-1 block text-sm text-muted">
                       {list.item_count}{' '}
-                      {list.item_count === 1 ? 'title' : 'titles'} ·{' '}
-                      {list.visibility}
+                      {list.item_count === 1 ? 'title' : 'titles'}
                     </span>
                   </Link>
                 </li>

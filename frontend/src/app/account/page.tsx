@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 
 export default function AccountPage() {
   return (
-    <div className="shell-atmosphere relative flex min-h-dvh flex-col items-center justify-center py-24">
+    <div className="layout-shell shell-atmosphere relative flex min-h-dvh flex-col items-center justify-center">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
