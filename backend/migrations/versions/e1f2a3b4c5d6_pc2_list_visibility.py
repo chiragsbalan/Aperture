@@ -21,12 +21,8 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     """Force system-list visibility; re-allow unlisted on custom lists."""
     # 1) Data fixes before widening CHECK.
-    op.execute(
-        "UPDATE lists SET visibility = 'public' WHERE kind = 'watchlist'"
-    )
-    op.execute(
-        "UPDATE lists SET visibility = 'private' WHERE kind = 'favorites'"
-    )
+    op.execute("UPDATE lists SET visibility = 'public' WHERE kind = 'watchlist'")
+    op.execute("UPDATE lists SET visibility = 'private' WHERE kind = 'favorites'")
 
     # 2) Expand visibility CHECK (custom lists may be unlisted again).
     op.drop_constraint(op.f('ck_lists_visibility'), 'lists', type_='check')
@@ -54,9 +50,7 @@ def downgrade() -> None:
     op.drop_constraint('ck_lists_favorites_private', 'lists', type_='check')
     op.drop_constraint('ck_lists_watchlist_public', 'lists', type_='check')
 
-    op.execute(
-        "UPDATE lists SET visibility = 'private' WHERE visibility = 'unlisted'"
-    )
+    op.execute("UPDATE lists SET visibility = 'private' WHERE visibility = 'unlisted'")
     op.drop_constraint(op.f('ck_lists_visibility'), 'lists', type_='check')
     op.create_check_constraint(
         op.f('ck_lists_visibility'),
