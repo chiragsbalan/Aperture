@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-01
+- **Amended:** 2026-08-05 — BFF deny-list for auth / resolve / catalog / landing; same-origin deny vs public API threat model
 - **Supersedes:** Informal PLAN defaults that assumed paid always-on Render for both API and Postgres with managed backups from P0; hosting sketches in Technical Architecture (Part 3) PDF that describe Vercel FE + generic “container + managed Postgres” without naming Supabase
 
 ## Context
@@ -25,6 +26,23 @@ Browser auth remains same-origin Next.js BFF with `__Host-` cookies (backend coo
 **Auth/BFF transport:** same-origin Next.js BFF; cookies `__Host-ap_at` / `__Host-ap_rt`; FastAPI cookie-agnostic. Token lifetimes, hashing, and OAuth link rules are in [ADR-0005](ADR-0005-auth.md).
 
 **Catch-all proxy refresh (pc.2):** `frontend/src/app/api/proxy/[...path]/route.ts` performs a **single** refresh-and-retry on upstream `401` when a refresh cookie is present. Concurrent 401s share one in-flight refresh (module-scoped singleflight keyed by refresh token); each waiter retries its own upstream request, including mutating methods. Residual risk: a non-idempotent POST/PATCH may double-submit if the first attempt already applied after the access token expired — accepted for session reliability; prefer Idempotency-Key on write routes if duplicates become measurable.
+
+**BFF proxy deny-list:** `isDeniedProxyPath` refuses to forward (same-origin only):
+
+| Prefix | Reason |
+|---|---|
+| `/api/v1/auth/*` | Tokens only via dedicated `/api/auth/*` routes |
+| `/api/v1/movies|tv/resolve` | Server-only catalog resolve/ingest |
+| `/api/v1/catalog/*` | Home rails (TMDb pools) — RSC → API only |
+| `/api/v1/landing/*` | Landing poster mosaic — RSC → API only |
+
+**Threat model:** the deny-list blocks scraping through the open same-origin proxy. The public FastAPI routes remain callable without a BFF secret (CORS empty by default; browsers should use the BFF). Accepted mitigation for direct API abuse is **per-IP rate limiting** on those public endpoints (landing + shared home-rail bucket), not hiding the routes behind the BFF secret.
+
+**Landing + home-rail rate-limit charges:** each guest `/` load that fetches the mosaic + three rails charges **1** landing-poster RL + **3** shared home-rail RL (four public GETs). Signed-in `/` (rails only) charges **3**. Defaults: landing `LANDING_POSTERS_RATE_LIMIT_MAX_PER_IP` (60) and home rails `TOP_MOVIES_RATE_LIMIT_MAX_PER_IP` (30) per window.
+
+### Accepted risks
+
+- **BFF deny bypass via direct API:** callers that know the Render API origin can hit `/api/v1/catalog/*` and `/api/v1/landing/*` without the Next.js deny-list. Mitigated by per-IP RL + empty CORS (browser apps should stay on the BFF); not a secret-gated edge.
 
 **Migrations:** run against Supabase (`DATABASE_URL`; prefer pooler/session settings documented in `.env.example`). Account for Free API sleep and possible Free project pause when automating migrate-on-deploy.
 

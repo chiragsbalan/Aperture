@@ -15,6 +15,17 @@ import {
 interface AuthFormProps {
   mode: 'login' | 'signup';
   initialError?: string | null;
+  /**
+   * When set (e.g. in-place landing auth), footer switches modes without
+   * navigating to `/login` or `/signup`.
+   */
+  onSwitchMode?: (mode: 'login' | 'signup') => void;
+  /**
+   * Focus the first text field after mount (guest landing hero only).
+   * Skipped when an OAuth/initial form error already claims focus.
+   * Leave unset on `/login` and `/signup` to avoid double-focus.
+   */
+  autoFocusFirstField?: boolean;
 }
 
 type FieldKey = 'username' | 'email' | 'identifier' | 'password';
@@ -33,10 +44,40 @@ const FIELD_FOCUS_ORDER: FieldKey[] = [
   'password',
 ];
 
+function GoogleMark({ className }: { className?: string }) {
+  return (
+    <svg
+      className={['btn-google-mark', className].filter(Boolean).join(' ')}
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      aria-hidden
+    >
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58Z"
+      />
+    </svg>
+  );
+}
+
+/** Frosted field — same fill/blur as the search popup (`.overlay-surface`). */
 const INPUT_CLASS =
-  'w-full rounded-[var(--radius-md)] border border-[var(--color-border)] ' +
-  'bg-[var(--color-bg-elevated)] px-3 py-2 text-base text-foreground ' +
-  'outline-none transition sm:py-2.5 sm:[font-size:var(--text-body-sm)] ' +
+  'overlay-surface-field w-full px-3 py-2 text-base text-foreground ' +
+  'placeholder:text-muted outline-none transition ' +
+  'sm:py-2.5 sm:[font-size:var(--text-body-sm)] ' +
   'hover:border-[var(--color-primary)]/40 ' +
   'focus-visible:border-[var(--color-primary)] ' +
   'focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]';
@@ -129,7 +170,12 @@ function focusFirstInvalidField(
   }
 }
 
-export function AuthForm({ mode, initialError = null }: AuthFormProps) {
+export function AuthForm({
+  mode,
+  initialError = null,
+  onSwitchMode,
+  autoFocusFirstField = false,
+}: AuthFormProps) {
   const router = useRouter();
   const emailId = useId();
   const usernameId = useId();
@@ -175,8 +221,14 @@ export function AuthForm({ mode, initialError = null }: AuthFormProps) {
   useEffect(() => {
     if (oauthErrorMessage(initialError) && formErrorRef.current) {
       formErrorRef.current.focus();
+      return;
     }
-  }, [initialError]);
+    if (!autoFocusFirstField) {
+      return;
+    }
+    const firstField = isSignup ? usernameRef.current : identifierRef.current;
+    firstField?.focus();
+  }, [initialError, autoFocusFirstField, isSignup]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -485,8 +537,9 @@ export function AuthForm({ mode, initialError = null }: AuthFormProps) {
       <div className="mt-5">
         <a
           href="/api/auth/google/start?intent=sign_in"
-          className="btn btn-lg btn-block text-muted hover:border-[var(--color-primary)] hover:text-foreground"
+          className="btn btn-google btn-lg btn-block gap-3"
         >
+          <GoogleMark className="shrink-0" />
           Continue with Google
         </a>
       </div>
@@ -495,22 +548,46 @@ export function AuthForm({ mode, initialError = null }: AuthFormProps) {
         {isSignup ? (
           <>
             Already have an account?{' '}
-            <Link
-              href="/login"
-              className="text-foreground underline-offset-2 hover:underline"
-            >
-              Log in
-            </Link>
+            {onSwitchMode ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onSwitchMode('login');
+                }}
+                className="text-foreground underline-offset-2 hover:underline"
+              >
+                Log in
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="text-foreground underline-offset-2 hover:underline"
+              >
+                Log in
+              </Link>
+            )}
           </>
         ) : (
           <>
             Need an account?{' '}
-            <Link
-              href="/signup"
-              className="text-foreground underline-offset-2 hover:underline"
-            >
-              Sign up
-            </Link>
+            {onSwitchMode ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onSwitchMode('signup');
+                }}
+                className="text-foreground underline-offset-2 hover:underline"
+              >
+                Sign up
+              </button>
+            ) : (
+              <Link
+                href="/signup"
+                className="text-foreground underline-offset-2 hover:underline"
+              >
+                Sign up
+              </Link>
+            )}
           </>
         )}
       </p>

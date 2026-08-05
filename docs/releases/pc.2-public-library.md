@@ -23,5 +23,6 @@ Activity tab remains a stub. Verb contract for pc.7 is reserved in the track doc
 
 - Optional diary **half-star ratings** on create/edit (`watch_entries.rating`, 0.5–5.0) and green star UI on diary cards.
 - `GET /me/watch-entries/contains` for title-page Log membership (independent Redis rate-limit namespace).
-- Signed-in home catalogue rails (now in theatres / top movies / top TV) via shared `HomeCatalogRail`.
+- Guest `/` landing: mosaic hero, “Aperture lets you…”, shared `HomeCatalogRails`; Get started / Sign up / Log in swap in-place on `/` with directional slides (mosaic stays; `/login` and `/signup` remain for direct visits). Guest header is brand + search only. Signed-in `/` remains rails-only. `/home` redirects to `/`.
+- BFF proxy denies browser access to `/api/v1/catalog/*` and `/api/v1/landing/*` (RSC → API only); shared home-rail IP rate limit default 30/min; public display `limit` clamped to 24.
 - Public custom-list GETs (`/lists/{id}`, `/lists/{id}/items`) share the users public IP rate-limit bucket.

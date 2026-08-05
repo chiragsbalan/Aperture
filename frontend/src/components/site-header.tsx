@@ -22,6 +22,10 @@ function HeaderSearch() {
   return <SiteSearch key={pathname} initialQuery={headerQuery} />;
 }
 
+/**
+ * Sparse chrome: brand → `/`, search, and AccountMenu when signed in.
+ * Guests use landing CTAs for auth (no header Sign in / Create account).
+ */
 export function SiteHeader() {
   const pathname = usePathname();
   const [authState, setAuthState] = useState<AuthState>('loading');
@@ -78,14 +82,6 @@ export function SiteHeader() {
         >
           <HeaderSearch />
         </Suspense>
-        {authState === 'loading' ? (
-          <span
-            className="inline-flex h-11 w-11 shrink-0 sm:h-12 sm:w-12"
-            aria-live="polite"
-          >
-            <span className="sr-only">Loading account…</span>
-          </span>
-        ) : null}
         {authState === 'signed_in' ? (
           <AccountMenu
             username={meUser?.username?.trim() || null}

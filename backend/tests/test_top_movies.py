@@ -305,6 +305,16 @@ def test_top_movies_pool_count_bounds_reject_invalid() -> None:
         Settings(**_settings_kwargs(), top_movies_default_limit=0)
     with pytest.raises(ValidationError):
         Settings(**_settings_kwargs(), top_movies_default_limit=101)
+    with pytest.raises(ValidationError):
+        Settings(
+            **_settings_kwargs(),
+            top_movies_default_limit=25,
+            top_movies_max_public_limit=24,
+        )
+    with pytest.raises(ValidationError):
+        Settings(**_settings_kwargs(), top_movies_max_public_limit=0)
+    with pytest.raises(ValidationError):
+        Settings(**_settings_kwargs(), top_movies_max_public_limit=101)
 
 
 def test_top_movies_settings_bounds_via_env(
@@ -327,6 +337,12 @@ def test_top_movies_settings_bounds_via_env(
         get_settings()
 
     monkeypatch.setenv('TOP_MOVIES_DEFAULT_LIMIT', '101')
+    get_settings.cache_clear()
+    with pytest.raises(ValidationError):
+        get_settings()
+
+    monkeypatch.setenv('TOP_MOVIES_DEFAULT_LIMIT', '25')
+    monkeypatch.setenv('TOP_MOVIES_MAX_PUBLIC_LIMIT', '24')
     get_settings.cache_clear()
     with pytest.raises(ValidationError):
         get_settings()
@@ -502,3 +518,111 @@ def test_top_tv_and_theatres_empty_without_tmdb_key(
     theatres = client.get('/api/v1/catalog/now-in-theatres')
     assert theatres.status_code == 200, theatres.text
     assert theatres.json() == {'movies': []}
+
+
+def test_public_rail_display_limit_clamps() -> None:
+    """Oversize Query and elevated default both clamp to max_public_limit."""
+    from app.metadata.api import _public_rail_display_limit
+
+    settings = Settings.model_construct(
+        **_settings_kwargs(),
+        top_movies_default_limit=50,
+        top_movies_max_public_limit=24,
+    )
+    assert _public_rail_display_limit(100, settings) == 24
+    assert _public_rail_display_limit(None, settings) == 24
+    assert _public_rail_display_limit(12, settings) == 12
+
+
+def test_top_movies_clamps_oversize_limit(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Query limit above max_public_limit is clamped (not rejected)."""
+    monkeypatch.setenv('TMDB_API_KEY', 'test-tmdb-key')
+    monkeypatch.setenv('TOP_MOVIES_MAX_PUBLIC_LIMIT', '24')
+    get_settings.cache_clear()
+    init_cache('')
+
+    pool = _sample_pool(size=50)
+
+    async def fake_fetch(
+        settings: Settings,
+        *,
+        count: int | None = None,
+        client: TmdbClient | None = None,
+    ) -> TopMoviesResponse:
+        del settings, count, client
+        return pool
+
+    monkeypatch.setattr(
+        metadata_service,
+        'fetch_top_movies_pool',
+        fake_fetch,
+    )
+
+    res = client.get('/api/v1/catalog/top-movies?limit=100')
+    assert res.status_code == 200, res.text
+    assert len(res.json()['movies']) == 24
+
+
+def test_top_movies_omit_limit_respects_elevated_default_cap(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Omit-limit with default at the public max returns at most that many."""
+    monkeypatch.setenv('TMDB_API_KEY', 'test-tmdb-key')
+    monkeypatch.setenv('TOP_MOVIES_DEFAULT_LIMIT', '24')
+    monkeypatch.setenv('TOP_MOVIES_MAX_PUBLIC_LIMIT', '24')
+    get_settings.cache_clear()
+    init_cache('')
+
+    pool = _sample_pool(size=50)
+
+    async def fake_fetch(
+        settings: Settings,
+        *,
+        count: int | None = None,
+        client: TmdbClient | None = None,
+    ) -> TopMoviesResponse:
+        del settings, count, client
+        return pool
+
+    monkeypatch.setattr(
+        metadata_service,
+        'fetch_top_movies_pool',
+        fake_fetch,
+    )
+
+    res = client.get('/api/v1/catalog/top-movies')
+    assert res.status_code == 200, res.text
+    assert len(res.json()['movies']) == 24
+
+
+def test_home_rails_share_rate_limit_bucket(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sequential top-movies / top-tv / now-in-theatres share one IP bucket."""
+    secret = 'test-bff-shared-secret'
+    unique_ip = f'203.0.113.{uuid.uuid4().int % 200 + 10}'
+    monkeypatch.setenv('AUTH_BFF_SHARED_SECRET', secret)
+    monkeypatch.setenv('TMDB_API_KEY', '')
+    monkeypatch.setenv('TOP_MOVIES_RATE_LIMIT_MAX_PER_IP', '2')
+    get_settings.cache_clear()
+    init_cache('')
+
+    headers = {
+        'X-Aperture-Client-IP': unique_ip,
+        'X-Aperture-BFF-Secret': secret,
+    }
+    first = client.get('/api/v1/catalog/top-movies', headers=headers)
+    second = client.get('/api/v1/catalog/top-tv-shows', headers=headers)
+    third = client.get('/api/v1/catalog/now-in-theatres', headers=headers)
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    assert third.status_code == 429, third.text
+    assert 'top movies' in third.json()['detail'].lower()
+
+    rl_key = f'metadata:rl:top-movies:ip:{hash_rate_limit_subject(unique_ip)}'
+    assert run_coro_sync(get_cache().get(rl_key)) is not None
