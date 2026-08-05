@@ -107,9 +107,9 @@ describe('decideSignedInHomeShell', () => {
   );
 
   it('access without outcome → guest (incomplete probe)', () => {
-    expect(
-      decideSignedInHomeShell({ hasAccess: true, hasRefresh: true }),
-    ).toBe(false);
+    expect(decideSignedInHomeShell({ hasAccess: true, hasRefresh: true })).toBe(
+      false,
+    );
   });
 });
 

@@ -350,10 +350,7 @@ async function fetchHomeRailTitles(
     return [];
   }
 
-  const capped = Math.min(
-    HOME_RAIL_MAX_PUBLIC_LIMIT,
-    Math.max(1, limit),
-  );
+  const capped = Math.min(HOME_RAIL_MAX_PUBLIC_LIMIT, Math.max(1, limit));
   try {
     const res = await fetch(`${base}${path}?limit=${capped}`, {
       cache: 'no-store',

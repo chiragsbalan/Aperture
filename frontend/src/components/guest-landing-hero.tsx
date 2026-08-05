@@ -14,11 +14,7 @@ interface GuestLandingHeroProps {
   onPanelChange: (panel: GuestLandingPanel) => void;
 }
 
-function MarketingPanel({
-  onGetStarted,
-}: {
-  onGetStarted: () => void;
-}) {
+function MarketingPanel({ onGetStarted }: { onGetStarted: () => void }) {
   return (
     <div className="flex flex-col items-center px-1 text-center">
       <h1 className="type-brand text-foreground">Aperture</h1>

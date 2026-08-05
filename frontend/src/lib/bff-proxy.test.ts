@@ -24,15 +24,15 @@ describe('isDeniedProxyPath', () => {
 
   it('denies home-rail catalog and landing poster paths', () => {
     expect(isDeniedProxyPath(['api', 'v1', 'catalog'])).toBe(true);
-    expect(
-      isDeniedProxyPath(['api', 'v1', 'catalog', 'top-movies']),
-    ).toBe(true);
-    expect(
-      isDeniedProxyPath(['api', 'v1', 'catalog', 'top-tv-shows']),
-    ).toBe(true);
-    expect(
-      isDeniedProxyPath(['api', 'v1', 'catalog', 'now-in-theatres']),
-    ).toBe(true);
+    expect(isDeniedProxyPath(['api', 'v1', 'catalog', 'top-movies'])).toBe(
+      true,
+    );
+    expect(isDeniedProxyPath(['api', 'v1', 'catalog', 'top-tv-shows'])).toBe(
+      true,
+    );
+    expect(isDeniedProxyPath(['api', 'v1', 'catalog', 'now-in-theatres'])).toBe(
+      true,
+    );
     expect(isDeniedProxyPath(['api', 'v1', 'landing'])).toBe(true);
     expect(isDeniedProxyPath(['api', 'v1', 'landing', 'posters'])).toBe(true);
   });

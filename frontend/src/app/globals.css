@@ -195,7 +195,8 @@
         100%
     );
     color: var(--color-fg);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-fg) 8%, transparent);
+    box-shadow: inset 0 1px 0
+      color-mix(in srgb, var(--color-fg) 8%, transparent);
     transition:
       border-color var(--duration-fast) var(--ease-out),
       background var(--duration-fast) var(--ease-out),
@@ -232,11 +233,13 @@
     transition: transform var(--duration-fast) var(--ease-out);
   }
 
-  .btn-google:hover:not(:disabled):not([aria-disabled='true']) .btn-google-mark {
+  .btn-google:hover:not(:disabled):not([aria-disabled='true'])
+    .btn-google-mark {
     transform: scale(1.08);
   }
 
-  .btn-google:active:not(:disabled):not([aria-disabled='true']) .btn-google-mark {
+  .btn-google:active:not(:disabled):not([aria-disabled='true'])
+    .btn-google-mark {
     transform: scale(0.96);
   }
 }
@@ -1358,11 +1361,13 @@
   }
 
   /* Guest landing hero: directional marketing ↔ login ↔ signup slides. */
-  .guest-hero-panel-stage .title-tab-panel-layer.is-outgoing.guest-hero-slide-out-up {
+  .guest-hero-panel-stage
+    .title-tab-panel-layer.is-outgoing.guest-hero-slide-out-up {
     animation: guest-hero-out-up var(--duration-slow) var(--ease-out) forwards;
   }
 
-  .guest-hero-panel-stage .title-tab-panel-layer.is-outgoing.guest-hero-slide-out-down {
+  .guest-hero-panel-stage
+    .title-tab-panel-layer.is-outgoing.guest-hero-slide-out-down {
     animation: guest-hero-out-down var(--duration-slow) var(--ease-out) forwards;
   }
 

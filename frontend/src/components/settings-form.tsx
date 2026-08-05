@@ -224,267 +224,269 @@ export function SettingsForm() {
 
   return (
     <>
-    <form
-      className="mt-8 space-y-6 text-left"
-      onSubmit={onSubmit}
-      noValidate
-      aria-busy={pending}
-    >
-      {error ? (
-        <p
-          id={errorId}
-          role="alert"
-          className="text-sm text-[var(--color-danger)]"
-        >
-          {error}
-        </p>
-      ) : null}
-      {success ? (
-        <p role="status" className="text-sm text-foreground">
-          {success}
-        </p>
-      ) : null}
-
-      <fieldset className="space-y-4" disabled={pending}>
-        <legend className="type-subsection text-foreground">Profile</legend>
-
-        <div>
-          <label htmlFor={usernameId} className="text-sm text-muted">
-            Username
-          </label>
-          <input
-            id={usernameId}
-            name="username"
-            autoComplete="username"
-            value={username}
-            onChange={(event) => {
-              setUsername(event.target.value);
-            }}
-            readOnly={renameLocked}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={usernameDescribedBy}
-            className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground read-only:opacity-70"
-          />
-          <p id={usernameHintId} className="mt-1 text-xs text-muted">
-            {renameLocked
-              ? `Username can change again after ${new Date(renameAvailableAt!).toLocaleString()}.`
-              : '3–32 characters: a–z, 0–9, underscore. Once every 30 days.'}
+      <form
+        className="mt-8 space-y-6 text-left"
+        onSubmit={onSubmit}
+        noValidate
+        aria-busy={pending}
+      >
+        {error ? (
+          <p
+            id={errorId}
+            role="alert"
+            className="text-sm text-[var(--color-danger)]"
+          >
+            {error}
           </p>
-        </div>
-
-        <div>
-          <label htmlFor={displayNameId} className="text-sm text-muted">
-            Display name
-          </label>
-          <input
-            id={displayNameId}
-            name="display_name"
-            autoComplete="nickname"
-            value={displayName}
-            onChange={(event) => {
-              setDisplayName(event.target.value);
-            }}
-            maxLength={120}
-            className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-          />
-        </div>
-
-        <div>
-          <label htmlFor={bioId} className="text-sm text-muted">
-            Bio
-          </label>
-          <textarea
-            id={bioId}
-            name="bio"
-            value={bio}
-            onChange={(event) => {
-              setBio(event.target.value);
-            }}
-            maxLength={500}
-            rows={4}
-            className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-          />
-        </div>
-
-        <div>
-          <label htmlFor={avatarId} className="text-sm text-muted">
-            Avatar URL
-          </label>
-          <input
-            id={avatarId}
-            name="avatar_url"
-            type="url"
-            inputMode="url"
-            placeholder="https://"
-            value={avatarUrl}
-            onChange={(event) => {
-              setAvatarUrl(event.target.value);
-            }}
-            maxLength={512}
-            className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-          />
-          <p className="mt-1 text-xs text-muted">
-            HTTPS image URL only. Leave blank for initials.
+        ) : null}
+        {success ? (
+          <p role="status" className="text-sm text-foreground">
+            {success}
           </p>
-        </div>
+        ) : null}
 
-        <div>
-          <label htmlFor={websiteId} className="text-sm text-muted">
-            Website
-          </label>
-          <input
-            id={websiteId}
-            name="website_url"
-            type="url"
-            inputMode="url"
-            placeholder="https://"
-            value={websiteUrl}
-            onChange={(event) => {
-              setWebsiteUrl(event.target.value);
-            }}
-            maxLength={512}
-            className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-          />
-        </div>
+        <fieldset className="space-y-4" disabled={pending}>
+          <legend className="type-subsection text-foreground">Profile</legend>
 
-        <div className="space-y-3">
-          <p className="text-sm text-muted">Links (up to {MAX_LINKS})</p>
-          {links.map((link, index) => (
-            <div
-              key={`link-${index}`}
-              className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]"
-            >
-              <input
-                aria-label={`Link ${index + 1} label`}
-                value={link.label}
-                onChange={(event) => {
-                  const next = [...links];
-                  next[index] = { ...link, label: event.target.value };
-                  setLinks(next);
-                }}
-                placeholder="Label"
-                maxLength={40}
-                className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-              />
-              <input
-                aria-label={`Link ${index + 1} URL`}
-                type="url"
-                value={link.url}
-                onChange={(event) => {
-                  const next = [...links];
-                  next[index] = { ...link, url: event.target.value };
-                  setLinks(next);
-                }}
-                placeholder="https://"
-                maxLength={512}
-                className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-              />
+          <div>
+            <label htmlFor={usernameId} className="text-sm text-muted">
+              Username
+            </label>
+            <input
+              id={usernameId}
+              name="username"
+              autoComplete="username"
+              value={username}
+              onChange={(event) => {
+                setUsername(event.target.value);
+              }}
+              readOnly={renameLocked}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={usernameDescribedBy}
+              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground read-only:opacity-70"
+            />
+            <p id={usernameHintId} className="mt-1 text-xs text-muted">
+              {renameLocked
+                ? `Username can change again after ${new Date(renameAvailableAt!).toLocaleString()}.`
+                : '3–32 characters: a–z, 0–9, underscore. Once every 30 days.'}
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor={displayNameId} className="text-sm text-muted">
+              Display name
+            </label>
+            <input
+              id={displayNameId}
+              name="display_name"
+              autoComplete="nickname"
+              value={displayName}
+              onChange={(event) => {
+                setDisplayName(event.target.value);
+              }}
+              maxLength={120}
+              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+            />
+          </div>
+
+          <div>
+            <label htmlFor={bioId} className="text-sm text-muted">
+              Bio
+            </label>
+            <textarea
+              id={bioId}
+              name="bio"
+              value={bio}
+              onChange={(event) => {
+                setBio(event.target.value);
+              }}
+              maxLength={500}
+              rows={4}
+              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+            />
+          </div>
+
+          <div>
+            <label htmlFor={avatarId} className="text-sm text-muted">
+              Avatar URL
+            </label>
+            <input
+              id={avatarId}
+              name="avatar_url"
+              type="url"
+              inputMode="url"
+              placeholder="https://"
+              value={avatarUrl}
+              onChange={(event) => {
+                setAvatarUrl(event.target.value);
+              }}
+              maxLength={512}
+              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+            />
+            <p className="mt-1 text-xs text-muted">
+              HTTPS image URL only. Leave blank for initials.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor={websiteId} className="text-sm text-muted">
+              Website
+            </label>
+            <input
+              id={websiteId}
+              name="website_url"
+              type="url"
+              inputMode="url"
+              placeholder="https://"
+              value={websiteUrl}
+              onChange={(event) => {
+                setWebsiteUrl(event.target.value);
+              }}
+              maxLength={512}
+              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm text-muted">Links (up to {MAX_LINKS})</p>
+            {links.map((link, index) => (
+              <div
+                key={`link-${index}`}
+                className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]"
+              >
+                <input
+                  aria-label={`Link ${index + 1} label`}
+                  value={link.label}
+                  onChange={(event) => {
+                    const next = [...links];
+                    next[index] = { ...link, label: event.target.value };
+                    setLinks(next);
+                  }}
+                  placeholder="Label"
+                  maxLength={40}
+                  className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+                />
+                <input
+                  aria-label={`Link ${index + 1} URL`}
+                  type="url"
+                  value={link.url}
+                  onChange={(event) => {
+                    const next = [...links];
+                    next[index] = { ...link, url: event.target.value };
+                    setLinks(next);
+                  }}
+                  placeholder="https://"
+                  maxLength={512}
+                  className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+                />
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setLinks(links.filter((_, i) => i !== index));
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            {links.length < MAX_LINKS ? (
               <button
                 type="button"
-                className="btn btn-ghost"
+                className="btn btn-ghost underline-offset-2 hover:underline"
                 onClick={() => {
-                  setLinks(links.filter((_, i) => i !== index));
+                  setLinks([...links, { label: '', url: '' }]);
                 }}
               >
-                Remove
+                Add link
               </button>
-            </div>
-          ))}
-          {links.length < MAX_LINKS ? (
-            <button
-              type="button"
-              className="btn btn-ghost underline-offset-2 hover:underline"
-              onClick={() => {
-                setLinks([...links, { label: '', url: '' }]);
+            ) : null}
+          </div>
+        </fieldset>
+
+        <fieldset className="space-y-4" disabled={pending}>
+          <legend className="type-subsection text-foreground">
+            Preferences
+          </legend>
+
+          <div>
+            <label htmlFor={themeId} className="text-sm text-muted">
+              Theme
+            </label>
+            <select
+              id={themeId}
+              name="theme"
+              value={preferences.theme}
+              onChange={(event) => {
+                const theme = event.target.value as Preferences['theme'];
+                setPreferences((prev) => ({ ...prev, theme }));
+                applyThemePreference(theme);
               }}
+              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
             >
-              Add link
-            </button>
-          ) : null}
-        </div>
-      </fieldset>
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
 
-      <fieldset className="space-y-4" disabled={pending}>
-        <legend className="type-subsection text-foreground">Preferences</legend>
+          <div>
+            <label htmlFor={spoilersId} className="text-sm text-muted">
+              Spoilers
+            </label>
+            <select
+              id={spoilersId}
+              name="spoilers"
+              value={preferences.spoilers}
+              onChange={(event) => {
+                setPreferences((prev) => ({
+                  ...prev,
+                  spoilers: event.target.value as Preferences['spoilers'],
+                }));
+              }}
+              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+            >
+              <option value="show">Show spoilers</option>
+              <option value="hide">Hide spoilers</option>
+            </select>
+          </div>
 
-        <div>
-          <label htmlFor={themeId} className="text-sm text-muted">
-            Theme
-          </label>
-          <select
-            id={themeId}
-            name="theme"
-            value={preferences.theme}
-            onChange={(event) => {
-              const theme = event.target.value as Preferences['theme'];
-              setPreferences((prev) => ({ ...prev, theme }));
-              applyThemePreference(theme);
-            }}
-            className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+          <div>
+            <label htmlFor={languageId} className="text-sm text-muted">
+              Language
+            </label>
+            <input
+              id={languageId}
+              name="language"
+              value={preferences.language}
+              onChange={(event) => {
+                setPreferences((prev) => ({
+                  ...prev,
+                  language: event.target.value,
+                }));
+              }}
+              maxLength={16}
+              aria-describedby={languageHintId}
+              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+            />
+            <p id={languageHintId} className="mt-1 text-xs text-muted">
+              Locale stub (e.g. en). Full i18n comes later.
+            </p>
+          </div>
+        </fieldset>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <button ref={submitRef} type="submit" className="btn btn-primary">
+            {pending ? 'Saving…' : 'Save settings'}
+          </button>
+          <Link
+            href="/account"
+            className="text-sm text-muted underline-offset-2 hover:underline"
           >
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
+            Back to account
+          </Link>
         </div>
-
-        <div>
-          <label htmlFor={spoilersId} className="text-sm text-muted">
-            Spoilers
-          </label>
-          <select
-            id={spoilersId}
-            name="spoilers"
-            value={preferences.spoilers}
-            onChange={(event) => {
-              setPreferences((prev) => ({
-                ...prev,
-                spoilers: event.target.value as Preferences['spoilers'],
-              }));
-            }}
-            className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-          >
-            <option value="show">Show spoilers</option>
-            <option value="hide">Hide spoilers</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor={languageId} className="text-sm text-muted">
-            Language
-          </label>
-          <input
-            id={languageId}
-            name="language"
-            value={preferences.language}
-            onChange={(event) => {
-              setPreferences((prev) => ({
-                ...prev,
-                language: event.target.value,
-              }));
-            }}
-            maxLength={16}
-            aria-describedby={languageHintId}
-            className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-          />
-          <p id={languageHintId} className="mt-1 text-xs text-muted">
-            Locale stub (e.g. en). Full i18n comes later.
-          </p>
-        </div>
-      </fieldset>
-
-      <div className="flex flex-wrap items-center gap-4">
-        <button ref={submitRef} type="submit" className="btn btn-primary">
-          {pending ? 'Saving…' : 'Save settings'}
-        </button>
-        <Link
-          href="/account"
-          className="text-sm text-muted underline-offset-2 hover:underline"
-        >
-          Back to account
-        </Link>
-      </div>
-    </form>
+      </form>
 
       <div className="mt-10 border-t border-[var(--color-border)] pt-8">
         {logoutError ? (
