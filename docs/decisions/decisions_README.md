@@ -39,6 +39,7 @@ ADR-0005-auth.md
 ADR-0006-redis-search-staging.md
 ADR-0008-personal-library-lists.md
 ADR-0009-public-profiles.md
+ADR-0010-guest-landing-home-shell.md
 ```
 
 Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
@@ -53,6 +54,7 @@ Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
 | [ADR-0006](ADR-0006-redis-search-staging.md) | Redis at P2; PG FTS → OpenSearch staging |
 | [ADR-0008](ADR-0008-personal-library-lists.md) | Personal library (system + custom lists, newest-first order, diary / ratings / contains) |
 | [ADR-0009](ADR-0009-public-profiles.md) | Public profiles (always-public shell, pc.2 Watchlist/Lists, counters in API layer) |
+| [ADR-0010](ADR-0010-guest-landing-home-shell.md) | Guest landing on `/` + signed-in home shell (in-place auth, session matrix) |
 
 Reserved / not yet written: **ADR-0007** — OpenSearch hosting (due at P5 exit per PLAN).
 ## Template

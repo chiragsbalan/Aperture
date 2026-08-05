@@ -5,6 +5,7 @@
 - **Related:** Domain Model PDF; Database Design PDFs; Metadata LLD; PLAN.md P2.1+; [ADR-0008](ADR-0008-personal-library-lists.md) (list content-ref typing)
 - **Implements in:** P2 (canonical catalog + detail UX); later domains reference these ids
 - **Amended:** 2026-08-05 — guest landing on `/` (hero + rails) + signed-in `/` discovery rails (cold TMDb cards; server-only TMDb; shared IP RL default 30); `/home` redirects to `/`
+- **See also:** [ADR-0010](ADR-0010-guest-landing-home-shell.md) (guest vs signed-in `/` product shell)
 
 ## Context
 

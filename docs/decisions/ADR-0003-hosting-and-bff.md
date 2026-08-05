@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-08-01
 - **Amended:** 2026-08-05 — BFF deny-list for auth / resolve / catalog / landing; same-origin deny vs public API threat model
+- **See also:** [ADR-0010](ADR-0010-guest-landing-home-shell.md) (guest `/` landing + home-shell session matrix)
 - **Supersedes:** Informal PLAN defaults that assumed paid always-on Render for both API and Postgres with managed backups from P0; hosting sketches in Technical Architecture (Part 3) PDF that describe Vercel FE + generic “container + managed Postgres” without naming Supabase
 
 ## Context
