@@ -147,7 +147,7 @@ describe('buildShellAtmosphereRandomizeScript / sync lock', () => {
       [key: string]: unknown;
       addEventListener: (
         type: string,
-        listener: (event: {persisted: boolean}) => void,
+        listener: (event: { persisted: boolean }) => void,
       ) => void;
     } = {
       addEventListener() {
@@ -165,12 +165,12 @@ describe('buildShellAtmosphereRandomizeScript / sync lock', () => {
     };
 
     const originalRandom = Math.random;
-    const originalWindow = (globalThis as {window?: unknown}).window;
-    const originalDocument = (globalThis as {document?: unknown}).document;
+    const originalWindow = (globalThis as { window?: unknown }).window;
+    const originalDocument = (globalThis as { document?: unknown }).document;
     try {
       Math.random = random;
-      (globalThis as {window: unknown}).window = fakeWindow;
-      (globalThis as {document: unknown}).document = fakeDocument;
+      (globalThis as { window: unknown }).window = fakeWindow;
+      (globalThis as { document: unknown }).document = fakeDocument;
 
       // Run only the apply() definition + one call from the generated script.
       // Strip the outer IIFE wrapper and invoke apply once without pageshow.
@@ -187,14 +187,14 @@ describe('buildShellAtmosphereRandomizeScript / sync lock', () => {
     } finally {
       Math.random = originalRandom;
       if (originalWindow === undefined) {
-        delete (globalThis as {window?: unknown}).window;
+        delete (globalThis as { window?: unknown }).window;
       } else {
-        (globalThis as {window: unknown}).window = originalWindow;
+        (globalThis as { window: unknown }).window = originalWindow;
       }
       if (originalDocument === undefined) {
-        delete (globalThis as {document?: unknown}).document;
+        delete (globalThis as { document?: unknown }).document;
       } else {
-        (globalThis as {document: unknown}).document = originalDocument;
+        (globalThis as { document: unknown }).document = originalDocument;
       }
     }
 

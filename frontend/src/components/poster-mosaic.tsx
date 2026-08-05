@@ -452,9 +452,7 @@ export function PosterMosaic({
       }
 
       setCols((current) => (nextCols === current ? current : nextCols));
-      setTileCount((current) =>
-        nextCount === current ? current : nextCount,
-      );
+      setTileCount((current) => (nextCount === current ? current : nextCount));
       recomputeTileCenters(layerRef.current, nextCols, centersRef);
     };
 
