@@ -11,10 +11,8 @@ import {
   fetchTopMovies,
   fetchTopTvShows,
 } from '@/lib/catalog';
-import {
-  shouldPrefetchHomeRails,
-  shouldShowSignedInHome,
-} from '@/lib/home-shell';
+import { shouldPrefetchHomeRails } from '@/lib/home-shell';
+import { shouldShowSignedInHome } from '@/lib/home-shell.server';
 
 export const metadata: Metadata = {
   title: 'Aperture',
