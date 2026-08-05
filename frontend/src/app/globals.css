@@ -10,6 +10,8 @@
     /* Keep the content column steady when a short loading shell grows into a
        scrollable title page (avoids a horizontal poster nudge). */
     scrollbar-gutter: stable;
+    /* iOS / Android default tap flash outlines every link & button. */
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
@@ -24,6 +26,17 @@
   :focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 3px;
+  }
+
+  /*
+   * Mobile browsers often treat a tap as :focus-visible, leaving a sticky
+   * focus ring on posters and chrome. Keep keyboard rings on fine pointers.
+   */
+  @media (hover: none) and (pointer: coarse) {
+    :focus-visible {
+      outline: none;
+      outline-offset: 0;
+    }
   }
 
   /*
