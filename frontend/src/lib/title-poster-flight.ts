@@ -23,6 +23,9 @@ interface ActiveFlight {
   sourceOpacity: string;
   outgoingHero: HTMLElement | null;
   outgoingHeroOpacity: string;
+  outgoingMain: HTMLElement | null;
+  outgoingMainOpacity: string;
+  outgoingMainTransition: string;
   animation: Animation;
   contentId: string | null;
   targetEl: HTMLElement | null;
@@ -222,6 +225,22 @@ export function startTitlePosterFlight(options: {
 
   document.body.appendChild(clone);
 
+  // Fade the outgoing page under the clone so the route change reads as
+  // starting with the morph (not after the poster lands). Only the current
+  // ``main`` is touched — the destination loading/detail shell must stay
+  // visible as soon as it mounts.
+  const outgoingMain = document.querySelector('main');
+  const outgoingMainOpacity = outgoingMain?.style.opacity ?? '';
+  const outgoingMainTransition = outgoingMain?.style.transition ?? '';
+  if (outgoingMain != null) {
+    const fadeMs = Math.round(TITLE_POSTER_MORPH_MS * 0.55);
+    outgoingMain.style.transition = `opacity ${fadeMs}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+    outgoingMain.style.pointerEvents = 'none';
+    // Force a style flush so the opacity transition runs from 1 → 0.
+    void outgoingMain.offsetWidth;
+    outgoingMain.style.opacity = '0';
+  }
+
   const deltaX = to.left - from.left;
   const deltaY = to.top - from.top;
   const scaleX = to.width / from.width;
@@ -236,7 +255,7 @@ export function startTitlePosterFlight(options: {
     ],
     {
       duration: TITLE_POSTER_MORPH_MS,
-      easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+      easing: 'cubic-bezier(0.22, 0.82, 0.2, 1)',
       fill: 'forwards',
     },
   );
@@ -247,6 +266,9 @@ export function startTitlePosterFlight(options: {
     sourceOpacity,
     outgoingHero,
     outgoingHeroOpacity,
+    outgoingMain,
+    outgoingMainOpacity,
+    outgoingMainTransition,
     animation,
     contentId: options.contentId ?? null,
     targetEl: null,
@@ -461,6 +483,9 @@ export function endTitlePosterFlight(): void {
     sourceOpacity,
     outgoingHero,
     outgoingHeroOpacity,
+    outgoingMain,
+    outgoingMainOpacity,
+    outgoingMainTransition,
     animation,
     targetEl,
     targetOpacity,
@@ -478,6 +503,11 @@ export function endTitlePosterFlight(): void {
   }
   if (outgoingHero != null && outgoingHero.isConnected) {
     outgoingHero.style.opacity = outgoingHeroOpacity;
+  }
+  if (outgoingMain != null && outgoingMain.isConnected) {
+    outgoingMain.style.opacity = outgoingMainOpacity;
+    outgoingMain.style.transition = outgoingMainTransition;
+    outgoingMain.style.pointerEvents = '';
   }
   if (targetEl != null && targetEl.isConnected) {
     targetEl.style.opacity = targetOpacity;

@@ -7,9 +7,10 @@
  *
  * Forward morph: click-time FLIP flight (`title-poster-flight.ts`) so the
  * animation works from any surface — including same-route Similar on a title
- * page, where React View Transitions often skip. Cold TMDb clicks await a
- * short resolve window; on timeout they push `/movies|tv/tmdb/{id}` with a
- * provisional id via {@link titlePosterProvisionalId}.
+ * page, where React View Transitions often skip. Cold TMDb clicks push
+ * `/movies|tv/tmdb/{id}` immediately with a provisional id via
+ * {@link titlePosterProvisionalId} so the loading shell appears under the
+ * morph (hover/focus still warms the UUID cache).
  * Browser Back: snapshot the detail hero and FLIP back — see
  * `TitlePosterBackMorph`.
  */
@@ -41,7 +42,7 @@ const HERO_SNAPSHOT_STORAGE_KEY = 'aperture:title-poster-hero-snapshot-v1';
 export const TITLE_POSTER_DATA_ATTR = 'data-title-poster';
 
 /** List→hero FLIP duration (keep in sync with flight WAAPI). */
-export const TITLE_POSTER_MORPH_MS = 400;
+export const TITLE_POSTER_MORPH_MS = 750;
 
 let armed: TitlePosterMorphArm | null = null;
 

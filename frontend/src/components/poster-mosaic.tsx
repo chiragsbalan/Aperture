@@ -269,7 +269,7 @@ function maxConcurrentFlips(tileCount: number, profile: FlipProfile): number {
  */
 export function PosterMosaic({
   posters,
-  opacity = 0.15,
+  opacity = 0.2,
 }: {
   posters: readonly string[];
   /** 0–1; keep low so hero copy stays readable. */
@@ -427,67 +427,64 @@ export function PosterMosaic({
     if (posters.length === 0) {
       return;
     }
-    const root = rootRef.current;
 
-    const syncFromContainer = () => {
-      if (!root) {
+    const syncGridCoverage = () => {
+      const root = rootRef.current;
+      const layer = layerRef.current;
+      if (root == null) {
         return;
       }
       const { width, height } = root.getBoundingClientRect();
       if (width < 1 || height < 1) {
         return;
       }
-      const nextCols = columnCountForWidth(width);
-      const estimated = tileCountForSize(width, height);
+
+      let nextCols = columnCountForWidth(width);
+      let nextCount = tileCountForSize(width, height);
+
+      // Prefer real CSS auto-fill columns once tiles have painted.
+      if (layer != null) {
+        const laidOut = tileCountFromLaidOutGrid(layer, height);
+        if (laidOut != null) {
+          nextCols = laidOut.cols;
+          nextCount = Math.max(nextCount, laidOut.count);
+        }
+      }
+
       setCols((current) => (nextCols === current ? current : nextCols));
-      setTileCount((current) => (estimated === current ? current : estimated));
+      setTileCount((current) =>
+        nextCount === current ? current : nextCount,
+      );
       recomputeTileCenters(layerRef.current, nextCols, centersRef);
     };
 
-    if (!root || typeof ResizeObserver === 'undefined') {
-      const syncFromWindow = () => {
-        const nextCols = columnCountForWidth(window.innerWidth);
-        setCols(nextCols);
-        setTileCount(tileCountForSize(window.innerWidth, window.innerHeight));
-        recomputeTileCenters(layerRef.current, nextCols, centersRef);
-      };
-      syncFromWindow();
-      window.addEventListener('resize', syncFromWindow);
-      return () => {
-        window.removeEventListener('resize', syncFromWindow);
-      };
+    syncGridCoverage();
+
+    const root = rootRef.current;
+    let observer: ResizeObserver | null = null;
+    if (root != null && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        syncGridCoverage();
+      });
+      observer.observe(root);
     }
 
-    syncFromContainer();
-    const observer = new ResizeObserver(syncFromContainer);
-    observer.observe(root);
+    // Window resize + rAF retries: absolute shells can miss the first RO pass
+    // (SSR floor of INITIAL_TILE_COUNT) if layout isn't final yet.
+    window.addEventListener('resize', syncGridCoverage);
+    const rafId = window.requestAnimationFrame(() => {
+      syncGridCoverage();
+      window.requestAnimationFrame(syncGridCoverage);
+    });
+    const retryId = window.setTimeout(syncGridCoverage, 120);
+
     return () => {
-      observer.disconnect();
+      observer?.disconnect();
+      window.removeEventListener('resize', syncGridCoverage);
+      window.cancelAnimationFrame(rafId);
+      window.clearTimeout(retryId);
     };
   }, [posters.length]);
-
-  // Second pass: if CSS columns differ from the estimate, top up to a full cover.
-  useLayoutEffect(() => {
-    if (posters.length === 0) {
-      return;
-    }
-    const root = rootRef.current;
-    const layer = layerRef.current;
-    if (!root || !layer) {
-      return;
-    }
-    const { height } = root.getBoundingClientRect();
-    const laidOut = tileCountFromLaidOutGrid(layer, height);
-    if (laidOut == null) {
-      return;
-    }
-    if (laidOut.cols !== cols) {
-      setCols(laidOut.cols);
-    }
-    if (laidOut.count > tileCount) {
-      setTileCount(laidOut.count);
-    }
-  }, [posters.length, tileCount, tiles.length, cols]);
 
   useEffect(() => {
     if (posters.length === 0 || tiles.length === 0) {

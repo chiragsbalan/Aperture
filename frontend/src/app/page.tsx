@@ -73,7 +73,7 @@ export default async function HomePage() {
   ]);
 
   return (
-    <div className="shell-atmosphere relative flex min-h-dvh flex-col">
+    <div className="shell-atmosphere shell-atmosphere-mosaic relative flex min-h-dvh flex-col">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>

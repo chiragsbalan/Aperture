@@ -288,19 +288,12 @@
 
   /*
    * Shared overlay chrome — account menu, search, CollectionSheet, form
-   * selects, and any popup. Gradient wash + glow hairline are mandatory.
+   * selects, and any popup. Purple + blue wash (page atmosphere language).
    */
   .overlay-surface {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    background:
-      linear-gradient(
-        165deg,
-        rgba(106, 174, 106, 0.14) 0%,
-        rgba(22, 20, 17, 0.2) 34%,
-        rgba(22, 20, 17, 0.92) 100%
-      ),
-      rgba(22, 20, 17, 0.88);
+    background: var(--overlay-surface-bg);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     box-shadow:
@@ -312,14 +305,7 @@
   .overlay-surface-field {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    background:
-      linear-gradient(
-        165deg,
-        rgba(106, 174, 106, 0.14) 0%,
-        rgba(22, 20, 17, 0.2) 34%,
-        rgba(22, 20, 17, 0.92) 100%
-      ),
-      rgba(22, 20, 17, 0.88);
+    background: var(--overlay-surface-bg);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -347,10 +333,11 @@
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(106, 174, 106, 0.35),
+      var(--overlay-header-glow-purple),
+      var(--overlay-header-glow-blue),
       transparent
     );
-    opacity: 0.7;
+    opacity: 0.75;
   }
 
   /* Custom listbox trigger — field chrome; open panel uses overlay surface. */
@@ -382,10 +369,10 @@
   .form-select.is-open {
     border-color: color-mix(
       in srgb,
-      var(--color-accent) 55%,
+      var(--overlay-tint-purple) 55%,
       var(--color-border)
     );
-    background-color: rgba(106, 174, 106, 0.06);
+    background-color: var(--overlay-tint-soft);
   }
 
   .form-select:focus-visible {
@@ -478,10 +465,10 @@
   .form-date.is-open {
     border-color: color-mix(
       in srgb,
-      var(--color-accent) 55%,
+      var(--overlay-tint-purple) 55%,
       var(--color-border)
     );
-    background-color: rgba(106, 174, 106, 0.06);
+    background-color: var(--overlay-tint-soft);
   }
 
   .form-date:focus-visible {
@@ -898,12 +885,51 @@
     text-decoration: none;
   }
 
+  /*
+   * Full-page purple + blue dual lobes. Positions / sizes / colour assignment
+   * are randomized per load via ``--shell-glow-*`` (see shell-atmosphere.ts).
+   * Defaults below are only a pre-script fallback.
+   */
   .shell-atmosphere {
     background:
-      radial-gradient(120% 80% at 50% -10%, var(--bg-glow-1), transparent 55%),
-      radial-gradient(80% 50% at 100% 100%, var(--bg-glow-2), transparent 50%),
-      linear-gradient(180deg, transparent 40%, var(--bg-vignette)),
+      /* Charcoal sheet on top — darkens the lobes without dulling their hue */
+      linear-gradient(var(--bg-glow-sheet), var(--bg-glow-sheet)),
+      radial-gradient(
+        var(--shell-glow-1-size, 115%) var(--shell-glow-1-size, 115%) at
+          var(--shell-glow-1-x, 18%) var(--shell-glow-1-y, 22%),
+        var(--shell-glow-1-color, var(--bg-glow-purple)),
+        transparent var(--shell-glow-1-stop, 64%)
+      ),
+      radial-gradient(
+        var(--shell-glow-2-size, 115%) var(--shell-glow-2-size, 115%) at
+          var(--shell-glow-2-x, 82%) var(--shell-glow-2-y, 28%),
+        var(--shell-glow-2-color, var(--bg-glow-blue)),
+        transparent var(--shell-glow-2-stop, 62%)
+      ),
+      radial-gradient(
+        var(--shell-glow-3-size, 110%) var(--shell-glow-3-size, 110%) at
+          var(--shell-glow-3-x, 78%) var(--shell-glow-3-y, 82%),
+        var(--shell-glow-3-color, var(--bg-glow-blue)),
+        transparent var(--shell-glow-3-stop, 60%)
+      ),
+      radial-gradient(
+        var(--shell-glow-4-size, 110%) var(--shell-glow-4-size, 110%) at
+          var(--shell-glow-4-x, 20%) var(--shell-glow-4-y, 88%),
+        var(--shell-glow-4-color, var(--bg-glow-purple)),
+        transparent var(--shell-glow-4-stop, 60%)
+      ),
+      linear-gradient(180deg, transparent 42%, var(--bg-vignette)),
       var(--color-bg);
+  }
+
+  /*
+   * Guest landing / auth shells with ``PosterMosaic``: dial the page glow down
+   * so it does not double-up with the mosaic veil. Non-mosaic pages keep the
+   * stronger ``.shell-atmosphere`` tokens.
+   */
+  .shell-atmosphere-mosaic {
+    --bg-glow-purple: rgba(148, 108, 210, 0.16);
+    --bg-glow-blue: rgba(56, 128, 210, 0.14);
   }
 
   /* Dense small-poster mosaic — pack rows tight; parent clips overflow. */
@@ -969,15 +995,27 @@
     }
   }
 
-  /* Soft cool wash so the landing poster mosaic stays atmospheric. */
+  /*
+   * Soft wash over the guest poster mosaic — same purple/blue pair as the
+   * shell, at mosaic strength so the tile grid stays readable.
+   */
   .poster-mosaic-veil {
     background:
-      radial-gradient(120% 80% at 50% -10%, var(--bg-glow-1), transparent 55%),
+      radial-gradient(
+        70% 70% at 30% -8%,
+        var(--bg-glow-mosaic-purple),
+        transparent 55%
+      ),
+      radial-gradient(
+        70% 70% at 70% -6%,
+        var(--bg-glow-mosaic-blue),
+        transparent 55%
+      ),
       linear-gradient(
         180deg,
-        rgba(12, 11, 9, 0.42) 0%,
-        rgba(12, 11, 9, 0.62) 55%,
-        rgba(12, 11, 9, 0.84) 100%
+        rgba(12, 11, 9, 0.18) 0%,
+        rgba(12, 11, 9, 0.32) 48%,
+        rgba(12, 11, 9, 0.5) 100%
       );
   }
 
@@ -985,15 +1023,20 @@
     .poster-mosaic-veil {
       background:
         radial-gradient(
-          120% 80% at 50% -10%,
-          var(--bg-glow-1),
+          70% 70% at 30% -8%,
+          var(--bg-glow-mosaic-purple),
+          transparent 55%
+        ),
+        radial-gradient(
+          70% 70% at 70% -6%,
+          var(--bg-glow-mosaic-blue),
           transparent 55%
         ),
         linear-gradient(
           180deg,
-          rgba(12, 11, 9, 0.35) 0%,
-          rgba(12, 11, 9, 0.55) 55%,
-          rgba(12, 11, 9, 0.78) 100%
+          rgba(12, 11, 9, 0.14) 0%,
+          rgba(12, 11, 9, 0.28) 48%,
+          rgba(12, 11, 9, 0.45) 100%
         );
     }
   }
@@ -1057,15 +1100,15 @@
   [data-title-contrast='on-dark'] {
     --color-fg: #f3efe6;
     --color-fg-muted: #c4bdb0;
-    --color-accent: #6aae6a;
-    --color-accent-soft: rgba(106, 174, 106, 0.16);
+    --color-accent: #9b7ad9;
+    --color-accent-soft: rgba(155, 122, 217, 0.18);
     --color-border: rgba(243, 239, 230, 0.18);
-    --color-focus: #9fd49f;
+    --color-focus: #c4b0f0;
     --color-bg-elevated: rgba(22, 20, 17, 0.82);
     --color-action-watchlist: #c9b07a;
     --color-action-favorites: #e07a8a;
     --color-action-lists: #6a9ec9;
-    --color-action-log: #6aae6a;
+    --color-action-log: #9b7ad9;
   }
 
   [data-title-contrast='on-dark'] .catalog-backdrop-veil {
@@ -1088,15 +1131,15 @@
   [data-title-contrast='on-light'] {
     --color-fg: #1a1712;
     --color-fg-muted: #4d473e;
-    --color-accent: #3d7a45;
-    --color-accent-soft: rgba(61, 122, 69, 0.14);
+    --color-accent: #6b4fa3;
+    --color-accent-soft: rgba(107, 79, 163, 0.14);
     --color-border: rgba(26, 23, 18, 0.16);
-    --color-focus: #2f6f3e;
+    --color-focus: #5a3d96;
     --color-bg-elevated: rgba(255, 253, 248, 0.78);
     --color-action-watchlist: #9a7a3a;
     --color-action-favorites: #c45c6a;
     --color-action-lists: #3d6f94;
-    --color-action-log: #3d7a45;
+    --color-action-log: #6b4fa3;
   }
 
   [data-title-contrast='on-light'] .catalog-backdrop-veil {
