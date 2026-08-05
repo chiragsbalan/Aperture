@@ -17,6 +17,7 @@ Browsers must authenticate to FastAPI without exposing long-lived secrets to Jav
 - BFF stores tokens in **`__Host-ap_at`** (access) and **`__Host-ap_rt`** (refresh) cookies.
 - FastAPI remains **cookie-agnostic**: Authorization / body / dedicated headers as designed in API routes; BFF does not forward browser `Cookie` to the API (see existing proxy allowlist).
 - Do **not** use Supabase Auth, Realtime, or client `service_role` for product login.
+- **In-place auth on `/`:** guest landing login/signup panels still post to the dedicated **`/api/auth/*`** BFF routes (register / login / Google start)—not the catch-all proxy—same as `/login` and `/signup`.
 
 ### Tokens and passwords
 
@@ -93,6 +94,10 @@ Cloud env is provisioned; secrets stay in host dashboards (never git). Local Com
 3. **Long-lived access tokens in `localStorage`** — rejected; XSS exposure; prefer `__Host-` cookies via BFF.
 4. **Email-based automatic account linking on Google** — rejected; account-takeover risk when email proof differs across providers.
 5. **Redis-required rate limits from day one** — rejected; P1 must ship on one Render instance with DB-backed counters.
+
+### Accepted risks
+
+- **Logout CSRF:** `POST /api/auth/logout` relies on **SameSite=Lax** `__Host-` cookies (no custom CSRF token). Cross-site POSTs do not include Lax cookies; accepted for this threat model. Do not invent CSRF tokens unless a future cookie/SameSite change requires them.
 
 ## Consequences
 

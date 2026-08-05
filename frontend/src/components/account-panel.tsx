@@ -46,7 +46,7 @@ export function AccountPanel() {
         return;
       }
       invalidatePublicWatchEntries();
-      router.push('/login');
+      router.push('/');
       router.refresh();
     } catch {
       setLogoutError('Could not log out. Please try again.');

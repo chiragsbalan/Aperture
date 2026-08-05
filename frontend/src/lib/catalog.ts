@@ -9,6 +9,14 @@ import {
 
 const CATALOG_FETCH_TIMEOUT_MS = 12_000;
 
+/**
+ * Public rail display cap. Must stay aligned with backend
+ * `TOP_MOVIES_MAX_PUBLIC_LIMIT` / `settings.top_movies_max_public_limit`
+ * (default 24). Default fetch helpers use limit 12 to match
+ * `top_movies_default_limit`.
+ */
+export const HOME_RAIL_MAX_PUBLIC_LIMIT = 24;
+
 export interface CreditPersonRef {
   type: 'person';
   id: string;
@@ -342,7 +350,10 @@ async function fetchHomeRailTitles(
     return [];
   }
 
-  const capped = Math.min(100, Math.max(1, limit));
+  const capped = Math.min(
+    HOME_RAIL_MAX_PUBLIC_LIMIT,
+    Math.max(1, limit),
+  );
   try {
     const res = await fetch(`${base}${path}?limit=${capped}`, {
       cache: 'no-store',
@@ -361,9 +372,9 @@ async function fetchHomeRailTitles(
 }
 
 /**
- * Shuffled sample from the TMDb top-rated pool for the signed-in home rail.
- * Public/unauthenticated upstream (request-level rate limited); always
- * no-store so each navigation can reshuffle via the API.
+ * Shuffled sample from the TMDb top-rated pool for home rails (signed-in `/`
+ * and guest `/` landing). Upstream is public but request-level rate limited;
+ * browsers must not hit these via the BFF proxy (RSC → API only).
  */
 export async function fetchTopMovies(limit = 12): Promise<TopMovie[]> {
   return fetchHomeRailTitles(
@@ -373,7 +384,7 @@ export async function fetchTopMovies(limit = 12): Promise<TopMovie[]> {
   );
 }
 
-/** Shuffled sample from TMDb top-rated TV for the signed-in home rail. */
+/** Shuffled sample from TMDb top-rated TV for home rails. */
 export async function fetchTopTvShows(limit = 12): Promise<TopMovie[]> {
   return fetchHomeRailTitles(
     '/api/v1/catalog/top-tv-shows',

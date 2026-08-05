@@ -836,49 +836,23 @@ export function PosterMosaic({
     return null;
   }
 
-  const togglePaused = () => {
-    setUserPaused((prev) => {
-      const next = !prev;
-      try {
-        window.localStorage.setItem(MOSAIC_FLIPS_PAUSED_KEY, next ? '1' : '0');
-      } catch {
-        // Ignore storage failures.
-      }
-      return next;
-    });
-  };
-
   return (
-    <>
-      <div
-        ref={rootRef}
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
-        style={{ opacity }}
-      >
-        <ul ref={layerRef} className="poster-mosaic-layer">
-          {tiles.map((url, index) => (
-            <PosterMosaicTile
-              key={index}
-              url={url}
-              flip={pendingFlipByIndex.get(index) ?? null}
-            />
-          ))}
-        </ul>
-        <div className="poster-mosaic-veil absolute inset-0" />
-      </div>
-      {!reduceMotion ? (
-        <button
-          type="button"
-          onClick={togglePaused}
-          aria-pressed={userPaused}
-          className="poster-mosaic-pause absolute bottom-4 left-4 z-[2] text-sm text-muted transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
-        >
-          {userPaused
-            ? 'Play background animation'
-            : 'Pause background animation'}
-        </button>
-      ) : null}
-    </>
+    <div
+      ref={rootRef}
+      aria-hidden
+      className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+      style={{ opacity }}
+    >
+      <ul ref={layerRef} className="poster-mosaic-layer">
+        {tiles.map((url, index) => (
+          <PosterMosaicTile
+            key={index}
+            url={url}
+            flip={pendingFlipByIndex.get(index) ?? null}
+          />
+        ))}
+      </ul>
+      <div className="poster-mosaic-veil absolute inset-0" />
+    </div>
   );
 }

@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from pydantic import ValidationError
 
 from app.core.cache import CacheBackend, get_cache
+from app.core.config import Settings
 from app.core.deps import DbSessionDep, SettingsDep
 from app.core.trusted_client import resolve_client_ip
 from app.metadata import resolve as metadata_resolve
@@ -190,6 +191,12 @@ async def get_landing_posters(
 
 def _filter_rail_titles(titles: list[TopMovie]) -> list[TopMovie]:
     return [title for title in titles if _is_valid_tmdb_poster_url(title.poster_url)]
+
+
+def _public_rail_display_limit(limit: int | None, settings: Settings) -> int:
+    """Clamp requested (or default) rail size to the public max."""
+    requested = limit if limit is not None else settings.top_movies_default_limit
+    return min(requested, settings.top_movies_max_public_limit)
 
 
 def _filter_top_movies(detail: TopMoviesResponse) -> TopMoviesResponse:
@@ -458,11 +465,12 @@ async def get_top_movies(
 ) -> TopMoviesResponse:
     """Return a shuffled sample from TMDb's all-time top-rated movies.
 
-    Public (unauthenticated), like ``/landing/posters``. Every request is
-    subject to a per-IP rate limit (HIT / BYPASS / MISS). The full pool
-    (default 100) is Redis-cached; each response reshuffles and truncates to
-    ``limit``. Degrades to an empty list when TMDb is unavailable so the home
-    rail can show an empty state.
+    Public (unauthenticated), like ``/landing/posters``. Served to signed-in
+    ``/`` and guest ``/`` (public home) via RSC (not the browser BFF proxy). Every
+    request is subject to a per-IP rate limit (HIT / BYPASS / MISS). The full
+    pool (default 100) is Redis-cached; each response reshuffles and truncates
+    to ``limit``. Degrades to an empty list when TMDb is unavailable so the
+    home rail can show an empty state.
     """
     client_ip = resolve_client_ip(request, settings)
     await enforce_top_movies_rate_limit(
@@ -470,7 +478,7 @@ async def get_top_movies(
         settings=settings,
         client_ip=client_ip,
     )
-    display_limit = limit if limit is not None else settings.top_movies_default_limit
+    display_limit = _public_rail_display_limit(limit, settings)
     pool = await _load_top_movies_pool(settings, response)
     response.headers['Cache-Control'] = _HOME_RAIL_CACHE_CONTROL
     return _shuffle_top_movies(pool, limit=display_limit)
@@ -490,7 +498,7 @@ async def get_top_tv_shows(
         settings=settings,
         client_ip=client_ip,
     )
-    display_limit = limit if limit is not None else settings.top_movies_default_limit
+    display_limit = _public_rail_display_limit(limit, settings)
     pool = await _load_top_tv_shows_pool(settings, response)
     response.headers['Cache-Control'] = _HOME_RAIL_CACHE_CONTROL
     return _shuffle_top_tv_shows(pool, limit=display_limit)
@@ -510,7 +518,7 @@ async def get_now_in_theatres(
         settings=settings,
         client_ip=client_ip,
     )
-    display_limit = limit if limit is not None else settings.top_movies_default_limit
+    display_limit = _public_rail_display_limit(limit, settings)
     pool = await _load_now_in_theatres_pool(settings, response)
     response.headers['Cache-Control'] = _HOME_RAIL_CACHE_CONTROL
     return NowInTheatresResponse(movies=pool.movies[:display_limit])

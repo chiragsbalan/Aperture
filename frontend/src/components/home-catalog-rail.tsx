@@ -15,7 +15,8 @@ interface HomeCatalogRailProps {
 }
 
 /**
- * Signed-in home poster rail (now in theatres / top movies / top TV).
+ * Home poster rail for signed-in `/` and the guest landing (now in theatres /
+ * top movies / top TV).
  */
 export function HomeCatalogRail({
   headingId,

@@ -33,5 +33,5 @@ def top_tv_shows_key(*, count: int) -> str:
 
 
 def now_in_theatres_key(*, count: int) -> str:
-    """Shared cache key for the signed-in home now-in-theatres set."""
+    """Shared cache key for the home now-in-theatres rail pool."""
     return f'meta:now-in-theatres:{count}'

@@ -111,16 +111,29 @@ class Settings(BaseSettings):
     landing_posters_rate_limit_window_seconds: int = 60
     landing_posters_rate_limit_max_per_ip: int = 60
 
-    # Signed-in home rails (TMDb pools; top movies/TV shuffle on serve).
-    # Shared limit so Now in theatres / Top movies / Top TV show the same count.
+    # Home rails (TMDb pools; top movies/TV shuffle on serve). Used by signed-in
+    # `/` and guest `/` (public home). Shared display limit across the three rails.
+    # Per-IP RL is shared across top-movies / top-tv / now-in-theatres (each
+    # home load charges 3). Keep headroom for refresh, not scrapers.
     top_movies_cache_ttl_seconds: int = 60 * 60 * 24
     top_movies_pool_count: int = Field(default=100, ge=1, le=100)
     top_movies_default_limit: int = Field(default=12, ge=1, le=100)
+    # Hard cap on public rail ``limit`` (and default) returned to clients.
+    top_movies_max_public_limit: int = Field(default=24, ge=1, le=100)
     top_movies_negative_cache_ttl_seconds: int = 60
     top_movies_rate_limit_window_seconds: int = 60
-    top_movies_rate_limit_max_per_ip: int = 60
+    top_movies_rate_limit_max_per_ip: int = 30
     # Now in theatres refreshes more often than all-time top lists.
     now_in_theatres_cache_ttl_seconds: int = 60 * 60 * 6
+
+    @model_validator(mode='after')
+    def validate_top_movies_public_limit(self) -> Self:
+        """Default display limit must not exceed the public max."""
+        if self.top_movies_default_limit > self.top_movies_max_public_limit:
+            raise ValueError(
+                'top_movies_default_limit must be <= top_movies_max_public_limit'
+            )
+        return self
 
     @model_validator(mode='after')
     def validate_production_secrets(self) -> Self:

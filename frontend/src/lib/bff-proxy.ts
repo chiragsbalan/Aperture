@@ -42,9 +42,13 @@ export function normalizeUpstreamBase(raw: string): string {
 }
 
 /**
- * Paths the generic BFF proxy must not forward. Auth tokens are only minted
- * via dedicated `/api/auth/*` routes. Catalog resolve/ingest is server-only
- * (RSC → API with trusted client-IP headers), not via the browser proxy.
+ * Paths the generic BFF proxy must not forward.
+ *
+ * - Auth tokens: only via dedicated `/api/auth/*` routes.
+ * - Catalog resolve/ingest: server-only (dedicated `/api/catalog/resolve` or
+ *   RSC → API with trusted client-IP headers).
+ * - Home rails + landing posters: RSC → API only, so anonymous browsers cannot
+ *   scrape TMDb-backed pools through the open proxy.
  */
 export function isDeniedProxyPath(pathParts: string[]): boolean {
   if (
@@ -61,6 +65,22 @@ export function isDeniedProxyPath(pathParts: string[]): boolean {
     pathParts[1] === 'v1' &&
     pathParts[3] === 'resolve' &&
     (pathParts[2] === 'movies' || pathParts[2] === 'tv')
+  ) {
+    return true;
+  }
+  if (
+    pathParts.length >= 3 &&
+    pathParts[0] === 'api' &&
+    pathParts[1] === 'v1' &&
+    pathParts[2] === 'catalog'
+  ) {
+    return true;
+  }
+  if (
+    pathParts.length >= 3 &&
+    pathParts[0] === 'api' &&
+    pathParts[1] === 'v1' &&
+    pathParts[2] === 'landing'
   ) {
     return true;
   }

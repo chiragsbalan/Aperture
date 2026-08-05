@@ -4,7 +4,7 @@
 - **Date:** 2026-08-01
 - **Related:** Domain Model PDF; Database Design PDFs; Metadata LLD; PLAN.md P2.1+; [ADR-0008](ADR-0008-personal-library-lists.md) (list content-ref typing)
 - **Implements in:** P2 (canonical catalog + detail UX); later domains reference these ids
-- **Amended:** 2026-08-05 — signed-in home discovery rails (cold TMDb cards; server-only TMDb)
+- **Amended:** 2026-08-05 — guest landing on `/` (hero + rails) + signed-in `/` discovery rails (cold TMDb cards; server-only TMDb; shared IP RL default 30); `/home` redirects to `/`
 
 ## Context
 
@@ -48,9 +48,16 @@ Database Design also models seasons, episodes, and people as first-class tables�
 - **TMDb is server-only:** the API key stays in backend env; browsers receive Aperture UUIDs and CDN image URLs built from relative paths.
 - **Fixture seed is a first-class ship path:** offline JSON under `backend/app/metadata/fixtures/` can populate prod via `make seed-metadata` (or equivalent) against `DATABASE_URL` without a TMDb key; live TMDb ingest remains optional.
 
-### Signed-in home discovery rails (pc.2)
+### Home discovery rails (pc.2 / guest browse)
 
-Cold **TMDb-id card** rails for the signed-in home (not Aperture UUID shelves):
+Cold **TMDb-id card** rails (not Aperture UUID shelves):
+
+| Surface | Who |
+|---|---|
+| Signed-in `/` | Authenticated home shell (three rails only) |
+| Guest `/` | Mosaic hero (in-place marketing ↔ login ↔ signup slides) + capability grid + same three rails |
+| Guest header | Brand · Search (auth via in-place panels on `/`) |
+| `/home` | Redirects to `/` (legacy alias) |
 
 | Route | Source |
 |---|---|
@@ -59,9 +66,12 @@ Cold **TMDb-id card** rails for the signed-in home (not Aperture UUID shelves):
 | `GET /api/v1/catalog/top-tv-shows` | TMDb top-rated TV (pool + per-request shuffle) |
 
 - Responses are lightweight poster cards keyed by **TMDb id** + kind; clients open titles via existing resolve / morph paths (warm Aperture UUID when known).
+- **Resolve-path exception:** catch-all BFF proxy denies `/api/v1/movies|tv/resolve`, but browsers still open cold TMDb cards through the dedicated same-origin **`POST /api/catalog/resolve`** route (trusted client-IP headers → API). That dedicated path is intentional, not a deny-list hole for the open proxy.
 - Pools are Redis-cached with single-flight fill; `Cache-Control: private, no-store` on responses.
-- Shared IP rate-limit bucket (`enforce_top_movies_rate_limit` / related knobs) across the three rails.
+- Shared IP rate-limit bucket (`enforce_top_movies_rate_limit`; default **30** / window via `TOP_MOVIES_RATE_LIMIT_MAX_PER_IP`) across the three rails — each home load charges 3.
+- Public display `limit` is clamped to `top_movies_max_public_limit` (default **24**). Frontend `HOME_RAIL_MAX_PUBLIC_LIMIT` (24) and default fetch limit **12** must stay aligned with `TOP_MOVIES_MAX_PUBLIC_LIMIT` / `top_movies_default_limit` (manual coupling; no shared codegen).
 - Empty/degraded pools return empty lists rather than failing the home page.
+- Browsers must not scrape these via the open BFF proxy (RSC → API only; see ADR-0003).
 
 ## Future evolution
 

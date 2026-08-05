@@ -176,6 +176,69 @@
     display: flex;
     width: 100%;
   }
+
+  /*
+   * Google OAuth — distinct from solid CTA and frosted inputs.
+   * Soft lift on hover; press on active.
+   */
+  .btn-google {
+    border-color: color-mix(
+      in srgb,
+      var(--color-border) 55%,
+      var(--color-accent) 45%
+    );
+    border-radius: var(--radius-md);
+    background: linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--color-bg-elevated) 78%, var(--color-fg) 22%) 0%,
+      color-mix(in srgb, var(--color-bg-elevated) 92%, var(--color-accent) 8%)
+        100%
+    );
+    color: var(--color-fg);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-fg) 8%, transparent);
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      background var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-med) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out);
+  }
+
+  .btn-google:hover:not(:disabled):not([aria-disabled='true']) {
+    border-color: var(--color-accent);
+    background: linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--color-bg-elevated) 65%, var(--color-fg) 35%) 0%,
+      color-mix(in srgb, var(--color-bg-elevated) 78%, var(--color-accent) 22%)
+        100%
+    );
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--color-fg) 12%, transparent),
+      0 10px 28px color-mix(in srgb, var(--color-bg) 55%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--color-accent) 35%, transparent);
+    transform: translateY(-2px);
+  }
+
+  .btn-google:active:not(:disabled):not([aria-disabled='true']) {
+    border-color: var(--color-accent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--color-fg) 6%, transparent),
+      0 2px 8px color-mix(in srgb, var(--color-bg) 45%, transparent);
+    transform: translateY(0) scale(0.98);
+    transition-duration: 80ms;
+  }
+
+  .btn-google .btn-google-mark {
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .btn-google:hover:not(:disabled):not([aria-disabled='true']) .btn-google-mark {
+    transform: scale(1.08);
+  }
+
+  .btn-google:active:not(:disabled):not([aria-disabled='true']) .btn-google-mark {
+    transform: scale(0.96);
+  }
 }
 
 @layer utilities {
@@ -240,6 +303,23 @@
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       0 28px 90px rgba(0, 0, 0, 0.55);
+  }
+
+  /* Same frosted fill as `.overlay-surface`, without the floating drop shadow. */
+  .overlay-surface-field {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background:
+      linear-gradient(
+        165deg,
+        rgba(106, 174, 106, 0.14) 0%,
+        rgba(22, 20, 17, 0.2) 34%,
+        rgba(22, 20, 17, 0.92) 100%
+      ),
+      rgba(22, 20, 17, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
   .overlay-panel-motion {
@@ -1277,6 +1357,33 @@
     transform: translateY(0);
   }
 
+  /* Guest landing hero: directional marketing ↔ login ↔ signup slides. */
+  .guest-hero-panel-stage .title-tab-panel-layer.is-outgoing.guest-hero-slide-out-up {
+    animation: guest-hero-out-up var(--duration-slow) var(--ease-out) forwards;
+  }
+
+  .guest-hero-panel-stage .title-tab-panel-layer.is-outgoing.guest-hero-slide-out-down {
+    animation: guest-hero-out-down var(--duration-slow) var(--ease-out) forwards;
+  }
+
+  .guest-hero-panel-stage .title-tab-panel.guest-hero-slide-in-up {
+    animation: guest-hero-in-up var(--duration-slow) var(--ease-out) both;
+  }
+
+  .guest-hero-panel-stage .title-tab-panel.guest-hero-slide-in-down {
+    animation: guest-hero-in-down var(--duration-slow) var(--ease-out) both;
+  }
+
+  .guest-hero-panel-stage.motion-size {
+    transition:
+      height var(--duration-slow) var(--ease-out),
+      width var(--duration-slow) var(--ease-out),
+      max-height var(--duration-slow) var(--ease-out),
+      max-width var(--duration-slow) var(--ease-out),
+      min-height var(--duration-slow) var(--ease-out),
+      min-width var(--duration-slow) var(--ease-out);
+  }
+
   /* Mobile synopsis clamp: soft fade hints more content on tap. */
   .title-overview-clamped {
     -webkit-mask-image: linear-gradient(
@@ -1451,6 +1558,54 @@
   to {
     opacity: 0;
     transform: translateY(0.4rem);
+  }
+}
+
+@keyframes guest-hero-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.85rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes guest-hero-out-up {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-0.55rem);
+  }
+}
+
+@keyframes guest-hero-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-0.85rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes guest-hero-out-down {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(0.55rem);
   }
 }
 
@@ -1632,8 +1787,20 @@
     transform: none !important;
   }
 
+  .btn-google,
+  .btn-google:hover:not(:disabled):not([aria-disabled='true']),
+  .btn-google:active:not(:disabled):not([aria-disabled='true']),
+  .btn-google .btn-google-mark {
+    transition: none !important;
+    transform: none !important;
+  }
+
   .title-tab-panel-layer.is-outgoing,
   .title-tab-panel.is-incoming,
+  .guest-hero-slide-in-up,
+  .guest-hero-slide-in-down,
+  .guest-hero-slide-out-up,
+  .guest-hero-slide-out-down,
   .account-menu-backdrop,
   .account-menu-backdrop.is-leaving,
   .account-menu-panel,

@@ -22,11 +22,27 @@ describe('isDeniedProxyPath', () => {
     expect(isDeniedProxyPath(['api', 'v1', 'tv', 'resolve'])).toBe(true);
   });
 
+  it('denies home-rail catalog and landing poster paths', () => {
+    expect(isDeniedProxyPath(['api', 'v1', 'catalog'])).toBe(true);
+    expect(
+      isDeniedProxyPath(['api', 'v1', 'catalog', 'top-movies']),
+    ).toBe(true);
+    expect(
+      isDeniedProxyPath(['api', 'v1', 'catalog', 'top-tv-shows']),
+    ).toBe(true);
+    expect(
+      isDeniedProxyPath(['api', 'v1', 'catalog', 'now-in-theatres']),
+    ).toBe(true);
+    expect(isDeniedProxyPath(['api', 'v1', 'landing'])).toBe(true);
+    expect(isDeniedProxyPath(['api', 'v1', 'landing', 'posters'])).toBe(true);
+  });
+
   it('allows health, version, and other api paths', () => {
     expect(isDeniedProxyPath(['health', 'ready'])).toBe(false);
     expect(isDeniedProxyPath(['version'])).toBe(false);
     expect(isDeniedProxyPath(['api', 'v1', 'users'])).toBe(false);
     expect(isDeniedProxyPath(['api', 'v1', 'movies', 'abc'])).toBe(false);
+    expect(isDeniedProxyPath(['api', 'v1', 'search'])).toBe(false);
     expect(isDeniedProxyPath(['api', 'v1'])).toBe(false);
   });
 });

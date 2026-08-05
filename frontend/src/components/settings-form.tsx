@@ -6,8 +6,10 @@ import {
   type Preferences,
   type ProfileLink,
 } from '@/lib/profile';
+import { invalidatePublicWatchEntries } from '@/lib/library';
 import { applyThemePreference } from '@/lib/theme';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 
 type LoadState =
@@ -18,6 +20,7 @@ type LoadState =
 const MAX_LINKS = 3;
 
 export function SettingsForm() {
+  const router = useRouter();
   const usernameId = useId();
   const usernameHintId = useId();
   const displayNameId = useId();
@@ -46,9 +49,30 @@ export function SettingsForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const [renameAvailableAt, setRenameAvailableAt] = useState<string | null>(
     null,
   );
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    setLogoutError(null);
+    try {
+      const res = await fetch('/api/auth/logout', { method: 'POST' });
+      if (!res.ok) {
+        setLogoutError(`Could not log out (HTTP ${res.status}).`);
+        return;
+      }
+      invalidatePublicWatchEntries();
+      router.push('/');
+      router.refresh();
+    } catch {
+      setLogoutError('Could not log out. Please try again.');
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -199,6 +223,7 @@ export function SettingsForm() {
     : usernameHintId;
 
   return (
+    <>
     <form
       className="mt-8 space-y-6 text-left"
       onSubmit={onSubmit}
@@ -460,5 +485,24 @@ export function SettingsForm() {
         </Link>
       </div>
     </form>
+
+      <div className="mt-10 border-t border-[var(--color-border)] pt-8">
+        {logoutError ? (
+          <p role="alert" className="mb-4 text-sm text-[var(--color-danger)]">
+            {logoutError}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => {
+            void handleLogout();
+          }}
+          disabled={loggingOut}
+          className="btn btn-lg hover:border-[var(--color-accent)]"
+        >
+          {loggingOut ? 'Logging out…' : 'Log out'}
+        </button>
+      </div>
+    </>
   );
 }
