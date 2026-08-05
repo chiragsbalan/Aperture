@@ -26,7 +26,7 @@ Architecture Decision Records (ADRs) and the Design System evolve during develop
 - **Content identity:** [ADR-0004](decisions/ADR-0004-content-identity.md) — canonical `content_items` + `external_ids` uniqueness; not raw provider ids as FKs.
 - **Auth / sessions:** [ADR-0005](decisions/ADR-0005-auth.md) — BFF `__Host-` cookies, 15m JWT, opaque refresh + 10s reuse grace, Argon2id, login via email **or** username, no OAuth auto-link.
 - **Redis / search staging:** [ADR-0006](decisions/ADR-0006-redis-search-staging.md) — Redis intro at P2 (Roadmap P11 = harden); PG FTS then OpenSearch+FTS fallback; OpenSearch host is ADR-0007 at P5 exit.
-- **Personal library:** [ADR-0008](decisions/ADR-0008-personal-library-lists.md) — system + custom lists, dense reorder, visibility AuthZ, diary/`watch_entries` in `app/library/`; public content refs `movie`/`tv` (alias `tv_show`).
+- **Personal library:** [ADR-0008](decisions/ADR-0008-personal-library-lists.md) — system + custom lists (newest-added-first; binary visibility; fixed system visibility), diary/`watch_entries` (+ half-star rating) in `app/library/`; public content refs `movie`/`tv` (alias `tv_show`). See also [ADR-0009](decisions/ADR-0009-public-profiles.md) for public shelves.
 - Architecture/engineering **PDFs** are not rewritten for every decision tweak; ADRs + PLAN carry the current decision until PDFs are revised.
 
 ## Structure
