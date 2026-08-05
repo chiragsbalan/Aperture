@@ -2,8 +2,9 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-01
-- **Related:** Authentication LLD; Users Module LLD; Frontend Architecture; ADR-0003 (BFF transport); PLAN.md P1
+- **Related:** Authentication LLD; Users Module LLD; Frontend Architecture; ADR-0003 (BFF transport); PLAN.md P1; [ADR-0010](ADR-0010-guest-landing-home-shell.md) (guest `/` in-place auth + home shell)
 - **Implements in:** P1.1–P1.3 (password, hardening, Google); profiles remain Users module (P1.4)
+- **Amended:** 2026-08-06 — in-place auth on `/`; logout → `/`; home-shell session matrix (see ADR-0010)
 
 ## Context
 
@@ -17,7 +18,8 @@ Browsers must authenticate to FastAPI without exposing long-lived secrets to Jav
 - BFF stores tokens in **`__Host-ap_at`** (access) and **`__Host-ap_rt`** (refresh) cookies.
 - FastAPI remains **cookie-agnostic**: Authorization / body / dedicated headers as designed in API routes; BFF does not forward browser `Cookie` to the API (see existing proxy allowlist).
 - Do **not** use Supabase Auth, Realtime, or client `service_role` for product login.
-- **In-place auth on `/`:** guest landing login/signup panels still post to the dedicated **`/api/auth/*`** BFF routes (register / login / Google start)—not the catch-all proxy—same as `/login` and `/signup`.
+- **In-place auth on `/`:** guest landing login/signup panels still post to the dedicated **`/api/auth/*`** BFF routes (register / login / Google start)—not the catch-all proxy—same as `/login` and `/signup`. Product shell rules (guest vs signed-in `/`, prefetch) are in [ADR-0010](ADR-0010-guest-landing-home-shell.md).
+- **Logout destination:** settings and account panel clear cookies then navigate to **`/`** (guest landing), not `/login`.
 
 ### Tokens and passwords
 
