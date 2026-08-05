@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import {
   type MouseEvent,
   type ReactNode,
-  startTransition,
   useRef,
   useSyncExternalStore,
 } from 'react';
@@ -17,7 +16,6 @@ import {
   type ResolveKind,
 } from '@/lib/catalog-resolve-client';
 import {
-  TITLE_POSTER_MORPH_MS,
   armTitlePosterMorph,
   getResolvedContentId,
   rememberResolvedContentId,
@@ -30,10 +28,9 @@ import { beginTitlePosterNavigation } from '@/lib/title-poster-nav';
  * Link to a TMDb title that warms resolve on hover/focus.
  *
  * Cached UUID → FLIP + push to the detail page.
- * Cold → await resolve up to {@link TITLE_POSTER_MORPH_MS}; success skips
- * ``/tmdb/``, timeout/fail → FLIP + push to the loading shell. Late resolves
- * only update the cache — they never re-arm while the shell is looking up a
- * provisional id.
+ * Cold → FLIP + push to the ``/tmdb/`` loading shell immediately (page change
+ * starts with the morph). Hover/focus warm still fills the cache for the next
+ * click; late resolves only update the cache.
  */
 export function TmdbResolveLink({
   href,
@@ -78,9 +75,7 @@ export function TmdbResolveLink({
     });
     const detailHref =
       kind === 'tv' ? `/tv/${resolvedId}` : `/movies/${resolvedId}`;
-    startTransition(() => {
-      router.push(detailHref);
-    });
+    router.push(detailHref);
   }
 
   function navigateCold(link: HTMLElement): void {
@@ -95,12 +90,10 @@ export function TmdbResolveLink({
       contentId: provisionalId,
       posterUrl,
     });
-    startTransition(() => {
-      router.push(href);
-    });
+    router.push(href);
   }
 
-  async function onClick(event: MouseEvent<HTMLAnchorElement>): Promise<void> {
+  function onClick(event: MouseEvent<HTMLAnchorElement>): void {
     if (
       event.defaultPrevented ||
       event.button !== 0 ||
@@ -122,26 +115,15 @@ export function TmdbResolveLink({
       return;
     }
 
-    const resolvedId = await Promise.race([
-      resolveCatalogContentId(kind, tmdbId),
-      new Promise<null>((resolve) => {
-        window.setTimeout(() => {
-          resolve(null);
-        }, TITLE_POSTER_MORPH_MS);
-      }),
-    ]);
-
-    if (generation !== clickGenerationRef.current) {
-      // Newer click won; in-flight resolve may still populate the cache.
-      return;
-    }
-
-    if (resolvedId != null) {
-      navigateWarm(link, resolvedId);
-      return;
-    }
-
+    // Morph + loading shell first; do not wait on resolve (that delayed the
+    // page swap until the poster had already landed).
     navigateCold(link);
+    void resolveCatalogContentId(kind, tmdbId).then((resolvedId) => {
+      if (generation !== clickGenerationRef.current || resolvedId == null) {
+        return;
+      }
+      rememberResolvedContentId(kind, tmdbId, resolvedId);
+    });
   }
 
   return (

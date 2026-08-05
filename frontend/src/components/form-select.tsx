@@ -17,7 +17,7 @@ export interface FormSelectOption<T extends string> {
 }
 
 /**
- * Custom listbox — `.overlay-surface` panel (account-menu gradient language).
+ * Custom listbox — `.overlay-surface` panel (purple/blue atmosphere language).
  */
 export function FormSelect<T extends string>({
   id,

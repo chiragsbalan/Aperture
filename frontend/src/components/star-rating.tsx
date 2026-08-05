@@ -79,7 +79,7 @@ export function ratingFromClientX(
   return Math.min(5, Math.max(0.5, slot / 2));
 }
 
-/** Read-only green filled stars (hidden when rating is null). */
+/** Read-only accent-coloured filled stars (hidden when rating is null). */
 export function StarRating({ rating }: { rating: number | null | undefined }) {
   const baseId = useId();
   if (rating == null) {

@@ -24,29 +24,69 @@
   --color-fg-muted: #a39e93;
   --color-secondary: var(--color-fg-muted);
 
-  /* Brand accent (primary CTA / links) */
-  --color-accent: #6aae6a;
-  --color-accent-soft: rgba(106, 174, 106, 0.16);
+  /* Brand accent — purple (primary CTA / links / tabs / focus) */
+  --color-accent: #9b7ad9;
+  --color-accent-soft: rgba(155, 122, 217, 0.18);
   --color-accent-contrast: #0c0b09;
   --color-primary: var(--color-accent);
   --color-primary-soft: var(--color-accent-soft);
   --color-primary-contrast: var(--color-accent-contrast);
 
   --color-border: rgba(243, 239, 230, 0.12);
-  --color-focus: #9fd49f;
+  --color-focus: #c4b0f0;
   --color-danger: #e07a8a;
-  --color-ok: #8fbf9f;
+  --color-ok: #8a9fd4;
 
   /* Library action semantics */
   --color-action-watchlist: #c9b07a;
   --color-action-favorites: #e07a8a;
   --color-action-lists: #6a9ec9;
-  --color-action-log: #6aae6a;
+  --color-action-log: var(--color-accent);
 
-  /* Atmosphere — cool/neutral wash only; green stays on UI accents */
-  --bg-glow-1: rgba(120, 132, 148, 0.12);
-  --bg-glow-2: rgba(80, 110, 140, 0.1);
-  --bg-vignette: rgba(0, 0, 0, 0.55);
+  /*
+   * Atmosphere — distinct purple + blue lobes via `.shell-atmosphere`
+   * (each wash uses both colours, not a blended mauve).
+   */
+  --bg-glow-purple: rgba(148, 108, 210, 0.3);
+  --bg-glow-blue: rgba(56, 128, 210, 0.26);
+  /* Soft charcoal sheet over the glow lobes — darkens without washing out hue */
+  --bg-glow-sheet: rgba(12, 11, 9, 0.55);
+  --bg-vignette: rgba(0, 0, 0, 0.56);
+  /*
+   * Overlay / popup chrome (``.overlay-surface``, header rule, open fields) —
+   * same purple + blue language as the page atmosphere.
+   */
+  --overlay-glow-purple: rgba(148, 108, 210, 0.18);
+  --overlay-glow-blue: rgba(56, 128, 210, 0.14);
+  --overlay-tint-purple: var(--color-accent);
+  --overlay-tint-soft: var(--color-accent-soft);
+  --overlay-header-glow-purple: rgba(155, 122, 217, 0.45);
+  --overlay-header-glow-blue: rgba(56, 128, 210, 0.38);
+  /* Shared frosted fill for ``.overlay-surface`` / ``.overlay-surface-field``. */
+  --overlay-surface-bg:
+    radial-gradient(
+      120% 90% at 0% 0%,
+      var(--overlay-glow-purple),
+      transparent 55%
+    ),
+    radial-gradient(
+      110% 80% at 100% 100%,
+      var(--overlay-glow-blue),
+      transparent 52%
+    ),
+    linear-gradient(
+      165deg,
+      rgba(22, 20, 17, 0.15) 0%,
+      rgba(22, 20, 17, 0.2) 34%,
+      rgba(22, 20, 17, 0.92) 100%
+    ),
+    rgba(22, 20, 17, 0.88);
+  /*
+   * Guest mosaic veil only — softer pair so the poster grid stays readable
+   * (see `.poster-mosaic-veil`).
+   */
+  --bg-glow-mosaic-purple: rgba(148, 108, 210, 0.1);
+  --bg-glow-mosaic-blue: rgba(56, 128, 210, 0.09);
 
   /* Typography — families (--font-* from next/font on <html>; fallbacks if unset) */
   --font-display: var(--font-fraunces, ui-serif), Georgia, serif;
@@ -200,26 +240,35 @@
   --color-fg-muted: #5c564c;
   --color-secondary: var(--color-fg-muted);
 
-  --color-accent: #3d7a45;
-  --color-accent-soft: rgba(61, 122, 69, 0.12);
+  --color-accent: #6b4fa3;
+  --color-accent-soft: rgba(107, 79, 163, 0.14);
   --color-accent-contrast: #f6f1e8;
   --color-primary: var(--color-accent);
   --color-primary-soft: var(--color-accent-soft);
   --color-primary-contrast: var(--color-accent-contrast);
 
   --color-border: rgba(26, 23, 18, 0.12);
-  --color-focus: #2f6f3e;
+  --color-focus: #5a3d96;
   --color-danger: #b42318;
-  --color-ok: #2f6f4e;
+  --color-ok: #4a6fa5;
 
   --color-action-watchlist: #9a7a3a;
   --color-action-favorites: #c45c6a;
   --color-action-lists: #3d6f94;
-  --color-action-log: #3d7a45;
+  --color-action-log: var(--color-accent);
 
-  --bg-glow-1: rgba(100, 112, 128, 0.1);
-  --bg-glow-2: rgba(90, 120, 150, 0.08);
-  --bg-vignette: rgba(26, 23, 18, 0.08);
+  --bg-glow-purple: rgba(130, 100, 190, 0.16);
+  --bg-glow-blue: rgba(60, 120, 190, 0.14);
+  --bg-glow-sheet: rgba(26, 23, 18, 0.36);
+  --bg-vignette: rgba(26, 23, 18, 0.12);
+  --overlay-glow-purple: rgba(107, 79, 163, 0.12);
+  --overlay-glow-blue: rgba(60, 120, 190, 0.1);
+  --overlay-tint-purple: var(--color-accent);
+  --overlay-tint-soft: var(--color-accent-soft);
+  --overlay-header-glow-purple: rgba(107, 79, 163, 0.35);
+  --overlay-header-glow-blue: rgba(60, 120, 190, 0.28);
+  --bg-glow-mosaic-purple: rgba(130, 100, 190, 0.08);
+  --bg-glow-mosaic-blue: rgba(60, 120, 190, 0.07);
 
   --elev-1: 0 1px 0 rgba(26, 23, 18, 0.06);
   --elev-poster: 0 24px 60px rgba(26, 23, 18, 0.18);

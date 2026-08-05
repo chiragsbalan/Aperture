@@ -99,6 +99,7 @@ function sampleUrlForBackdrop(backdropUrl: string): string {
  * Sets ``data-title-contrast`` to ``on-dark`` | ``on-light`` so globals.css can
  * override fg/muted tokens locally — independent of the app ``data-theme``.
  * Drift pauses under prefers-reduced-motion or shared mosaic pause preference.
+ * While the document is hidden, drift uses ``animation-play-state: paused``.
  */
 export function TitleAtmosphere({
   backdropUrl,
@@ -109,6 +110,7 @@ export function TitleAtmosphere({
 }) {
   const [contrast, setContrast] = useState<TitleContrast>('on-dark');
   const [driftPaused, setDriftPaused] = useState(false);
+  const [pageHidden, setPageHidden] = useState(false);
 
   useEffect(() => {
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -128,6 +130,18 @@ export function TitleAtmosphere({
     return () => {
       motion.removeEventListener('change', syncDriftPause);
       window.removeEventListener('storage', syncDriftPause);
+    };
+  }, []);
+
+  // Pause catalog drift while the tab is hidden (mosaic already does the same).
+  useEffect(() => {
+    const syncPageHidden = () => {
+      setPageHidden(document.hidden);
+    };
+    syncPageHidden();
+    document.addEventListener('visibilitychange', syncPageHidden);
+    return () => {
+      document.removeEventListener('visibilitychange', syncPageHidden);
     };
   }, []);
 
@@ -184,7 +198,12 @@ export function TitleAtmosphere({
           />
           <div className="catalog-backdrop-veil absolute inset-0" />
           {driftPaused ? null : (
-            <div className="catalog-backdrop-drift absolute -inset-[8%]" />
+            <div
+              className="catalog-backdrop-drift absolute -inset-[8%]"
+              style={{
+                animationPlayState: pageHidden ? 'paused' : 'running',
+              }}
+            />
           )}
         </div>
       ) : null}

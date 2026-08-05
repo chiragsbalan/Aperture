@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type MouseEvent, type ReactNode, startTransition } from 'react';
+import { type MouseEvent, type ReactNode } from 'react';
 
 import { SharedTitlePoster } from '@/components/shared-title-poster';
 import { armTitlePosterMorph } from '@/lib/title-poster-morph';
@@ -12,7 +12,10 @@ import { beginTitlePosterNavigation } from '@/lib/title-poster-nav';
  * Catalog UUID title link with shared poster morph.
  *
  * Starts a FLIP flight on click (works from any page, including Similar on
- * a title detail), then ``router.push`` inside ``startTransition``.
+ * a title detail), then ``router.push`` immediately so ``loading.tsx`` can
+ * paint under the clone. Do not wrap push in ``startTransition`` — that keeps
+ * the previous page visible until the RSC payload is ready (poster lands,
+ * then the screen swaps).
  */
 export function TitlePosterLink({
   href,
@@ -62,10 +65,7 @@ export function TitlePosterLink({
       contentId,
       posterUrl,
     });
-
-    startTransition(() => {
-      router.push(href);
-    });
+    router.push(href);
   }
 
   const poster = (
