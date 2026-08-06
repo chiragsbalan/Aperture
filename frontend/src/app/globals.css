@@ -650,7 +650,7 @@
   }
 
   /*
-   * Off-screen shelf cells stay cheap to keep in the DOM (paginated Load more
+   * Off-screen shelf cells stay cheap to keep in the DOM (infinite-scroll pages
    * can still grow to hundreds). Intrinsic size ≈ 2:3 poster + desktop meta.
    */
   .poster-grid > li {

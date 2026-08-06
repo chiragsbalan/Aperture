@@ -1,8 +1,9 @@
 'use client';
 
-import { type ReactNode, useId } from 'react';
+import { type ReactNode } from 'react';
 
 import { ListTitleWithVisibility } from '@/components/list-title-with-visibility';
+import { ShelfInfiniteScroll } from '@/components/shelf-infinite-scroll';
 import { TitleNavPoster } from '@/components/title-nav-poster';
 import type { ListVisibility } from '@/lib/library';
 import { POSTER_GRID_SIZES } from '@/lib/poster';
@@ -36,12 +37,12 @@ interface TitleShelfViewProps {
   onLoadMore?: () => void;
   /**
    * Override default ``TitleNavPoster`` cells (e.g. ``LibraryPosterCell`` in
-   * list edit mode). Load more still renders below when provided.
+   * list edit mode). Infinite scroll still runs below when provided.
    */
   renderGrid?: ReactNode;
   /** Extra content under the header (e.g. action error). */
   belowHeader?: ReactNode;
-  /** Extra content under the grid / Load more (e.g. guest login CTA). */
+  /** Extra content under the grid / infinite scroll (e.g. guest login CTA). */
   footer?: ReactNode;
 }
 
@@ -82,7 +83,6 @@ export function TitleShelfView({
   belowHeader,
   footer,
 }: TitleShelfViewProps) {
-  const loadMoreStatusId = useId();
   const resolvedTotal = total ?? items.length;
   const showEmpty =
     status === 'ready' && resolvedTotal === 0 && renderGrid == null;
@@ -90,13 +90,11 @@ export function TitleShelfView({
     status === 'ready' && renderGrid == null && items.length > 0;
   const showCustomGrid =
     status === 'ready' && renderGrid != null && items.length > 0;
-  const showLoadMore =
+  const showInfiniteScroll =
     status === 'ready' &&
     hasMore &&
     onLoadMore != null &&
     (items.length > 0 || resolvedTotal > 0);
-  const describeLoadMore =
-    showLoadMore && total != null && hasMore;
 
   return (
     <div className="layout-content motion-fade-rise text-left">
@@ -181,40 +179,21 @@ export function TitleShelfView({
       items.length === 0 &&
       resolvedTotal > 0 ? (
         <p className="mt-10 text-muted" role="status">
-          Load more to see the rest of this list.
+          Loading more of this list…
         </p>
       ) : null}
 
-      {showLoadMore ? (
-        <div className="mt-10">
-          {describeLoadMore ? (
-            <span
-              id={loadMoreStatusId}
-              className="sr-only"
-              role="status"
-              aria-live="polite"
-            >
-              Showing {items.length} of {resolvedTotal}
-            </span>
-          ) : null}
-          {loadingMore ? (
-            <span className="sr-only" role="status" aria-live="polite">
-              Loading more titles…
-            </span>
-          ) : null}
-          <button
-            type="button"
-            className="btn btn-lg"
-            disabled={loadingMore}
-            aria-busy={loadingMore || undefined}
-            aria-describedby={
-              describeLoadMore ? loadMoreStatusId : undefined
-            }
-            onClick={onLoadMore}
-          >
-            {loadingMore ? 'Loading…' : 'Load more'}
-          </button>
-        </div>
+      {showInfiniteScroll && onLoadMore != null ? (
+        <ShelfInfiniteScroll
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={onLoadMore}
+          statusText={
+            total != null
+              ? `Showing ${items.length} of ${resolvedTotal}`
+              : undefined
+          }
+        />
       ) : null}
 
       {footer}

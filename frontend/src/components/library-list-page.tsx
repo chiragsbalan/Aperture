@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ActionToast } from '@/components/action-toast';
 import { LibraryNav } from '@/components/library-nav';
 import { LibraryPosterCell } from '@/components/library-poster-cell';
+import { ShelfInfiniteScroll } from '@/components/shelf-infinite-scroll';
 import {
   CheckOutlineIcon,
   PencilOutlineIcon,
@@ -189,59 +190,62 @@ export function LibraryListPage({
     }
   }
 
-  async function handleLoadMore() {
+  const handleLoadMore = useCallback(() => {
     if (state.status !== 'ready' || loadingMore) {
       return;
     }
     if (state.items.length >= state.total) {
       return;
     }
+    const ready = state;
+    const useWindow = ready.items.length < TITLE_SHELF_SYSTEM_MAX_FETCH;
     setLoadingMore(true);
     setActionError(null);
-    // Below system max: expand page=1 window (safe after removes).
-    // At/above max: append the next page and dedupe.
-    const useWindow = state.items.length < TITLE_SHELF_SYSTEM_MAX_FETCH;
-    const result = useWindow
-      ? await fetchSystemList(
-          kind,
-          1,
-          nextShelfWindowLimit(
-            state.items.length,
-            TITLE_SHELF_SYSTEM_MAX_FETCH,
-          ),
-        )
-      : await fetchSystemList(
-          kind,
-          nextShelfPage(state.items.length),
-          TITLE_SHELF_PAGE_SIZE,
-        );
-    if (!mountedRef.current) {
-      return;
-    }
-    setLoadingMore(false);
-    if (!result.ok) {
-      setActionError(result.error);
-      return;
-    }
-    setState((current) => {
-      if (current.status !== 'ready') {
-        return current;
+    void (async () => {
+      // Below system max: expand page=1 window (safe after removes).
+      // At/above max: append the next page and dedupe.
+      const result = useWindow
+        ? await fetchSystemList(
+            kind,
+            1,
+            nextShelfWindowLimit(
+              ready.items.length,
+              TITLE_SHELF_SYSTEM_MAX_FETCH,
+            ),
+          )
+        : await fetchSystemList(
+            kind,
+            nextShelfPage(ready.items.length),
+            TITLE_SHELF_PAGE_SIZE,
+          );
+      if (!mountedRef.current) {
+        return;
       }
-      const items = useWindow
-        ? dedupeLibraryListItems(result.data.items)
-        : dedupeLibraryListItems([
-            ...current.items,
-            ...result.data.items,
-          ]);
-      return {
-        status: 'ready',
-        items,
-        total: result.data.total,
-        page: result.data.page,
-        limit: result.data.limit,
-      };
-    });
-  }
+      setLoadingMore(false);
+      if (!result.ok) {
+        setActionError(result.error);
+        return;
+      }
+      setState((current) => {
+        if (current.status !== 'ready') {
+          return current;
+        }
+        const items = useWindow
+          ? dedupeLibraryListItems(result.data.items)
+          : dedupeLibraryListItems([
+              ...current.items,
+              ...result.data.items,
+            ]);
+        return {
+          status: 'ready',
+          items,
+          total: result.data.total,
+          page: result.data.page,
+          limit: result.data.limit,
+        };
+      });
+    })();
+  }, [kind, loadingMore, state]);
 
   return (
     <div className="layout-content motion-fade-rise text-left">
@@ -299,7 +303,7 @@ export function LibraryListPage({
 
       {state.status === 'ready' && state.total > 0 && state.items.length === 0 ? (
         <p className="mt-10 text-muted" role="status">
-          Load more to see the rest of this list.
+          Loading more of this list…
         </p>
       ) : null}
 
@@ -321,17 +325,12 @@ export function LibraryListPage({
       ) : null}
 
       {state.status === 'ready' && state.items.length < state.total ? (
-        <button
-          type="button"
-          className="btn btn-lg mt-8"
-          disabled={loadingMore}
-          aria-busy={loadingMore}
-          onClick={() => {
-            void handleLoadMore();
-          }}
-        >
-          {loadingMore ? 'Loading…' : 'Load more'}
-        </button>
+        <ShelfInfiniteScroll
+          hasMore
+          loadingMore={loadingMore}
+          onLoadMore={handleLoadMore}
+          statusText={`Showing ${state.items.length} of ${state.total}`}
+        />
       ) : null}
 
       {undo != null ? (

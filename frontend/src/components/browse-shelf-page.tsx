@@ -20,7 +20,7 @@ export function BrowseShelfPage({
   kind: 'movie' | 'tv';
   /**
    * Top movies / Top TV only: guests get the public window + login CTA.
-   * Signed-in shelves paginate client-side with Load more (up to 500).
+   * Signed-in shelves infinite-scroll client-side (up to 500).
    */
   guestLimited?: boolean;
 }) {

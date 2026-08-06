@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { TitleShelfView } from '@/components/title-shelf-view';
 import type { TopMovie } from '@/lib/catalog';
@@ -12,7 +12,7 @@ import {
 
 /**
  * Top movies / Top TV browse shelf body: guests see the public window + login
- * CTA; signed-in users get shelf Load more over a shuffled pool (max 500).
+ * CTA; signed-in users infinite-scroll a shuffled pool (max 500).
  */
 export function BrowseShelfContent({
   title,
@@ -27,7 +27,7 @@ export function BrowseShelfContent({
   emptyMessage: string;
   items: TopMovie[];
   kind: 'movie' | 'tv';
-  /** When true, show the public window only + login CTA (no Load more). */
+  /** When true, show the public window only + login CTA (no infinite scroll). */
   guestLimited: boolean;
 }) {
   const allItems = shelfItemsFromTopMovies(items, kind);
@@ -36,6 +36,7 @@ export function BrowseShelfContent({
       ? allItems.length
       : Math.min(TITLE_SHELF_PAGE_SIZE, allItems.length),
   );
+  const [loadingMore, setLoadingMore] = useState(false);
   const prevGuestLimitedRef = useRef(guestLimited);
 
   useEffect(() => {
@@ -48,6 +49,7 @@ export function BrowseShelfContent({
           ? allItems.length
           : Math.min(TITLE_SHELF_PAGE_SIZE, allItems.length),
       );
+      setLoadingMore(false);
       return;
     }
 
@@ -60,6 +62,28 @@ export function BrowseShelfContent({
       return current;
     });
   }, [guestLimited, allItems.length]);
+
+  useEffect(() => {
+    if (!loadingMore) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setLoadingMore(false);
+    }, 180);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [visibleCount, loadingMore]);
+
+  const handleLoadMore = useCallback(() => {
+    if (guestLimited || loadingMore || visibleCount >= allItems.length) {
+      return;
+    }
+    setLoadingMore(true);
+    setVisibleCount((current) =>
+      Math.min(current + TITLE_SHELF_PAGE_SIZE, allItems.length),
+    );
+  }, [allItems.length, guestLimited, loadingMore, visibleCount]);
 
   const visibleItems = guestLimited
     ? allItems
@@ -75,15 +99,8 @@ export function BrowseShelfContent({
       items={visibleItems}
       total={allItems.length}
       hasMore={hasMore}
-      onLoadMore={
-        hasMore
-          ? () => {
-              setVisibleCount((current) =>
-                Math.min(current + TITLE_SHELF_PAGE_SIZE, allItems.length),
-              );
-            }
-          : undefined
-      }
+      loadingMore={loadingMore}
+      onLoadMore={hasMore ? handleLoadMore : undefined}
       footer={
         guestLimited && allItems.length > 0 ? (
           <p className="mt-10 text-muted">
