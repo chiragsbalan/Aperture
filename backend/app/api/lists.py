@@ -12,6 +12,7 @@ from app.core.cache import get_cache
 from app.core.deps import DbSessionDep, SettingsDep
 from app.core.trusted_client import resolve_client_ip
 from app.library import service as library_service
+from app.library.rate_limit import enforce_watch_entries_contains_rate_limit
 from app.lists import service as lists_service
 from app.lists.rate_limit import enforce_lists_write_rate_limit
 from app.lists.schemas import (
@@ -453,14 +454,23 @@ async def custom_lists_membership(
 async def title_library_status(
     identity: CurrentIdentityDep,
     session: DbSessionDep,
+    settings: SettingsDep,
+    response: Response,
     type: Annotated[str, Query(min_length=1, max_length=16)],
     id: Annotated[uuid.UUID, Query()],
 ) -> TitleLibraryStatusResponse:
     """Combined watchlist / favorites / diary / custom-list status for one title.
 
     Orchestrated in the API layer so ``lists`` and ``library`` domain modules
-    stay independent (import-linter).
+    stay independent (import-linter). Shares the diary ``contains`` rate-limit
+    bucket so combining calls does not bypass abuse controls.
     """
+    response.headers['Cache-Control'] = 'private, no-store'
+    await enforce_watch_entries_contains_rate_limit(
+        get_cache(),
+        settings=settings,
+        identity_id=identity.id,
+    )
     try:
         watch_membership = await lists_service.system_list_contains(
             session,

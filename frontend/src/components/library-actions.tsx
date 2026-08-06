@@ -227,7 +227,7 @@ export function LibraryActions({
   contentType: string;
   contentId: string;
 }) {
-  const { status: sessionStatus } = useAuth();
+  const { status: sessionStatus, clearAuth } = useAuth();
   const libraryType = toLibraryContentType(contentType);
   const formId = useId();
   const [authState, setAuthState] = useState<AuthState>('loading');
@@ -292,6 +292,7 @@ export function LibraryActions({
 
         if (!result.ok) {
           if (result.status === 401) {
+            clearAuth();
             setListMembership({});
             setListItemIds({});
             setAuthState('signed_out');

@@ -111,9 +111,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       void refreshAuth();
     }
+    function onFocus() {
+      void refreshAuth();
+    }
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onFocus);
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onFocus);
     };
   }, [refreshAuth]);
 

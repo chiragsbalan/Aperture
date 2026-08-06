@@ -1,5 +1,6 @@
 'use client';
 
+import { useAuth } from '@/components/auth-provider';
 import { oauthErrorMessage } from '@/lib/google-oauth-errors';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -177,6 +178,7 @@ export function AuthForm({
   autoFocusFirstField = false,
 }: AuthFormProps) {
   const router = useRouter();
+  const { refreshAuth } = useAuth();
   const emailId = useId();
   const usernameId = useId();
   const identifierId = useId();
@@ -278,6 +280,7 @@ export function AuthForm({
         }
         return;
       }
+      await refreshAuth();
       router.push('/');
       router.refresh();
     } catch {

@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import random
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, HTTPException, Path, Query, Request, Response, status
 from pydantic import ValidationError
 
 from app.core.cache import CacheBackend, get_cache
@@ -675,7 +676,7 @@ async def get_tv(
 )
 async def get_tv_season(
     content_id: uuid.UUID,
-    season_number: int,
+    season_number: Annotated[int, Path(ge=0, le=200)],
     session: DbSessionDep,
     response: Response,
 ) -> SeasonDetail:
