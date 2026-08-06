@@ -15,10 +15,11 @@ export function ProfileNav({ username }: ProfileNavProps) {
   const pathname = usePathname();
   const listId = useId();
   const tablistRef = useRef<HTMLElement | null>(null);
+  const tablistHostRef = useRef<HTMLDivElement | null>(null);
   const tabRefs = useRef<Array<HTMLAnchorElement | null>>([]);
   const [indicator, setIndicator] = useState({ left: 0, width: 0 });
   const [indicatorReady, setIndicatorReady] = useState(false);
-  useScrollFadeX(tablistRef, PROFILE_TABS.length);
+  useScrollFadeX(tablistRef, PROFILE_TABS.length, tablistHostRef);
 
   const base = `/u/${encodeURIComponent(username)}`;
   const activeIndex = PROFILE_TABS.findIndex((tab) => {
@@ -99,42 +100,44 @@ export function ProfileNav({ username }: ProfileNavProps) {
   }, [activeIndex]);
 
   return (
-    <nav
-      ref={tablistRef}
-      aria-labelledby={listId}
-      className="scroll-fade-x relative mt-8 flex w-full flex-nowrap items-end gap-1 overflow-x-auto border-b border-[var(--color-border)] pb-px [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      <span id={listId} className="sr-only">
-        Profile sections
-      </span>
-      {PROFILE_TABS.map((tab, index) => {
-        const href = tab.slug ? `${base}/${tab.slug}` : base;
-        const active = index === activeIndex;
-        return (
-          <Link
-            key={tab.label}
-            href={href}
-            ref={(element) => {
-              tabRefs.current[index] = element;
-            }}
-            className={`shrink-0 whitespace-nowrap px-3 pb-2 pt-2 text-sm transition-colors duration-[var(--duration-med)] ${
-              active ? 'text-accent' : 'text-muted hover:text-foreground'
-            }`}
-            aria-current={active ? 'page' : undefined}
-          >
-            {tab.label}
-          </Link>
-        );
-      })}
-      <span
-        aria-hidden
-        className="title-tab-indicator pointer-events-none absolute bottom-0 h-0.5 bg-accent"
-        style={{
-          width: indicator.width,
-          transform: `translateX(${indicator.left}px)`,
-          opacity: indicatorReady ? 1 : 0,
-        }}
-      />
-    </nav>
+    <div ref={tablistHostRef} className="scroll-fade-x-host mt-8">
+      <nav
+        ref={tablistRef}
+        aria-labelledby={listId}
+        className="scroll-fade-x relative flex w-full flex-nowrap items-end gap-1 border-b border-[var(--color-border)] pb-px"
+      >
+        <span id={listId} className="sr-only">
+          Profile sections
+        </span>
+        {PROFILE_TABS.map((tab, index) => {
+          const href = tab.slug ? `${base}/${tab.slug}` : base;
+          const active = index === activeIndex;
+          return (
+            <Link
+              key={tab.label}
+              href={href}
+              ref={(element) => {
+                tabRefs.current[index] = element;
+              }}
+              className={`shrink-0 whitespace-nowrap px-3 pb-2 pt-2 text-sm transition-colors duration-[var(--duration-med)] ${
+                active ? 'text-accent' : 'text-muted hover:text-foreground'
+              }`}
+              aria-current={active ? 'page' : undefined}
+            >
+              {tab.label}
+            </Link>
+          );
+        })}
+        <span
+          aria-hidden
+          className="title-tab-indicator pointer-events-none absolute bottom-0 h-0.5 bg-accent"
+          style={{
+            width: indicator.width,
+            transform: `translateX(${indicator.left}px)`,
+            opacity: indicatorReady ? 1 : 0,
+          }}
+        />
+      </nav>
+    </div>
   );
 }

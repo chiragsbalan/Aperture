@@ -27,6 +27,9 @@ interface ProfilePeopleSheetProps {
   username: string;
   collection: PeopleCollection;
   open: boolean;
+  /** Begin close (set open=false); keeps mount for leave animation. */
+  onDismiss: () => void;
+  /** After leave animation — parent may clear sheet state. */
   onClose: () => void;
 }
 
@@ -38,6 +41,7 @@ export function ProfilePeopleSheet({
   username,
   collection,
   open,
+  onDismiss,
   onClose,
 }: ProfilePeopleSheetProps) {
   const meta = PROFILE_COLLECTIONS[collection];
@@ -98,7 +102,12 @@ export function ProfilePeopleSheet({
   const emptyMessage = meta.emptyMessage(displayName);
 
   return (
-    <CollectionSheet open={open} title={meta.title} onClose={onClose}>
+    <CollectionSheet
+      open={open}
+      title={meta.title}
+      onDismiss={onDismiss}
+      onClose={onClose}
+    >
       {state.status === 'loading' ? (
         <p className="text-muted" role="status">
           Loading…

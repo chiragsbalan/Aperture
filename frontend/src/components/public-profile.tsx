@@ -314,6 +314,9 @@ export function PublicProfileView({
         username={username}
         collection={peopleSheetCollection}
         open={peopleSheet != null}
+        onDismiss={() => {
+          setPeopleSheet(null);
+        }}
         onClose={() => {
           setPeopleSheet(null);
         }}

@@ -1,23 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
-import { FormSelect } from '@/components/form-select';
+import { CreateCustomListSheet } from '@/components/create-custom-list-sheet';
 import { LibraryNav } from '@/components/library-nav';
 import { ListTitleWithVisibility } from '@/components/list-title-with-visibility';
+import { PlusOutlineIcon } from '@/components/shelf-chrome-icons';
 import {
-  createCustomList,
   fetchMyCustomLists,
   type CustomListSummary,
-  type ListVisibility,
 } from '@/lib/library';
 import { listDetailHref } from '@/lib/list-nav';
-
-const VISIBILITY_OPTIONS = [
-  { value: 'public' as const, label: 'Anyone' },
-  { value: 'private' as const, label: 'Private' },
-];
 
 type LoadState =
   | { status: 'loading' }
@@ -26,13 +21,10 @@ type LoadState =
   | { status: 'ready'; lists: CustomListSummary[] };
 
 export function CustomListsPage() {
-  const formId = useId();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [state, setState] = useState<LoadState>({ status: 'loading' });
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [visibility, setVisibility] = useState<ListVisibility>('public');
-  const [creating, setCreating] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,47 +51,38 @@ export function CustomListsPage() {
     };
   }, []);
 
-  async function handleCreate(event: FormEvent) {
-    event.preventDefault();
-    if (creating || !title.trim()) {
+  useEffect(() => {
+    if (searchParams.get('create') !== '1') {
       return;
     }
-    setCreating(true);
-    setActionError(null);
-    const result = await createCustomList({
-      title: title.trim(),
-      description: description.trim() || null,
-      visibility,
-    });
-    setCreating(false);
-    if (!result.ok) {
-      setActionError(result.error);
-      return;
-    }
-    setTitle('');
-    setDescription('');
-    setVisibility('private');
-    setState((current) => {
-      if (current.status !== 'ready') {
-        return current;
-      }
-      const summary: CustomListSummary = {
-        id: result.list.id,
-        title: result.list.title,
-        description: result.list.description,
-        visibility: result.list.visibility,
-        item_count: result.list.item_count,
-        created_at: result.list.created_at,
-        updated_at: result.list.updated_at,
-      };
-      return { status: 'ready', lists: [summary, ...current.lists] };
-    });
+    setCreateOpen(true);
+    router.replace('/library/lists', { scroll: false });
+  }, [searchParams, router]);
+
+  function openCreateSheet() {
+    setCreateOpen(true);
+  }
+
+  function dismissCreateSheet() {
+    setCreateOpen(false);
   }
 
   return (
     <div className="layout-content motion-fade-rise text-left">
-      <h1 className="type-page-lg text-foreground">Lists</h1>
-      <p className="mt-2 text-muted">Curate named collections of titles.</p>
+      <div className="flex items-start justify-between gap-4">
+        <h1 className="type-page-lg text-foreground">Lists</h1>
+        {state.status === 'ready' ? (
+          <button
+            type="button"
+            aria-label="Create a list"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-muted transition hover:bg-[var(--color-accent-soft)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+            onClick={openCreateSheet}
+          >
+            <PlusOutlineIcon />
+          </button>
+        ) : null}
+      </div>
+      <p className="mt-2 text-muted">Your personal shelves.</p>
       <LibraryNav />
 
       {state.status === 'loading' ? (
@@ -124,124 +107,52 @@ export function CustomListsPage() {
       ) : null}
 
       {state.status === 'ready' ? (
-        <>
-          <form
-            onSubmit={(event) => {
-              void handleCreate(event);
-            }}
-            className="mt-10 space-y-4 border-t border-[var(--color-border)] pt-8"
-            aria-labelledby={`${formId}-heading`}
-          >
-            <h2
-              id={`${formId}-heading`}
-              className="type-card-title text-foreground"
-            >
-              Create a list
-            </h2>
-            <div>
-              <label
-                htmlFor={`${formId}-title`}
-                className="block text-sm text-muted"
-              >
-                Title
-              </label>
-              <input
-                id={`${formId}-title`}
-                name="title"
-                required
-                maxLength={100}
-                value={title}
-                onChange={(event) => {
-                  setTitle(event.target.value);
-                }}
-                className="mt-1 w-full border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor={`${formId}-description`}
-                className="block text-sm text-muted"
-              >
-                Description (optional)
-              </label>
-              <textarea
-                id={`${formId}-description`}
-                name="description"
-                maxLength={2000}
-                rows={3}
-                value={description}
-                onChange={(event) => {
-                  setDescription(event.target.value);
-                }}
-                className="mt-1 w-full border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-              />
-            </div>
-            <div>
-              <span
-                id={`${formId}-visibility-label`}
-                className="block text-sm text-muted"
-              >
-                Visibility
-              </span>
-              <FormSelect
-                id={`${formId}-visibility`}
-                name="visibility"
-                aria-labelledby={`${formId}-visibility-label`}
-                value={visibility}
-                options={VISIBILITY_OPTIONS}
-                onChange={setVisibility}
-                className="mt-1"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={creating || !title.trim()}
-              aria-busy={creating}
-              className="btn btn-primary"
-            >
-              {creating ? 'Creating…' : 'Create list'}
-            </button>
-          </form>
-
-          {actionError ? (
-            <p className="mt-4 text-[var(--color-danger)]" role="alert">
-              {actionError}
-            </p>
-          ) : null}
-
-          {state.lists.length === 0 ? (
-            <p className="mt-10 text-muted">
-              No custom lists yet. Create one above.
-            </p>
-          ) : (
-            <ul className="mt-10 space-y-4">
-              {state.lists.map((list) => (
-                <li key={list.id}>
-                  <Link
-                    href={listDetailHref(list.id, '/library/lists')}
-                    className="block border-b border-[var(--color-border)] pb-4 transition hover:border-foreground"
-                  >
-                    <ListTitleWithVisibility
-                      className="font-medium text-foreground"
-                      title={list.title}
-                      visibility={list.visibility}
-                    />
-                    {list.description ? (
-                      <span className="mt-1 block text-sm text-muted">
-                        {list.description}
-                      </span>
-                    ) : null}
+        state.lists.length === 0 ? (
+          <p className="mt-10 text-muted">
+            No lists yet. Use Create a list above.
+          </p>
+        ) : (
+          <ul className="mt-10 space-y-4">
+            {state.lists.map((list) => (
+              <li key={list.id}>
+                <Link
+                  href={listDetailHref(list.id, '/library/lists')}
+                  className="block border-b border-[var(--color-border)] pb-4 transition hover:border-foreground"
+                >
+                  <ListTitleWithVisibility
+                    className="font-medium text-foreground"
+                    title={list.title}
+                    visibility={list.visibility}
+                  />
+                  {list.description ? (
                     <span className="mt-1 block text-sm text-muted">
-                      {list.item_count}{' '}
-                      {list.item_count === 1 ? 'title' : 'titles'}
+                      {list.description}
                     </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
+                  ) : null}
+                  <span className="mt-1 block text-sm text-muted">
+                    {list.item_count}{' '}
+                    {list.item_count === 1 ? 'title' : 'titles'}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )
       ) : null}
+
+      <CreateCustomListSheet
+        open={createOpen}
+        onDismiss={dismissCreateSheet}
+        onClose={dismissCreateSheet}
+        onCreated={(list) => {
+          setState((current) => {
+            if (current.status !== 'ready') {
+              return current;
+            }
+            return { status: 'ready', lists: [list, ...current.lists] };
+          });
+        }}
+      />
     </div>
   );
 }

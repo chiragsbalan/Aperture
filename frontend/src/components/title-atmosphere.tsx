@@ -181,12 +181,15 @@ export function TitleAtmosphere({
       data-title-contrast={contrast}
       // Re-bind ``color`` to the local token so inheritance does not keep the
       // app-theme computed color from ``body`` (light fg stays black otherwise).
-      className="relative min-h-dvh text-foreground"
+      // ``svh`` (not ``dvh``): mobile URL-bar show/hide must not resize the page.
+      className="relative min-h-svh text-foreground"
     >
       {backdropUrl ? (
         <div
           aria-hidden
-          className="pointer-events-none fixed inset-0 z-0 h-dvh w-screen overflow-hidden"
+          // Pin top + ``h-svh`` only — avoid ``inset-0``/``dvh``, which resize
+          // when mobile browser chrome toggles on scroll (same as guest mosaic).
+          className="pointer-events-none fixed top-0 left-0 z-0 h-svh w-screen overflow-hidden"
         >
           <Image
             src={backdropUrl}

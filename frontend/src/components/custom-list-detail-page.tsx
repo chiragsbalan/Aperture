@@ -54,6 +54,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [sheet, setSheet] = useState<ListSheet | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editVisibility, setEditVisibility] =
@@ -233,7 +234,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
       return;
     }
     setState({ ...state, list: result.list });
-    setSheet(null);
+    setSheetOpen(false);
   }
 
   async function handleDelete() {
@@ -248,7 +249,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
       setActionError(result.error);
       return;
     }
-    setSheet(null);
+    setSheetOpen(false);
     if (isSafeListReturnPath(returnPath)) {
       router.push(returnPath);
       return;
@@ -318,6 +319,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
                         setEditDescription(state.list.description ?? '');
                         setEditVisibility(state.list.visibility);
                         setSheet('edit');
+                        setSheetOpen(true);
                       }}
                     >
                       <SettingsOutlineIcon />
@@ -372,9 +374,13 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
           ) : null}
 
           <CollectionSheet
-            open={sheet != null}
+            open={sheetOpen}
             title={sheet === 'delete' ? 'Delete this list?' : 'List settings'}
+            onDismiss={() => {
+              setSheetOpen(false);
+            }}
             onClose={() => {
+              setSheetOpen(false);
               setSheet(null);
             }}
           >
@@ -405,7 +411,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
                   </button>
                 </div>
               </div>
-            ) : (
+            ) : sheet === 'edit' ? (
               <form
                 onSubmit={(event) => {
                   void handleSaveEdit(event);
@@ -476,7 +482,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
                     type="button"
                     className="btn"
                     onClick={() => {
-                      setSheet(null);
+                      setSheetOpen(false);
                     }}
                   >
                     Cancel
@@ -494,7 +500,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
                   </button>
                 </div>
               </form>
-            )}
+            ) : null}
           </CollectionSheet>
         </>
       ) : null}

@@ -170,6 +170,7 @@ export function TitleSeasons({
 }) {
   const panelId = useId();
   const tablistRef = useRef<HTMLDivElement | null>(null);
+  const tablistHostRef = useRef<HTMLDivElement | null>(null);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const skipPanelAnimRef = useRef(true);
@@ -281,7 +282,7 @@ export function TitleSeasons({
     };
   }, []);
 
-  useScrollFadeX(tablistRef, seasons.length);
+  useScrollFadeX(tablistRef, seasons.length, tablistHostRef);
 
   useLayoutEffect(() => {
     const list = tablistRef.current;
@@ -306,18 +307,14 @@ export function TitleSeasons({
 
     const tab = tabRefs.current[activeIndex];
     if (tab) {
-      const tabLeft = tab.offsetLeft;
-      const tabRight = tabLeft + tab.offsetWidth;
-      const viewLeft = list.scrollLeft;
-      const viewRight = viewLeft + list.clientWidth;
-      const pad = 24;
-      if (tabLeft < viewLeft + pad) {
-        list.scrollTo({ left: Math.max(0, tabLeft - pad), behavior: 'smooth' });
-      } else if (tabRight > viewRight - pad) {
-        list.scrollTo({
-          left: tabRight - list.clientWidth + pad,
-          behavior: 'smooth',
-        });
+      // Center the selected season in the tablist (or as far as scroll
+      // bounds allow when near either end).
+      const tabCenter = tab.offsetLeft + tab.offsetWidth / 2;
+      const targetLeft = tabCenter - list.clientWidth / 2;
+      const maxScroll = Math.max(0, list.scrollWidth - list.clientWidth);
+      const nextLeft = Math.min(Math.max(0, targetLeft), maxScroll);
+      if (Math.abs(nextLeft - list.scrollLeft) > 1) {
+        list.scrollTo({left: nextLeft, behavior: 'smooth'});
       }
     }
 
@@ -461,55 +458,61 @@ export function TitleSeasons({
 
   return (
     <section className="mt-8 w-full text-left sm:mt-10" aria-label="Seasons">
-      <div
-        ref={tablistRef}
-        role="tablist"
-        aria-label="Seasons"
-        aria-orientation="horizontal"
-        className="scroll-fade-x relative flex w-full flex-nowrap items-end gap-4 border-b border-[var(--color-border)] pb-px sm:gap-5"
-      >
-        {seasons.map((season, index) => {
-          const selected = season.id === active.id;
-          const label = seasonTabLabel(season);
-          const count =
-            season.episode_count ??
-            (season.episodes.length > 0 ? season.episodes.length : null);
-          return (
-            <button
-              key={season.id}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-label={count != null ? `${label}, ${count} episodes` : label}
-              tabIndex={selected ? 0 : -1}
-              id={`season-tab-${season.id}`}
-              aria-controls={panelId}
-              ref={(element) => {
-                tabRefs.current[index] = element;
-              }}
-              onClick={() => {
-                setActiveId(season.id);
-              }}
-              onKeyDown={(event) => {
-                onTabKeyDown(event, index);
-              }}
-              className={`shrink-0 whitespace-nowrap pb-1.5 text-xs font-semibold tracking-[0.03em] transition-colors duration-[var(--duration-med)] sm:pb-2 sm:text-sm sm:tracking-[0.08em] ${
-                selected ? 'text-accent' : 'text-muted hover:text-foreground'
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-        <span
-          aria-hidden
-          className="title-tab-indicator pointer-events-none absolute bottom-0 h-0.5 bg-accent"
-          style={{
-            width: indicator.width,
-            transform: `translateX(${indicator.left}px)`,
-            opacity: indicatorReady ? 1 : 0,
-          }}
-        />
+      <div ref={tablistHostRef} className="scroll-fade-x-host">
+        <div
+          ref={tablistRef}
+          role="tablist"
+          aria-label="Seasons"
+          aria-orientation="horizontal"
+          className="scroll-fade-x relative flex w-full flex-nowrap items-end gap-4 border-b border-[var(--color-border)] pb-px sm:gap-5"
+        >
+          {seasons.map((season, index) => {
+            const selected = season.id === active.id;
+            const label = seasonTabLabel(season);
+            const count =
+              season.episode_count ??
+              (season.episodes.length > 0 ? season.episodes.length : null);
+            return (
+              <button
+                key={season.id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-label={
+                  count != null ? `${label}, ${count} episodes` : label
+                }
+                tabIndex={selected ? 0 : -1}
+                id={`season-tab-${season.id}`}
+                aria-controls={panelId}
+                ref={(element) => {
+                  tabRefs.current[index] = element;
+                }}
+                onClick={() => {
+                  setActiveId(season.id);
+                }}
+                onKeyDown={(event) => {
+                  onTabKeyDown(event, index);
+                }}
+                className={`shrink-0 whitespace-nowrap pb-1.5 text-xs font-semibold tracking-[0.03em] transition-colors duration-[var(--duration-med)] sm:pb-2 sm:text-sm sm:tracking-[0.08em] ${
+                  selected
+                    ? 'text-accent'
+                    : 'text-muted hover:text-foreground'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+          <span
+            aria-hidden
+            className="title-tab-indicator pointer-events-none absolute bottom-0 h-0.5 bg-accent"
+            style={{
+              width: indicator.width,
+              transform: `translateX(${indicator.left}px)`,
+              opacity: indicatorReady ? 1 : 0,
+            }}
+          />
+        </div>
       </div>
 
       <div

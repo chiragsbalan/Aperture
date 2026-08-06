@@ -72,8 +72,13 @@ export function DiaryPage() {
     setActionError(null);
   }
 
+  function dismissSheet() {
+    setSheetOpen(false);
+  }
+
   function closeSheet() {
     setSheetOpen(false);
+    setSelected(null);
   }
 
   function handleUpdated(entry: WatchEntry) {
@@ -138,7 +143,7 @@ export function DiaryPage() {
   return (
     <div className="layout-content motion-fade-rise text-left">
       <h1 className="type-page-lg text-foreground">Diary</h1>
-      <p className="mt-2 text-muted">Watches you have logged over time.</p>
+      <p className="mt-2 text-muted">Your logged watches.</p>
       <LibraryNav />
 
       {state.status === 'loading' ? (
@@ -170,7 +175,7 @@ export function DiaryPage() {
 
       {state.status === 'ready' && state.items.length === 0 ? (
         <p className="mt-10 text-muted">
-          No watches logged. Use Log watch on any movie or TV page.
+          Nothing logged yet. Use Log on any movie or TV page.
         </p>
       ) : null}
 
@@ -221,6 +226,7 @@ export function DiaryPage() {
       <DiaryEntrySheet
         entry={selected}
         open={sheetOpen}
+        onDismiss={dismissSheet}
         onClose={closeSheet}
         onUpdated={handleUpdated}
         onDeleted={handleDeleted}

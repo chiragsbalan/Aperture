@@ -195,11 +195,7 @@
    * Soft lift on hover; press on active.
    */
   .btn-google {
-    border-color: color-mix(
-      in srgb,
-      var(--color-border) 55%,
-      var(--color-accent) 45%
-    );
+    border-color: transparent;
     border-radius: var(--radius-md);
     background: linear-gradient(
       165deg,
@@ -219,7 +215,7 @@
   }
 
   .btn-google:hover:not(:disabled):not([aria-disabled='true']) {
-    border-color: var(--color-accent);
+    border-color: transparent;
     background: linear-gradient(
       165deg,
       color-mix(in srgb, var(--color-bg-elevated) 65%, var(--color-fg) 35%) 0%,
@@ -228,13 +224,12 @@
     );
     box-shadow:
       inset 0 1px 0 color-mix(in srgb, var(--color-fg) 12%, transparent),
-      0 10px 28px color-mix(in srgb, var(--color-bg) 55%, transparent),
-      0 0 0 1px color-mix(in srgb, var(--color-accent) 35%, transparent);
+      0 10px 28px color-mix(in srgb, var(--color-bg) 55%, transparent);
     transform: translateY(-2px);
   }
 
   .btn-google:active:not(:disabled):not([aria-disabled='true']) {
-    border-color: var(--color-accent);
+    border-color: transparent;
     box-shadow:
       inset 0 1px 0 color-mix(in srgb, var(--color-fg) 6%, transparent),
       0 2px 8px color-mix(in srgb, var(--color-bg) 45%, transparent);
@@ -1121,7 +1116,7 @@
     --color-action-watchlist: #c9b07a;
     --color-action-favorites: #e07a8a;
     --color-action-lists: #6a9ec9;
-    --color-action-log: #9b7ad9;
+    --color-action-log: #6fbf73;
   }
 
   [data-title-contrast='on-dark'] .catalog-backdrop-veil {
@@ -1152,7 +1147,7 @@
     --color-action-watchlist: #9a7a3a;
     --color-action-favorites: #c45c6a;
     --color-action-lists: #3d6f94;
-    --color-action-log: #6b4fa3;
+    --color-action-log: #2f8f45;
   }
 
   [data-title-contrast='on-light'] .catalog-backdrop-veil {
@@ -1220,16 +1215,13 @@
   /*
    * Overflow scrollers — no visible scrollbar; edge fades when more content
    * exists that way. Drive `data-fade-start` / `data-fade-end` with
-   * `useScrollFadeX` / `useScrollFadeY` from `lib/scroll-fade.ts`.
+   * `useScrollFadeX` / `useScrollFadeY` from `lib/scroll-fade.ts`, mirrored
+   * onto `.scroll-fade-*-host` for charcoal overlay washes.
    */
   .scroll-fade-x,
   .scroll-fade-y {
     scrollbar-width: none;
     -ms-overflow-style: none;
-    -webkit-mask-size: 100% 100%;
-    mask-size: 100% 100%;
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
   }
 
   .scroll-fade-x::-webkit-scrollbar,
@@ -1245,21 +1237,51 @@
   .scroll-fade-y {
     overflow-y: auto;
     overscroll-behavior-y: contain;
-    /* Vertical sheets use overlay fades (below) — mask is unreliable on
-       overflow scrollers in Chromium and reads as “no fade”. */
-    -webkit-mask-image: none;
-    mask-image: none;
   }
 
   /*
-   * Vertical edge fades — ::before/::after overlays on `.scroll-fade-y-host`
-   * (z-index above the scroller). Inset box-shadow paints UNDER children so
-   * it never shows; mask-image is unreliable on Chromium overflow scrollers.
-   * Length = --scroll-fade-size-y (half a people row). Soft panel charcoal
-   * (same base as `.overlay-surface`) — not a hard black bar.
+   * Horizontal colourless fade: JS marks the edge-most visible tab with
+   * `data-scroll-fade-edge`. Fade via background-clip (not mask-image) —
+   * Chromium hard-clips glyphs with mask on these tabs. Gradient spans the
+   * full label — opaque at the inner side, transparent at the outer end.
+   * Use currentColor at 0 alpha (not `transparent` / black) so glyphs dissolve.
+   * `currentColor` tracks muted / accent / hover from the tab’s text color.
    */
+  .scroll-fade-x > [data-scroll-fade-edge='end'],
+  .scroll-fade-x > [data-scroll-fade-edge='start'] {
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    -webkit-background-clip: text;
+  }
+
+  .scroll-fade-x > [data-scroll-fade-edge='end'] {
+    background-image: linear-gradient(
+      to right,
+      currentColor 0%,
+      rgb(from currentColor r g b / 0) 100%
+    );
+  }
+
+  .scroll-fade-x > [data-scroll-fade-edge='start'] {
+    background-image: linear-gradient(
+      to right,
+      rgb(from currentColor r g b / 0) 0%,
+      currentColor 100%
+    );
+  }
+
+  /*
+   * Vertical edge fades — charcoal ::before/::after on `.scroll-fade-y-host`
+   * (masks are unreliable on overflow scrollers in Chromium). Soft panel
+   * charcoal — not a hard bar.
+   */
+  .scroll-fade-x-host,
   .scroll-fade-y-host {
     position: relative;
+    min-width: 0;
+  }
+
+  .scroll-fade-y-host {
     min-height: 0;
   }
 
@@ -1299,53 +1321,6 @@
   .scroll-fade-y-host[data-fade-start='true']::before,
   .scroll-fade-y-host[data-fade-end='true']::after {
     opacity: 1;
-  }
-
-  .scroll-fade-x[data-fade-start='true'][data-fade-end='true'] {
-    -webkit-mask-image: linear-gradient(
-      to right,
-      transparent,
-      #000 var(--scroll-fade-size),
-      #000 calc(100% - var(--scroll-fade-size)),
-      transparent
-    );
-    mask-image: linear-gradient(
-      to right,
-      transparent,
-      #000 var(--scroll-fade-size),
-      #000 calc(100% - var(--scroll-fade-size)),
-      transparent
-    );
-  }
-
-  .scroll-fade-x[data-fade-start='true'][data-fade-end='false'] {
-    -webkit-mask-image: linear-gradient(
-      to right,
-      transparent,
-      #000 var(--scroll-fade-size),
-      #000 100%
-    );
-    mask-image: linear-gradient(
-      to right,
-      transparent,
-      #000 var(--scroll-fade-size),
-      #000 100%
-    );
-  }
-
-  .scroll-fade-x[data-fade-start='false'][data-fade-end='true'] {
-    -webkit-mask-image: linear-gradient(
-      to right,
-      #000 0%,
-      #000 calc(100% - var(--scroll-fade-size)),
-      transparent
-    );
-    mask-image: linear-gradient(
-      to right,
-      #000 0%,
-      #000 calc(100% - var(--scroll-fade-size)),
-      transparent
-    );
   }
 
   /*
