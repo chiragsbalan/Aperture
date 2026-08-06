@@ -10,7 +10,8 @@ def movie_detail_key(content_id: uuid.UUID) -> str:
 
 
 def tv_detail_key(content_id: uuid.UUID) -> str:
-    return f'meta:tv:{content_id}'
+    # v3: thin season graph + preferred-season episode embed (S1).
+    return f'meta:tv:v3:{content_id}'
 
 
 def person_detail_key(person_id: uuid.UUID) -> str:
