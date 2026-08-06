@@ -8,10 +8,12 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import get_cache
 from app.core.config import Settings
 from app.metadata import repository as metadata_repository
 from app.metadata.images import InvalidImagePathError, tmdb_image_url
 from app.metadata.models import ContentCredit, ContentItem, Person
+from app.metadata.rate_limit import enforce_season_hydrate_rate_limit
 from app.metadata.schemas import (
     AlternativeTitle,
     CollectionRef,
@@ -39,11 +41,21 @@ from app.metadata.schemas import (
     WatchProvider,
     WatchProviderRegion,
 )
-from app.metadata.tmdb.client import TmdbClient, TmdbConfigError, TmdbUnavailableError
+from app.metadata.tmdb.client import (
+    TmdbClient,
+    TmdbConfigError,
+    TmdbNotFoundError,
+    TmdbUnavailableError,
+)
+from app.metadata.tv_season_hydrate import hydrate_tv_season_episodes
 
 
 class CatalogNotFoundError(Exception):
     """Requested catalog entity does not exist (or wrong type)."""
+
+
+class CatalogUnavailableError(Exception):
+    """Upstream catalog provider unavailable (e.g. TMDb outage)."""
 
 
 class LandingPostersUnavailableError(Exception):
@@ -574,21 +586,29 @@ def _episode_details(episodes: list[Any]) -> list[EpisodeDetail]:
     ]
 
 
-def _default_episodes_season_number(seasons: list[Any]) -> int | None:
-    """Prefer the first regular season that has episodes; else any with episodes."""
-    with_eps = [s for s in seasons if s.episodes]
-    if not with_eps:
+def _preferred_embed_season_number(seasons: list[Any]) -> int | None:
+    """Prefer Season 1; else first regular season; else first stub (incl. specials)."""
+    if not seasons:
         return None
-    regular = [s for s in with_eps if s.season_number >= 1]
-    pick = regular[0] if regular else with_eps[0]
-    return int(pick.season_number)
+    by_number = {int(s.season_number): s for s in seasons}
+    if 1 in by_number:
+        return 1
+    regular = sorted(
+        (s for s in seasons if int(s.season_number) >= 1),
+        key=lambda s: int(s.season_number),
+    )
+    if regular:
+        return int(regular[0].season_number)
+    return int(sorted(seasons, key=lambda s: int(s.season_number))[0].season_number)
 
 
 def _season_detail(
     season: Any,
     *,
     include_episodes: bool,
+    episodes: list[Any] | None = None,
 ) -> SeasonDetail:
+    episode_rows = episodes if episodes is not None else list(season.episodes)
     return SeasonDetail(
         id=season.id,
         season_number=season.season_number,
@@ -597,20 +617,33 @@ def _season_detail(
         air_date=season.air_date,
         episode_count=season.episode_count,
         poster_url=_image_url(season.poster_path),
-        episodes=_episode_details(season.episodes) if include_episodes else [],
+        episodes=_episode_details(episode_rows) if include_episodes else [],
     )
 
 
-def _tv_detail(item: ContentItem) -> TvDetail:
+def _tv_detail(
+    item: ContentItem,
+    *,
+    embed_season_number: int | None,
+    embed_episodes: list[Any],
+) -> TvDetail:
     assert item.tv_show is not None
     cast_refs, crew_refs = _credit_refs(list(item.credits))
     seasons = sorted(item.tv_show.seasons, key=lambda s: s.season_number)
-    hydrate_number = _default_episodes_season_number(seasons)
     season_details = [
         _season_detail(
             season,
             include_episodes=(
-                hydrate_number is not None and season.season_number == hydrate_number
+                embed_season_number is not None
+                and season.season_number == embed_season_number
+            ),
+            episodes=(
+                embed_episodes
+                if (
+                    embed_season_number is not None
+                    and season.season_number == embed_season_number
+                )
+                else None
             ),
         )
         for season in seasons
@@ -742,6 +775,8 @@ async def get_tv_detail(
 ) -> TvDetail:
     """Load a TV detail DTO or raise :class:`CatalogNotFoundError`.
 
+    Season stubs load without episodes; the preferred season (Season 1 when
+    present) is loaded separately and embedded when rows already exist.
     The write-through warm path after ingest uses ``resolve_similar=True`` so
     Similar titles are catalog-linked before the post-redirect detail GET.
     Pass ``resolve_similar=False`` only when the caller will resolve them later.
@@ -749,7 +784,22 @@ async def get_tv_detail(
     item = await metadata_repository.get_tv_by_id(session, content_item_id)
     if item is None or item.tv_show is None:
         raise CatalogNotFoundError('tv show not found')
-    detail = _tv_detail(item)
+    seasons = list(item.tv_show.seasons)
+    embed_number = _preferred_embed_season_number(seasons)
+    embed_episodes: list[Any] = []
+    if embed_number is not None:
+        season_row = await metadata_repository.get_tv_season_by_number(
+            session,
+            content_item_id,
+            embed_number,
+        )
+        if season_row is not None:
+            embed_episodes = list(season_row.episodes)
+    detail = _tv_detail(
+        item,
+        embed_season_number=embed_number,
+        embed_episodes=embed_episodes,
+    )
     if resolve_similar:
         await _resolve_similar_catalog_ids(
             session,
@@ -763,8 +813,17 @@ async def get_tv_season_detail(
     session: AsyncSession,
     content_item_id: uuid.UUID,
     season_number: int,
+    *,
+    settings: Settings,
+    client_ip: str | None = None,
 ) -> SeasonDetail:
-    """Return one season with full episodes for lazy title-page tab loads."""
+    """Return one season with full episodes for lazy title-page tab loads.
+
+    When the season stub exists but episodes were never hydrated (cold
+    stub-only resolve), fetch that season from TMDb on demand and persist.
+    Upstream / config failures raise :class:`CatalogUnavailableError` (503)
+    so clients can retry instead of caching an empty episode list.
+    """
     season = await metadata_repository.get_tv_season_by_number(
         session,
         content_item_id,
@@ -772,6 +831,49 @@ async def get_tv_season_detail(
     )
     if season is None:
         raise CatalogNotFoundError('tv season not found')
+    if season.episodes or (season.episode_count or 0) <= 0:
+        return _season_detail(season, include_episodes=True)
+
+    await enforce_season_hydrate_rate_limit(
+        get_cache(),
+        settings=settings,
+        client_ip=client_ip,
+    )
+
+    try:
+        client = TmdbClient.from_settings(settings)
+    except TmdbConfigError as exc:
+        raise CatalogUnavailableError(
+            'Catalog temporarily unavailable',
+        ) from exc
+
+    try:
+        season = await hydrate_tv_season_episodes(
+            session,
+            content_item_id=content_item_id,
+            season_number=season_number,
+            client=client,
+        )
+    except TmdbNotFoundError as exc:
+        raise CatalogUnavailableError(
+            'Catalog temporarily unavailable',
+        ) from exc
+    except TmdbUnavailableError as exc:
+        raise CatalogUnavailableError(
+            'Catalog temporarily unavailable',
+        ) from exc
+    except LookupError as exc:
+        raise CatalogUnavailableError(
+            'Catalog temporarily unavailable',
+        ) from exc
+    except RuntimeError as exc:
+        raise CatalogUnavailableError(
+            'Catalog temporarily unavailable',
+        ) from exc
+
+    if not season.episodes and (season.episode_count or 0) > 0:
+        raise CatalogUnavailableError('Catalog temporarily unavailable')
+
     return _season_detail(season, include_episodes=True)
 
 

@@ -54,6 +54,19 @@ function seasonTabLabel(season: SeasonDetail): string {
   return `Season ${season.season_number}`;
 }
 
+/** Prefer Season 1 over specials (0); else first regular season; else first stub. */
+function preferredInitialSeasonId(seasons: SeasonDetail[]): string {
+  const seasonOne = seasons.find((season) => season.season_number === 1);
+  if (seasonOne) {
+    return seasonOne.id;
+  }
+  const regular = seasons.find((season) => season.season_number >= 1);
+  if (regular) {
+    return regular.id;
+  }
+  return seasons[0]?.id ?? '';
+}
+
 function SeasonPanel({
   season,
   loadingEpisodes,
@@ -160,11 +173,13 @@ export function TitleSeasons({
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const skipPanelAnimRef = useRef(true);
+  const attemptedSeasonIdsRef = useRef<Set<string>>(new Set());
+  const initialActiveId = preferredInitialSeasonId(initialSeasons);
   const [seasons, setSeasons] = useState(initialSeasons);
   const [loadingSeasonId, setLoadingSeasonId] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState(initialSeasons[0]?.id ?? '');
-  const [panelIdState, setPanelIdState] = useState(initialSeasons[0]?.id ?? '');
-  const panelIdRef = useRef(initialSeasons[0]?.id ?? '');
+  const [activeId, setActiveId] = useState(initialActiveId);
+  const [panelIdState, setPanelIdState] = useState(initialActiveId);
+  const panelIdRef = useRef(initialActiveId);
   const [outgoingId, setOutgoingId] = useState<string | null>(null);
   const [stageHeight, setStageHeight] = useState<number | undefined>();
   const [indicator, setIndicator] = useState({ left: 0, width: 0 });
@@ -172,12 +187,14 @@ export function TitleSeasons({
   const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
+    const nextActiveId = preferredInitialSeasonId(initialSeasons);
     setSeasons(initialSeasons);
-    setActiveId(initialSeasons[0]?.id ?? '');
-    setPanelIdState(initialSeasons[0]?.id ?? '');
-    panelIdRef.current = initialSeasons[0]?.id ?? '';
+    setActiveId(nextActiveId);
+    setPanelIdState(nextActiveId);
+    panelIdRef.current = nextActiveId;
     setOutgoingId(null);
     setLoadingSeasonId(null);
+    attemptedSeasonIdsRef.current = new Set();
     // Reset when navigating to another title (not on every parent re-render).
     // eslint-disable-next-line react-hooks/exhaustive-deps -- contentId gate
   }, [contentId]);
@@ -206,9 +223,13 @@ export function TitleSeasons({
     if (expectedCount <= 0) {
       return;
     }
+    const seasonId = active.id;
+    if (attemptedSeasonIdsRef.current.has(seasonId)) {
+      return;
+    }
+    attemptedSeasonIdsRef.current.add(seasonId);
 
     let cancelled = false;
-    const seasonId = active.id;
     const seasonNumber = active.season_number;
     setLoadingSeasonId(seasonId);
 
@@ -219,6 +240,17 @@ export function TitleSeasons({
       }
       setLoadingSeasonId((current) => (current === seasonId ? null : current));
       if (!result.ok) {
+        // Allow a later retry if the user switches away and back.
+        attemptedSeasonIdsRef.current.delete(seasonId);
+        return;
+      }
+      // Empty list while episode_count > 0 is not a successful hydrate —
+      // clear attempted so a later tab visit can retry.
+      if (
+        result.data.episodes.length === 0 &&
+        (result.data.episode_count ?? expectedCount) > 0
+      ) {
+        attemptedSeasonIdsRef.current.delete(seasonId);
         return;
       }
       setSeasons((prev) =>
@@ -232,6 +264,8 @@ export function TitleSeasons({
 
     return () => {
       cancelled = true;
+      // Mid-fetch tab switch must not permanently block a later retry.
+      attemptedSeasonIdsRef.current.delete(seasonId);
     };
   }, [active, contentId]);
 

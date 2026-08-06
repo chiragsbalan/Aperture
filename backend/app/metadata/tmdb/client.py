@@ -20,12 +20,10 @@ _SHARED_TIMEOUT_SECONDS = 30.0
 
 # On-click resolve: credits for cast/director + recommendations for Similar.
 # Heavier appends (images/videos/providers/release_dates/…) stay off this path.
-# TV season episode lists require separate /tv/{id}/season/{n} calls after detail.
+# TV episode lists are fetched on demand via GET /tv/{id}/season/{n} when a
+# season tab opens — never fan-out during cold resolve.
 _MOVIE_INGEST_APPEND = 'credits,recommendations'
 _TV_INGEST_APPEND = 'credits,recommendations,content_ratings'
-# Cap per-season HTTP fetches on resolve; remaining season stubs stay as-is
-# (list order) so long-running shows do not explode request count.
-_MAX_SEASON_HYDRATE = 25
 
 _shared_http_client: httpx.AsyncClient | None = None
 _shared_http_client_lock = asyncio.Lock()
@@ -128,12 +126,10 @@ class TmdbClient:
         return TmdbSeason.model_validate(data)
 
     async def get_tv_for_ingest(self, tmdb_id: int) -> TmdbTvShow:
-        """Fetch TV detail, extras, and per-season episode lists for upsert.
+        """Fetch TV detail + extras with season stubs only (no episode fan-out).
 
-        Hydrates the first ``_MAX_SEASON_HYDRATE`` season stubs (TMDb list
-        order). Later stubs are appended unchanged. Only ``TmdbNotFoundError``
-        is stubbed; ``TmdbUnavailableError`` propagates so resolve can retry
-        instead of persisting empty seasons.
+        One TMDb request. Episode lists are loaded later via
+        :meth:`get_tv_season` when a season is requested.
         """
         data = await self._get(
             f'/tv/{tmdb_id}',
@@ -141,25 +137,7 @@ class TmdbClient:
         )
         show = TmdbTvShow.model_validate(data)
         show.extras = build_extras_from_tmdb_payload(data, kind='tv')
-        # Detail payload only includes season stubs (no episodes). Hydrate
-        # a capped prefix so title detail can list episodes after resolve.
-        hydrated: list[TmdbSeason] = []
-        stubs = show.seasons
-        for stub in stubs[:_MAX_SEASON_HYDRATE]:
-            try:
-                season = await self.get_tv_season(tmdb_id, stub.season_number)
-            except TmdbNotFoundError:
-                # Keep the stub so season chrome still appears.
-                hydrated.append(stub)
-                continue
-            if season.episode_count is None and season.episodes:
-                season = season.model_copy(
-                    update={'episode_count': len(season.episodes)},
-                )
-            hydrated.append(season)
-        if len(stubs) > _MAX_SEASON_HYDRATE:
-            hydrated.extend(stubs[_MAX_SEASON_HYDRATE:])
-        return show.model_copy(update={'seasons': hydrated})
+        return show
 
     async def get_person(self, tmdb_id: int) -> TmdbPerson:
         """Fetch person detail."""

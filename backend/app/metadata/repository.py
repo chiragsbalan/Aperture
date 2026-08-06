@@ -9,7 +9,8 @@ from typing import Any
 
 from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.metadata.models import (
     ContentCredit,
@@ -64,7 +65,11 @@ async def get_tv_by_id(
     session: AsyncSession,
     content_item_id: uuid.UUID,
 ) -> ContentItem | None:
-    """Return a TV content item with seasons/episodes + credits loaded."""
+    """Return a TV content item with season stubs + credits (no episodes).
+
+    Episode rows are loaded separately via :func:`get_tv_season_by_number`
+    for the preferred embed season or lazy season GETs.
+    """
     result = await session.execute(
         select(ContentItem)
         .where(
@@ -74,7 +79,7 @@ async def get_tv_by_id(
         .options(
             selectinload(ContentItem.tv_show)
             .selectinload(TvShow.seasons)
-            .selectinload(Season.episodes),
+            .options(noload(Season.episodes)),
             selectinload(ContentItem.credits).selectinload(ContentCredit.person),
         )
     )
@@ -86,7 +91,13 @@ async def get_tv_season_by_number(
     content_item_id: uuid.UUID,
     season_number: int,
 ) -> Season | None:
-    """Return one season (+ episodes) for a TV content item."""
+    """Return one season (+ episodes) for a TV content item.
+
+    Episodes are loaded with a direct SELECT and applied via
+    ``set_committed_value`` so a prior thin ``get_tv_by_id`` that
+    ``noload``-ed ``Season.episodes`` cannot leave an empty collection on
+    the identity-mapped season row.
+    """
     result = await session.execute(
         select(Season)
         .join(TvShow, Season.tv_show_id == TvShow.content_item_id)
@@ -94,7 +105,34 @@ async def get_tv_season_by_number(
             TvShow.content_item_id == content_item_id,
             Season.season_number == season_number,
         )
-        .options(selectinload(Season.episodes))
+    )
+    season = result.scalar_one_or_none()
+    if season is None:
+        return None
+    episodes_result = await session.execute(
+        select(Episode)
+        .where(Episode.season_id == season.id)
+        .order_by(Episode.episode_number)
+    )
+    set_committed_value(season, 'episodes', list(episodes_result.scalars().all()))
+    return season
+
+
+async def get_external_id_for_content(
+    session: AsyncSession,
+    *,
+    source: str,
+    source_namespace: str,
+    content_item_id: uuid.UUID,
+) -> ExternalId | None:
+    """Return the provider mapping for a catalog content item, if any."""
+    result = await session.execute(
+        select(ExternalId).where(
+            ExternalId.source == source,
+            ExternalId.source_namespace == source_namespace,
+            ExternalId.content_item_id == content_item_id,
+            ExternalId.entity_type == 'content_item',
+        )
     )
     return result.scalar_one_or_none()
 
@@ -556,6 +594,52 @@ async def upsert_episode(
     session.add(episode)
     await session.flush()
     return episode
+
+
+async def upsert_episodes_batch(
+    session: AsyncSession,
+    *,
+    season_id: uuid.UUID,
+    episodes: list[dict[str, Any]],
+) -> None:
+    """Create or update many episodes for a season (one SELECT + one flush).
+
+    Each dict must include ``episode_number`` (int) and may include
+    ``name``, ``overview``, ``air_date``, ``runtime_minutes``, ``still_path``.
+    """
+    if not episodes:
+        return
+    result = await session.execute(
+        select(Episode).where(Episode.season_id == season_id),
+    )
+    by_number = {ep.episode_number: ep for ep in result.scalars().all()}
+    for payload in episodes:
+        episode_number = int(payload['episode_number'])
+        name = payload.get('name')
+        overview = payload.get('overview')
+        air_date = payload.get('air_date')
+        runtime_minutes = payload.get('runtime_minutes')
+        still_path = payload.get('still_path')
+        existing = by_number.get(episode_number)
+        if existing is not None:
+            existing.name = name
+            existing.overview = overview
+            existing.air_date = air_date
+            existing.runtime_minutes = runtime_minutes
+            existing.still_path = still_path
+            continue
+        episode = Episode(
+            season_id=season_id,
+            episode_number=episode_number,
+            name=name,
+            overview=overview,
+            air_date=air_date,
+            runtime_minutes=runtime_minutes,
+            still_path=still_path,
+        )
+        session.add(episode)
+        by_number[episode_number] = episode
+    await session.flush()
 
 
 async def upsert_credit(

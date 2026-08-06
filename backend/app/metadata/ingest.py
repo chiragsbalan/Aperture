@@ -335,16 +335,21 @@ async def upsert_tv_payload(
             episode_count=season_payload.episode_count,
             poster_path=season_payload.poster_path,
         )
-        for episode_payload in season_payload.episodes:
-            await metadata_repository.upsert_episode(
+        if season_payload.episodes:
+            await metadata_repository.upsert_episodes_batch(
                 session,
                 season_id=season.id,
-                episode_number=episode_payload.episode_number,
-                name=episode_payload.name,
-                overview=episode_payload.overview,
-                air_date=_parse_date(episode_payload.air_date),
-                runtime_minutes=episode_payload.runtime,
-                still_path=episode_payload.still_path,
+                episodes=[
+                    {
+                        'episode_number': episode_payload.episode_number,
+                        'name': episode_payload.name,
+                        'overview': episode_payload.overview,
+                        'air_date': _parse_date(episode_payload.air_date),
+                        'runtime_minutes': episode_payload.runtime,
+                        'still_path': episode_payload.still_path,
+                    }
+                    for episode_payload in season_payload.episodes
+                ],
             )
     return item
 
