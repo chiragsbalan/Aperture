@@ -610,8 +610,7 @@ def _tv_detail(item: ContentItem) -> TvDetail:
         _season_detail(
             season,
             include_episodes=(
-                hydrate_number is not None
-                and season.season_number == hydrate_number
+                hydrate_number is not None and season.season_number == hydrate_number
             ),
         )
         for season in seasons

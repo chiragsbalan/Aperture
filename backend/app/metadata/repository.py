@@ -739,9 +739,7 @@ async def search_content_items(
         return [], total
 
     ids = [row.id for row in hit_rows]
-    loaded = await session.execute(
-        select(ContentItem).where(ContentItem.id.in_(ids))
-    )
+    loaded = await session.execute(select(ContentItem).where(ContentItem.id.in_(ids)))
     by_id = {item.id: item for item in loaded.scalars().all()}
     items: list[tuple[ContentItem, float, int | None]] = []
     for row in hit_rows:
@@ -826,4 +824,3 @@ async def get_external_ids_by_external(
         )
     )
     return {row.external_id: row for row in result.scalars().all()}
-

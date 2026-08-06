@@ -266,8 +266,7 @@ export async function fetchTitleLibraryStatus(
   type: LibraryContentType,
   id: string,
 ): Promise<
-  | { ok: true; status: TitleLibraryStatus }
-  | { ok: false; status: number }
+  { ok: true; status: TitleLibraryStatus } | { ok: false; status: number }
 > {
   const params = new URLSearchParams({ type, id });
   const res = await fetch(

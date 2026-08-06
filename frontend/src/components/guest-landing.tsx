@@ -11,8 +11,7 @@ import { HomeCatalogRails } from '@/components/home-catalog-rails';
 import type { TopMovie } from '@/lib/catalog';
 
 const PosterMosaic = dynamic(
-  () =>
-    import('@/components/poster-mosaic').then((mod) => mod.PosterMosaic),
+  () => import('@/components/poster-mosaic').then((mod) => mod.PosterMosaic),
   {
     ssr: false,
     loading: () => (

@@ -107,9 +107,7 @@ def test_tv_season_detail_200(
     seeded_ids: dict[str, uuid.UUID],
 ) -> None:
     detail = api_client.get(f'/api/v1/tv/{seeded_ids["tv"]}').json()
-    season_number = next(
-        s['season_number'] for s in detail['seasons'] if s['episodes']
-    )
+    season_number = next(s['season_number'] for s in detail['seasons'] if s['episodes'])
     res = api_client.get(
         f'/api/v1/tv/{seeded_ids["tv"]}/seasons/{season_number}',
     )

@@ -5,10 +5,7 @@ import { GuestLanding } from '@/components/guest-landing';
 import { HomeCatalogRails } from '@/components/home-catalog-rails';
 import { SiteHeader } from '@/components/site-header';
 import { refreshCookieName } from '@/lib/auth-cookies';
-import {
-  fetchHomeCatalogRails,
-  fetchLandingPosterUrls,
-} from '@/lib/catalog';
+import { fetchHomeCatalogRails, fetchLandingPosterUrls } from '@/lib/catalog';
 import { shouldPrefetchHomeRails } from '@/lib/home-shell';
 import { shouldShowSignedInHome } from '@/lib/home-shell.server';
 

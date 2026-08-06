@@ -40,8 +40,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function fetchMe(): Promise<
-  | { status: 'signed_in'; me: MeResponse }
-  | { status: 'signed_out' }
+  { status: 'signed_in'; me: MeResponse } | { status: 'signed_out' }
 > {
   const res = await fetch('/api/auth/me', { cache: 'no-store' });
   if (!res.ok) {

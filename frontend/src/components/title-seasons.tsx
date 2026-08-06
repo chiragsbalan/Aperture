@@ -163,9 +163,7 @@ export function TitleSeasons({
   const [seasons, setSeasons] = useState(initialSeasons);
   const [loadingSeasonId, setLoadingSeasonId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState(initialSeasons[0]?.id ?? '');
-  const [panelIdState, setPanelIdState] = useState(
-    initialSeasons[0]?.id ?? '',
-  );
+  const [panelIdState, setPanelIdState] = useState(initialSeasons[0]?.id ?? '');
   const panelIdRef = useRef(initialSeasons[0]?.id ?? '');
   const [outgoingId, setOutgoingId] = useState<string | null>(null);
   const [stageHeight, setStageHeight] = useState<number | undefined>();
@@ -219,9 +217,7 @@ export function TitleSeasons({
       if (cancelled) {
         return;
       }
-      setLoadingSeasonId((current) =>
-        current === seasonId ? null : current,
-      );
+      setLoadingSeasonId((current) => (current === seasonId ? null : current));
       if (!result.ok) {
         return;
       }

@@ -1,9 +1,6 @@
 'use client';
 
-import {
-  useAuth,
-  type MeResponse,
-} from '@/components/auth-provider';
+import { useAuth, type MeResponse } from '@/components/auth-provider';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { oauthErrorMessage } from '@/lib/google-oauth-errors';
 import { invalidatePublicWatchEntries } from '@/lib/library';

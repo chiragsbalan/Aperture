@@ -27,9 +27,7 @@ export function SearchResults({
   initialError?: string | null;
 }) {
   const ssrQueryRef = useRef(query.trim());
-  const [results, setResults] = useState<SearchHit[] | null>(
-    initialResults,
-  );
+  const [results, setResults] = useState<SearchHit[] | null>(initialResults);
   const [total, setTotal] = useState(initialTotal);
   const [error, setError] = useState<string | null>(initialError);
   const [loading, setLoading] = useState(false);

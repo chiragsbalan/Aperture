@@ -16,8 +16,7 @@ export default async function SearchPage({
 }) {
   const params = await searchParams;
   const q = typeof params.q === 'string' ? params.q : '';
-  const initial =
-    q.trim().length > 0 ? await fetchSearchServer(q) : null;
+  const initial = q.trim().length > 0 ? await fetchSearchServer(q) : null;
 
   return (
     <div className="shell-atmosphere relative min-h-screen">
@@ -38,9 +37,7 @@ export default async function SearchPage({
             query={q}
             initialResults={initial?.ok ? initial.data.results : null}
             initialTotal={initial?.ok ? initial.data.total : 0}
-            initialError={
-              initial != null && !initial.ok ? initial.error : null
-            }
+            initialError={initial != null && !initial.ok ? initial.error : null}
           />
         </div>
       </main>
