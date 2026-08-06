@@ -6,6 +6,7 @@ import {
   type Preferences,
   type ProfileLink,
 } from '@/lib/profile';
+import { useAuth } from '@/components/auth-provider';
 import { invalidatePublicWatchEntries } from '@/lib/library';
 import { applyThemePreference } from '@/lib/theme';
 import Link from 'next/link';
@@ -21,6 +22,7 @@ const MAX_LINKS = 3;
 
 export function SettingsForm() {
   const router = useRouter();
+  const { clearAuth } = useAuth();
   const usernameId = useId();
   const usernameHintId = useId();
   const displayNameId = useId();
@@ -64,6 +66,7 @@ export function SettingsForm() {
         setLogoutError(`Could not log out (HTTP ${res.status}).`);
         return;
       }
+      clearAuth();
       invalidatePublicWatchEntries();
       router.push('/');
       router.refresh();

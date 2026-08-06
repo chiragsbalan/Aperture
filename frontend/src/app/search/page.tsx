@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { SearchResults } from '@/components/search-results';
 import { SiteHeader } from '@/components/site-header';
+import { fetchSearchServer } from '@/lib/search.server';
 
 export const metadata: Metadata = {
   title: 'Search · Aperture',
@@ -15,6 +16,7 @@ export default async function SearchPage({
 }) {
   const params = await searchParams;
   const q = typeof params.q === 'string' ? params.q : '';
+  const initial = q.trim().length > 0 ? await fetchSearchServer(q) : null;
 
   return (
     <div className="shell-atmosphere relative min-h-screen">
@@ -31,7 +33,12 @@ export default async function SearchPage({
           Find movies, TV shows, and people in the catalog.
         </p>
         <div className="mt-8">
-          <SearchResults query={q} />
+          <SearchResults
+            query={q}
+            initialResults={initial?.ok ? initial.data.results : null}
+            initialTotal={initial?.ok ? initial.data.total : 0}
+            initialError={initial != null && !initial.ok ? initial.error : null}
+          />
         </div>
       </main>
     </div>

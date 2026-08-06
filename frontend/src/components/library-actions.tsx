@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import { useAuth } from '@/components/auth-provider';
 import { localTodayIsoDate } from '@/lib/iso_date';
 import {
   addCustomListItem,
@@ -18,8 +19,8 @@ import {
   createWatchEntry,
   DIARY_LOGGED_CHANGED_EVENT,
   fetchCustomListsMembership,
-  fetchLibraryContains,
   fetchMyCustomLists,
+  fetchTitleLibraryStatus,
   fetchWatchEntriesContains,
   membershipKey,
   removeCustomListItem,
@@ -226,6 +227,7 @@ export function LibraryActions({
   contentType: string;
   contentId: string;
 }) {
+  const { status: sessionStatus, clearAuth } = useAuth();
   const libraryType = toLibraryContentType(contentType);
   const formId = useId();
   const [authState, setAuthState] = useState<AuthState>('loading');
@@ -258,11 +260,24 @@ export function LibraryActions({
     if (libraryType == null) {
       return;
     }
+    if (sessionStatus === 'loading') {
+      setAuthState('loading');
+      setMembershipState('loading');
+      return;
+    }
+    if (sessionStatus === 'signed_out') {
+      setListMembership({});
+      setListItemIds({});
+      setAuthState('signed_out');
+      setMembershipState('ready');
+      return;
+    }
+
     const generation = ++loadGeneration.current;
     let cancelled = false;
 
     async function load() {
-      setAuthState('loading');
+      setAuthState('signed_in');
       setMembershipState('loading');
       setError(null);
       // Clear prior title membership so derive(inAnyList) cannot stick.
@@ -270,29 +285,20 @@ export function LibraryActions({
       setListItemIds({});
       try {
         const type = libraryType as LibraryContentType;
-        const [watch, fav, logged, listMembershipResult] = await Promise.all([
-          fetchLibraryContains('watchlist', [{ type, id: contentId }]),
-          fetchLibraryContains('favorites', [{ type, id: contentId }]),
-          fetchWatchEntriesContains([{ type, id: contentId }]),
-          fetchCustomListsMembership(type, contentId),
-        ]);
+        const result = await fetchTitleLibraryStatus(type, contentId);
         if (cancelled || generation !== loadGeneration.current) {
           return;
         }
 
-        const unauthorized =
-          (!watch.ok && watch.status === 401) ||
-          (!fav.ok && fav.status === 401) ||
-          (!logged.ok && logged.status === 401);
-        if (unauthorized) {
-          setListMembership({});
-          setListItemIds({});
-          setAuthState('signed_out');
-          setMembershipState('ready');
-          return;
-        }
-
-        if (!watch.ok || !fav.ok || !logged.ok) {
+        if (!result.ok) {
+          if (result.status === 401) {
+            clearAuth();
+            setListMembership({});
+            setListItemIds({});
+            setAuthState('signed_out');
+            setMembershipState('ready');
+            return;
+          }
           setListMembership({});
           setListItemIds({});
           setAuthState('signed_in');
@@ -301,26 +307,20 @@ export function LibraryActions({
           return;
         }
 
-        const key = membershipKey(type, contentId);
         setAuthState('signed_in');
-        setInWatchlist(Boolean(watch.membership[key]));
-        setInFavorites(Boolean(fav.membership[key]));
-        setHasLogged(Boolean(logged.membership[key]));
-        if (listMembershipResult.ok) {
-          setListMembership(listMembershipResult.membership);
-          setListItemIds(listMembershipResult.itemIds);
-        } else {
-          setListMembership({});
-          setListItemIds({});
-        }
+        setInWatchlist(result.status.inWatchlist);
+        setInFavorites(result.status.inFavorites);
+        setHasLogged(result.status.hasLogged);
+        setListMembership(result.status.listMembership);
+        setListItemIds(result.status.listItemIds);
         setMembershipState('ready');
         setError(null);
       } catch {
         if (!cancelled && generation === loadGeneration.current) {
           setListMembership({});
           setListItemIds({});
-          setAuthState('signed_out');
-          setMembershipState('ready');
+          setMembershipState('error');
+          setError('Could not load library status.');
         }
       }
     }
@@ -350,7 +350,7 @@ export function LibraryActions({
         onDiaryLoggedChanged,
       );
     };
-  }, [contentId, libraryType]);
+  }, [contentId, libraryType, sessionStatus]);
 
   if (libraryType == null) {
     return null;

@@ -1,17 +1,28 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
+
+import { useAuth } from '@/components/auth-provider';
 import { applyThemePreference, type ThemePreference } from '@/lib/theme';
-import { usePathname } from 'next/navigation';
-import { useEffect } from 'react';
 
 /**
- * Loads signed-in preference theme and applies it to ``data-theme``.
+ * Loads signed-in preference theme once per session and applies ``data-theme``.
  * Signed-out users keep the layout default.
  */
 export function ThemeSync() {
-  const pathname = usePathname();
+  const { status } = useAuth();
+  const loadedForSignedIn = useRef(false);
 
   useEffect(() => {
+    if (status !== 'signed_in') {
+      loadedForSignedIn.current = false;
+      return;
+    }
+    if (loadedForSignedIn.current) {
+      return;
+    }
+    loadedForSignedIn.current = true;
+
     let cancelled = false;
 
     async function load() {
@@ -39,7 +50,7 @@ export function ThemeSync() {
     return () => {
       cancelled = true;
     };
-  }, [pathname]);
+  }, [status]);
 
   return null;
 }

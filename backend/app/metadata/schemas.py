@@ -196,6 +196,14 @@ class NowInTheatresResponse(BaseModel):
     movies: list[TopMovie] = Field(default_factory=list)
 
 
+class HomeRailsResponse(BaseModel):
+    """Batched home rails: theatres + top movies + top TV in one response."""
+
+    in_theatres: list[TopMovie] = Field(default_factory=list)
+    movies: list[TopMovie] = Field(default_factory=list)
+    shows: list[TopMovie] = Field(default_factory=list)
+
+
 class ResolveByTmdbRequest(BaseModel):
     """Resolve (and optionally ingest) a title by TMDb id."""
 

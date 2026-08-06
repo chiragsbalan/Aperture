@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useState, type ReactNode } from 'react';
 
 import {
@@ -7,8 +8,20 @@ import {
   type GuestLandingPanel,
 } from '@/components/guest-landing-hero';
 import { HomeCatalogRails } from '@/components/home-catalog-rails';
-import { PosterMosaic } from '@/components/poster-mosaic';
 import type { TopMovie } from '@/lib/catalog';
+
+const PosterMosaic = dynamic(
+  () => import('@/components/poster-mosaic').then((mod) => mod.PosterMosaic),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        aria-hidden
+      />
+    ),
+  },
+);
 
 interface GuestLandingProps {
   posters: string[];

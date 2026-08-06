@@ -310,7 +310,7 @@ function TitleDetailShell({
                 status={status}
               />
               {contentType === 'tv_show' ? (
-                <TitleSeasons seasons={seasonList} />
+                <TitleSeasons contentId={contentId} seasons={seasonList} />
               ) : null}
               <div className="sm:hidden">
                 <WhereToWatch

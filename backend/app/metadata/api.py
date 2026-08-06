@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import random
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, HTTPException, Path, Query, Request, Response, status
 from pydantic import ValidationError
 
 from app.core.cache import CacheBackend, get_cache
@@ -30,6 +31,7 @@ from app.metadata.rate_limit import (
     enforce_top_movies_rate_limit,
 )
 from app.metadata.schemas import (
+    HomeRailsResponse,
     LandingPoster,
     LandingPostersResponse,
     MovieDetail,
@@ -37,6 +39,7 @@ from app.metadata.schemas import (
     PersonDetail,
     ResolveByTmdbRequest,
     ResolveByTmdbResponse,
+    SeasonDetail,
     TopMovie,
     TopMoviesResponse,
     TopTvShowsResponse,
@@ -524,6 +527,39 @@ async def get_now_in_theatres(
     return NowInTheatresResponse(movies=pool.movies[:display_limit])
 
 
+@router.get('/catalog/home-rails', response_model=HomeRailsResponse)
+async def get_home_rails(
+    request: Request,
+    settings: SettingsDep,
+    response: Response,
+    limit: int | None = Query(default=None, ge=1, le=100),
+) -> HomeRailsResponse:
+    """Return shuffled home rails in one response (RSC → API only).
+
+    Charges the same per-IP rate limit once (not three times). Each rail is
+    still drawn from its Redis-backed pool.
+    """
+    client_ip = resolve_client_ip(request, settings)
+    await enforce_top_movies_rate_limit(
+        get_cache(),
+        settings=settings,
+        client_ip=client_ip,
+    )
+    display_limit = _public_rail_display_limit(limit, settings)
+    theatres_pool, movies_pool, tv_pool = await asyncio.gather(
+        _load_now_in_theatres_pool(settings, response),
+        _load_top_movies_pool(settings, response),
+        _load_top_tv_shows_pool(settings, response),
+    )
+    response.headers['Cache-Control'] = _HOME_RAIL_CACHE_CONTROL
+    # Prefer MISS if any pool fill was a miss (headers overwritten by last load).
+    return HomeRailsResponse(
+        in_theatres=theatres_pool.movies[:display_limit],
+        movies=_shuffle_top_movies(movies_pool, limit=display_limit).movies,
+        shows=_shuffle_top_tv_shows(tv_pool, limit=display_limit).shows,
+    )
+
+
 @router.post('/movies/resolve', response_model=ResolveByTmdbResponse)
 async def resolve_movie(
     request: Request,
@@ -632,6 +668,28 @@ async def get_tv(
     )
     response.headers['X-Cache'] = 'MISS'
     return detail
+
+
+@router.get(
+    '/tv/{content_id}/seasons/{season_number}',
+    response_model=SeasonDetail,
+)
+async def get_tv_season(
+    content_id: uuid.UUID,
+    season_number: Annotated[int, Path(ge=0, le=200)],
+    session: DbSessionDep,
+    response: Response,
+) -> SeasonDetail:
+    """Return one TV season with full episodes (lazy tab load)."""
+    response.headers['Cache-Control'] = _CACHE_CONTROL
+    try:
+        return await metadata_service.get_tv_season_detail(
+            session,
+            content_id,
+            season_number,
+        )
+    except metadata_service.CatalogNotFoundError as exc:
+        raise _not_found('TV season not found') from exc
 
 
 @router.get('/people/{person_id}', response_model=PersonDetail)

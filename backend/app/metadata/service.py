@@ -36,7 +36,6 @@ from app.metadata.schemas import (
     TopMoviesResponse,
     TopTvShowsResponse,
     TvDetail,
-    VideoRef,
     WatchProvider,
     WatchProviderRegion,
 )
@@ -337,9 +336,6 @@ async def fetch_now_in_theatres_pool(
 def _title_extras(raw: dict[str, Any] | None) -> TitleExtras:
     """Map stored JSONB extras into API DTOs with resolved image URLs."""
     doc: dict[str, Any] = raw if isinstance(raw, dict) else {}
-    images_raw: dict[str, Any] = (
-        doc['images'] if isinstance(doc.get('images'), dict) else {}
-    )
     collection_raw = (
         doc['collection'] if isinstance(doc.get('collection'), dict) else None
     )
@@ -462,33 +458,10 @@ def _title_extras(raw: dict[str, Any] | None) -> TitleExtras:
             for r in doc.get('releases', [])
             if isinstance(r, dict)
         ],
-        videos=[
-            VideoRef(
-                key=str(v['key']),
-                name=v.get('name'),
-                site=str(v.get('site') or 'YouTube'),
-                type=v.get('type'),
-                official=bool(v.get('official')),
-            )
-            for v in doc.get('videos', [])
-            if isinstance(v, dict) and v.get('key')
-        ],
-        images=MediaGallery(
-            backdrops=[
-                url
-                for path in images_raw.get('backdrops', [])
-                if isinstance(path, str)
-                for url in [_image_url(path, size='w780')]
-                if url
-            ],
-            posters=[
-                url
-                for path in images_raw.get('posters', [])
-                if isinstance(path, str)
-                for url in [_image_url(path, size='w500')]
-                if url
-            ],
-        ),
+        # Gallery / video extras are unused by the product UI — omit from the
+        # public detail payload to cut JSON size (still stored in extras JSONB).
+        videos=[],
+        images=MediaGallery(),
         watch_providers=providers,
         similar=[
             SimilarTitle(
@@ -516,13 +489,17 @@ async def _resolve_similar_catalog_ids(
 ) -> None:
     """Attach Aperture content ids when recommended titles exist in-catalog."""
     content_type = 'movie' if source_namespace == 'movie' else 'tv_show'
+    if not extras.similar:
+        return
+    external_ids = [str(item.tmdb_id) for item in extras.similar]
+    mappings = await metadata_repository.get_external_ids_by_external(
+        session,
+        source='tmdb',
+        source_namespace=source_namespace,
+        external_ids=external_ids,
+    )
     for item in extras.similar:
-        mapping = await metadata_repository.get_external_id(
-            session,
-            source='tmdb',
-            source_namespace=source_namespace,
-            external_id=str(item.tmdb_id),
-        )
+        mapping = mappings.get(str(item.tmdb_id))
         if mapping is not None and mapping.content_item_id is not None:
             item.content_id = mapping.content_item_id
             item.content_type = content_type
@@ -581,36 +558,63 @@ def _movie_detail(item: ContentItem) -> MovieDetail:
     )
 
 
+def _episode_details(episodes: list[Any]) -> list[EpisodeDetail]:
+    ordered = sorted(episodes, key=lambda e: e.episode_number)
+    return [
+        EpisodeDetail(
+            id=episode.id,
+            episode_number=episode.episode_number,
+            name=episode.name,
+            overview=episode.overview,
+            air_date=episode.air_date,
+            runtime_minutes=episode.runtime_minutes,
+            still_url=_image_url(episode.still_path),
+        )
+        for episode in ordered
+    ]
+
+
+def _default_episodes_season_number(seasons: list[Any]) -> int | None:
+    """Prefer the first regular season that has episodes; else any with episodes."""
+    with_eps = [s for s in seasons if s.episodes]
+    if not with_eps:
+        return None
+    regular = [s for s in with_eps if s.season_number >= 1]
+    pick = regular[0] if regular else with_eps[0]
+    return int(pick.season_number)
+
+
+def _season_detail(
+    season: Any,
+    *,
+    include_episodes: bool,
+) -> SeasonDetail:
+    return SeasonDetail(
+        id=season.id,
+        season_number=season.season_number,
+        name=season.name,
+        overview=season.overview,
+        air_date=season.air_date,
+        episode_count=season.episode_count,
+        poster_url=_image_url(season.poster_path),
+        episodes=_episode_details(season.episodes) if include_episodes else [],
+    )
+
+
 def _tv_detail(item: ContentItem) -> TvDetail:
     assert item.tv_show is not None
     cast_refs, crew_refs = _credit_refs(list(item.credits))
     seasons = sorted(item.tv_show.seasons, key=lambda s: s.season_number)
-    season_details: list[SeasonDetail] = []
-    for season in seasons:
-        episodes = sorted(season.episodes, key=lambda e: e.episode_number)
-        season_details.append(
-            SeasonDetail(
-                id=season.id,
-                season_number=season.season_number,
-                name=season.name,
-                overview=season.overview,
-                air_date=season.air_date,
-                episode_count=season.episode_count,
-                poster_url=_image_url(season.poster_path),
-                episodes=[
-                    EpisodeDetail(
-                        id=episode.id,
-                        episode_number=episode.episode_number,
-                        name=episode.name,
-                        overview=episode.overview,
-                        air_date=episode.air_date,
-                        runtime_minutes=episode.runtime_minutes,
-                        still_url=_image_url(episode.still_path),
-                    )
-                    for episode in episodes
-                ],
-            )
+    hydrate_number = _default_episodes_season_number(seasons)
+    season_details = [
+        _season_detail(
+            season,
+            include_episodes=(
+                hydrate_number is not None and season.season_number == hydrate_number
+            ),
         )
+        for season in seasons
+    ]
     return TvDetail(
         type='tv_show',
         id=item.id,
@@ -753,6 +757,22 @@ async def get_tv_detail(
             source_namespace='tv',
         )
     return detail
+
+
+async def get_tv_season_detail(
+    session: AsyncSession,
+    content_item_id: uuid.UUID,
+    season_number: int,
+) -> SeasonDetail:
+    """Return one season with full episodes for lazy title-page tab loads."""
+    season = await metadata_repository.get_tv_season_by_number(
+        session,
+        content_item_id,
+        season_number,
+    )
+    if season is None:
+        raise CatalogNotFoundError('tv season not found')
+    return _season_detail(season, include_episodes=True)
 
 
 async def get_person_detail(

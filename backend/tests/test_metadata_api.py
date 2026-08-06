@@ -89,11 +89,33 @@ def test_tv_detail_200(
     assert body['type'] == 'tv_show'
     assert body['title'] == 'Breaking Bad'
     assert len(body['seasons']) >= 1
-    assert body['seasons'][0]['episodes']
+    # Thin payload: episodes only for the default season; stubs for the rest.
+    seasons_with_eps = [s for s in body['seasons'] if s['episodes']]
+    assert len(seasons_with_eps) == 1
+    assert seasons_with_eps[0]['season_number'] >= 1
     extras = body['extras']
     assert any(n['name'] == 'AMC' for n in extras['networks'])
     assert extras['episode_runtime_minutes'] == 47
     assert any(c['job'] == 'Creator' for c in body['crew'])
+    assert extras.get('videos') == []
+    assert extras.get('images') == {'backdrops': [], 'posters': []}
+
+
+@pytest.mark.integration
+def test_tv_season_detail_200(
+    api_client: TestClient,
+    seeded_ids: dict[str, uuid.UUID],
+) -> None:
+    detail = api_client.get(f'/api/v1/tv/{seeded_ids["tv"]}').json()
+    season_number = next(s['season_number'] for s in detail['seasons'] if s['episodes'])
+    res = api_client.get(
+        f'/api/v1/tv/{seeded_ids["tv"]}/seasons/{season_number}',
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body['season_number'] == season_number
+    assert body['episodes']
+    assert res.headers.get('cache-control') == 'public, max-age=300'
 
 
 @pytest.mark.integration

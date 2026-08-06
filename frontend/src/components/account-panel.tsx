@@ -1,22 +1,12 @@
 'use client';
 
+import { useAuth, type MeResponse } from '@/components/auth-provider';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { oauthErrorMessage } from '@/lib/google-oauth-errors';
 import { invalidatePublicWatchEntries } from '@/lib/library';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-
-interface MeResponse {
-  identity_id: string;
-  email: string;
-  user: {
-    id: string;
-    username: string | null;
-    display_name: string | null;
-  } | null;
-  providers: Array<'password' | 'google'>;
-}
 
 type LoadState =
   | { status: 'loading' }
@@ -32,6 +22,7 @@ export function AccountPanel() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryError = oauthErrorMessage(searchParams.get('error'));
+  const { status: authStatus, me: authMe, clearAuth } = useAuth();
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
@@ -45,6 +36,7 @@ export function AccountPanel() {
         setLogoutError(`Could not log out (HTTP ${res.status}).`);
         return;
       }
+      clearAuth();
       invalidatePublicWatchEntries();
       router.push('/');
       router.refresh();
@@ -56,45 +48,19 @@ export function AccountPanel() {
   }
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        const res = await fetch('/api/auth/me', { cache: 'no-store' });
-        if (cancelled) {
-          return;
-        }
-        if (res.status === 401) {
-          setState({
-            status: 'error',
-            message: 'You are not signed in.',
-          });
-          return;
-        }
-        if (!res.ok) {
-          setState({
-            status: 'error',
-            message: `Could not load account (HTTP ${res.status}).`,
-          });
-          return;
-        }
-        const me = (await res.json()) as MeResponse;
-        setState({ status: 'ok', me });
-      } catch {
-        if (!cancelled) {
-          setState({
-            status: 'error',
-            message: 'Failed to reach the API.',
-          });
-        }
-      }
+    if (authStatus === 'loading') {
+      setState({ status: 'loading' });
+      return;
     }
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (authStatus === 'signed_out' || authMe == null) {
+      setState({
+        status: 'error',
+        message: 'You are not signed in.',
+      });
+      return;
+    }
+    setState({ status: 'ok', me: authMe });
+  }, [authStatus, authMe]);
 
   if (state.status === 'loading') {
     return (

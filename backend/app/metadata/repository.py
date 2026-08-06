@@ -81,6 +81,24 @@ async def get_tv_by_id(
     return result.scalar_one_or_none()
 
 
+async def get_tv_season_by_number(
+    session: AsyncSession,
+    content_item_id: uuid.UUID,
+    season_number: int,
+) -> Season | None:
+    """Return one season (+ episodes) for a TV content item."""
+    result = await session.execute(
+        select(Season)
+        .join(TvShow, Season.tv_show_id == TvShow.content_item_id)
+        .where(
+            TvShow.content_item_id == content_item_id,
+            Season.season_number == season_number,
+        )
+        .options(selectinload(Season.episodes))
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_person_by_id(
     session: AsyncSession,
     person_id: uuid.UUID,
@@ -717,9 +735,15 @@ async def search_content_items(
         },
     )
     hit_rows = result.all()
+    if not hit_rows:
+        return [], total
+
+    ids = [row.id for row in hit_rows]
+    loaded = await session.execute(select(ContentItem).where(ContentItem.id.in_(ids)))
+    by_id = {item.id: item for item in loaded.scalars().all()}
     items: list[tuple[ContentItem, float, int | None]] = []
     for row in hit_rows:
-        item = await session.get(ContentItem, row.id)
+        item = by_id.get(row.id)
         if item is None:
             continue
         year = int(row.year) if row.year is not None else None
@@ -766,10 +790,37 @@ async def search_people(
         ),
         {'q': query, 'limit': limit, 'offset': offset},
     )
+    hit_rows = result.all()
+    if not hit_rows:
+        return [], total
+
+    ids = [row.id for row in hit_rows]
+    loaded = await session.execute(select(Person).where(Person.id.in_(ids)))
+    by_id = {person.id: person for person in loaded.scalars().all()}
     people: list[tuple[Person, float]] = []
-    for row in result.all():
-        person = await session.get(Person, row.id)
+    for row in hit_rows:
+        person = by_id.get(row.id)
         if person is None:
             continue
         people.append((person, float(row.rank or 0.0)))
     return people, total
+
+
+async def get_external_ids_by_external(
+    session: AsyncSession,
+    *,
+    source: str,
+    source_namespace: str,
+    external_ids: list[str],
+) -> dict[str, ExternalId]:
+    """Batch-load provider mappings keyed by ``external_id`` string."""
+    if not external_ids:
+        return {}
+    result = await session.execute(
+        select(ExternalId).where(
+            ExternalId.source == source,
+            ExternalId.source_namespace == source_namespace,
+            ExternalId.external_id.in_(external_ids),
+        )
+    )
+    return {row.external_id: row for row in result.scalars().all()}
