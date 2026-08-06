@@ -305,7 +305,13 @@ def test_top_movies_pool_count_bounds_reject_invalid() -> None:
     with pytest.raises(ValidationError):
         Settings(**_settings_kwargs(), top_movies_pool_count=0)
     with pytest.raises(ValidationError):
-        Settings(**_settings_kwargs(), top_movies_pool_count=101)
+        Settings(**_settings_kwargs(), top_movies_pool_count=501)
+    with pytest.raises(ValidationError):
+        Settings(
+            **_settings_kwargs(),
+            top_movies_pool_count=100,
+            top_movies_max_auth_limit=101,
+        )
     with pytest.raises(ValidationError):
         Settings(**_settings_kwargs(), top_movies_default_limit=0)
     with pytest.raises(ValidationError):
@@ -320,6 +326,12 @@ def test_top_movies_pool_count_bounds_reject_invalid() -> None:
         Settings(**_settings_kwargs(), top_movies_max_public_limit=0)
     with pytest.raises(ValidationError):
         Settings(**_settings_kwargs(), top_movies_max_public_limit=101)
+    with pytest.raises(ValidationError):
+        Settings(
+            **_settings_kwargs(),
+            top_movies_max_public_limit=24,
+            top_movies_max_auth_limit=20,
+        )
 
 
 def test_top_movies_settings_bounds_via_env(
@@ -330,7 +342,7 @@ def test_top_movies_settings_bounds_via_env(
     with pytest.raises(ValidationError):
         get_settings()
 
-    monkeypatch.setenv('TOP_MOVIES_POOL_COUNT', '101')
+    monkeypatch.setenv('TOP_MOVIES_POOL_COUNT', '501')
     get_settings.cache_clear()
     with pytest.raises(ValidationError):
         get_settings()
@@ -649,6 +661,157 @@ def test_top_movies_clamps_oversize_limit(
     res = client.get('/api/v1/catalog/top-movies?limit=100')
     assert res.status_code == 200, res.text
     assert len(res.json()['movies']) == 24
+
+
+def test_top_movies_auth_allows_higher_limit(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bearer auth raises the clamp to max_auth_limit."""
+    monkeypatch.setenv('TMDB_API_KEY', 'test-tmdb-key')
+    monkeypatch.setenv('TOP_MOVIES_MAX_PUBLIC_LIMIT', '24')
+    monkeypatch.setenv('TOP_MOVIES_MAX_AUTH_LIMIT', '500')
+    get_settings.cache_clear()
+    init_cache('')
+
+    pool = _sample_pool(size=80)
+
+    async def fake_fetch(
+        settings: Settings,
+        *,
+        count: int | None = None,
+        client: TmdbClient | None = None,
+    ) -> TopMoviesResponse:
+        del settings, count, client
+        return pool
+
+    monkeypatch.setattr(
+        metadata_service,
+        'fetch_top_movies_pool',
+        fake_fetch,
+    )
+
+    register = client.post(
+        '/api/v1/auth/register',
+        json={
+            'email': f'topmovies-{uuid.uuid4().hex[:10]}@example.com',
+            'username': f'tm_{uuid.uuid4().hex[:10]}',
+            'password': 'secure-pass-1',
+        },
+    )
+    assert register.status_code == 201, register.text
+    access = register.json()['access_token']
+
+    anon = client.get('/api/v1/catalog/top-movies?limit=80')
+    assert anon.status_code == 200, anon.text
+    assert len(anon.json()['movies']) == 24
+
+    authed = client.get(
+        '/api/v1/catalog/top-movies?limit=80',
+        headers={'Authorization': f'Bearer {access}'},
+    )
+    assert authed.status_code == 200, authed.text
+    assert len(authed.json()['movies']) == 80
+
+
+def test_top_tv_auth_allows_higher_limit(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bearer auth raises the top-TV clamp to max_auth_limit."""
+    monkeypatch.setenv('TMDB_API_KEY', 'test-tmdb-key')
+    monkeypatch.setenv('TOP_MOVIES_MAX_PUBLIC_LIMIT', '24')
+    monkeypatch.setenv('TOP_MOVIES_MAX_AUTH_LIMIT', '500')
+    get_settings.cache_clear()
+    init_cache('')
+
+    movies_pool = _sample_pool(size=80)
+    pool = TopTvShowsResponse(shows=list(movies_pool.movies))
+
+    async def fake_fetch(
+        settings: Settings,
+        *,
+        count: int | None = None,
+        client: TmdbClient | None = None,
+    ) -> TopTvShowsResponse:
+        del settings, count, client
+        return pool
+
+    monkeypatch.setattr(
+        metadata_service,
+        'fetch_top_tv_shows_pool',
+        fake_fetch,
+    )
+
+    register = client.post(
+        '/api/v1/auth/register',
+        json={
+            'email': f'toptv-{uuid.uuid4().hex[:10]}@example.com',
+            'username': f'tv_{uuid.uuid4().hex[:10]}',
+            'password': 'secure-pass-1',
+        },
+    )
+    assert register.status_code == 201, register.text
+    access = register.json()['access_token']
+
+    anon = client.get('/api/v1/catalog/top-tv-shows?limit=80')
+    assert anon.status_code == 200, anon.text
+    assert len(anon.json()['shows']) == 24
+
+    authed = client.get(
+        '/api/v1/catalog/top-tv-shows?limit=80',
+        headers={'Authorization': f'Bearer {access}'},
+    )
+    assert authed.status_code == 200, authed.text
+    assert len(authed.json()['shows']) == 80
+
+
+def test_top_movies_invalid_bearer_returns_401(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Invalid Bearer token must not fall through as an anonymous rail."""
+    monkeypatch.setenv('TMDB_API_KEY', 'test-tmdb-key')
+    get_settings.cache_clear()
+    init_cache('')
+
+    pool = _sample_pool(size=12)
+
+    async def fake_fetch(
+        settings: Settings,
+        *,
+        count: int | None = None,
+        client: TmdbClient | None = None,
+    ) -> TopMoviesResponse:
+        del settings, count, client
+        return pool
+
+    monkeypatch.setattr(
+        metadata_service,
+        'fetch_top_movies_pool',
+        fake_fetch,
+    )
+
+    res = client.get(
+        '/api/v1/catalog/top-movies',
+        headers={'Authorization': 'Bearer not-a-valid-token'},
+    )
+    assert res.status_code == 401, res.text
+
+
+def test_rail_display_limit_auth_vs_public() -> None:
+    from app.metadata.api import _rail_display_limit
+
+    settings = Settings.model_construct(
+        **_settings_kwargs(),
+        top_movies_default_limit=12,
+        top_movies_max_public_limit=24,
+        top_movies_max_auth_limit=500,
+    )
+    assert _rail_display_limit(100, settings, authenticated=False) == 24
+    assert _rail_display_limit(100, settings, authenticated=True) == 100
+    assert _rail_display_limit(600, settings, authenticated=True) == 500
+    assert _rail_display_limit(None, settings, authenticated=True) == 12
 
 
 def test_top_movies_omit_limit_respects_elevated_default_cap(

@@ -17,6 +17,12 @@ const CATALOG_FETCH_TIMEOUT_MS = 12_000;
  */
 export const HOME_RAIL_MAX_PUBLIC_LIMIT = 24;
 
+/**
+ * Authenticated browse-shelf cap (top movies / top TV). Aligned with backend
+ * `TOP_MOVIES_MAX_AUTH_LIMIT` / `settings.top_movies_max_auth_limit` (500).
+ */
+export const HOME_RAIL_MAX_AUTH_LIMIT = 500;
+
 export interface CreditPersonRef {
   type: 'person';
   id: string;
@@ -338,35 +344,82 @@ function isHomeRailTitle(item: TopMovie): boolean {
   );
 }
 
+export interface HomeRailFetchOptions {
+  /** Bearer access token — unlocks ``HOME_RAIL_MAX_AUTH_LIMIT`` on top lists. */
+  accessToken?: string;
+}
+
+export interface HomeRailFetchResult {
+  items: TopMovie[];
+  /** True when the request used a Bearer token and the API accepted it. */
+  authAccepted: boolean;
+}
+
 async function fetchHomeRailTitles(
   path: string,
   pick: (body: unknown) => TopMovie[] | undefined,
   limit = 12,
-): Promise<TopMovie[]> {
+  options?: HomeRailFetchOptions & { maxLimit?: number },
+): Promise<HomeRailFetchResult> {
   let base: string;
   try {
     base = upstreamApiBaseUrl();
   } catch {
-    return [];
+    return { items: [], authAccepted: false };
   }
 
-  const capped = Math.min(HOME_RAIL_MAX_PUBLIC_LIMIT, Math.max(1, limit));
-  try {
-    const res = await fetch(`${base}${path}?limit=${capped}`, {
+  const maxLimit = options?.maxLimit ?? HOME_RAIL_MAX_PUBLIC_LIMIT;
+  const accessToken = options?.accessToken?.trim() || undefined;
+  const capped = Math.min(maxLimit, Math.max(1, limit));
+
+  async function once(
+    token: string | undefined,
+    requestLimit = capped,
+  ): Promise<{ ok: boolean; status: number; items: TopMovie[] }> {
+    const headers = await catalogUpstreamHeaders(
+      token ? { Authorization: `Bearer ${token}` } : undefined,
+    );
+    const res = await fetch(`${base}${path}?limit=${requestLimit}`, {
       ...(process.env.NODE_ENV === 'development'
         ? { cache: 'no-store' as const }
         : { next: { revalidate: 60 } }),
-      headers: await catalogUpstreamHeaders(),
+      headers,
       signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
       await res.text().catch(() => undefined);
-      return [];
+      return { ok: false, status: res.status, items: [] };
     }
     const data: unknown = await res.json();
-    return (pick(data) ?? []).filter(isHomeRailTitle);
+    return {
+      ok: true,
+      status: res.status,
+      items: (pick(data) ?? []).filter(isHomeRailTitle),
+    };
+  }
+
+  try {
+    if (accessToken) {
+      const authed = await once(accessToken);
+      if (authed.ok) {
+        return { items: authed.items, authAccepted: true };
+      }
+      // Expired / invalid access: fall back to the public rail.
+      if (authed.status !== 401) {
+        return { items: [], authAccepted: false };
+      }
+    }
+    const publicLimit = Math.min(
+      HOME_RAIL_MAX_PUBLIC_LIMIT,
+      Math.max(1, limit),
+    );
+    const publicResult = await once(undefined, publicLimit);
+    return {
+      items: publicResult.ok ? publicResult.items : [],
+      authAccepted: false,
+    };
   } catch {
-    return [];
+    return { items: [], authAccepted: false };
   }
 }
 
@@ -374,34 +427,60 @@ async function fetchHomeRailTitles(
  * Shuffled sample from the TMDb top-rated pool for home rails (signed-in `/`
  * and guest `/` landing). Upstream is public but request-level rate limited;
  * browsers must not hit these via the BFF proxy (RSC → API only).
+ *
+ * Pass ``accessToken`` for browse shelves (up to ``HOME_RAIL_MAX_AUTH_LIMIT``).
  */
-export async function fetchTopMovies(limit = 12): Promise<TopMovie[]> {
+export async function fetchTopMovies(
+  limit = 12,
+  options?: HomeRailFetchOptions,
+): Promise<HomeRailFetchResult> {
+  const wantsAuth = Boolean(options?.accessToken?.trim());
   return fetchHomeRailTitles(
     '/api/v1/catalog/top-movies',
     (body) => (body as TopMoviesResponse).movies,
     limit,
+    {
+      ...options,
+      maxLimit: wantsAuth
+        ? HOME_RAIL_MAX_AUTH_LIMIT
+        : HOME_RAIL_MAX_PUBLIC_LIMIT,
+    },
   );
 }
 
-/** Shuffled sample from TMDb top-rated TV for home rails. */
-export async function fetchTopTvShows(limit = 12): Promise<TopMovie[]> {
+/** Shuffled sample from the TMDb top-rated TV for home rails. */
+export async function fetchTopTvShows(
+  limit = 12,
+  options?: HomeRailFetchOptions,
+): Promise<HomeRailFetchResult> {
+  const wantsAuth = Boolean(options?.accessToken?.trim());
   return fetchHomeRailTitles(
     '/api/v1/catalog/top-tv-shows',
     (body) => (body as TopTvShowsResponse).shows,
     limit,
+    {
+      ...options,
+      maxLimit: wantsAuth
+        ? HOME_RAIL_MAX_AUTH_LIMIT
+        : HOME_RAIL_MAX_PUBLIC_LIMIT,
+    },
   );
 }
 
 /**
  * Most popular movies currently in theatres (TMDb now_playing, popularity
- * order). Same default count as top movies / top TV.
+ * order). Same default count as top movies / top TV. Always public-capped.
  */
-export async function fetchNowInTheatres(limit = 12): Promise<TopMovie[]> {
-  return fetchHomeRailTitles(
+export async function fetchNowInTheatres(
+  limit = 12,
+): Promise<TopMovie[]> {
+  const result = await fetchHomeRailTitles(
     '/api/v1/catalog/now-in-theatres',
     (body) => (body as NowInTheatresResponse).movies,
     limit,
+    { maxLimit: HOME_RAIL_MAX_PUBLIC_LIMIT },
   );
+  return result.items;
 }
 
 export interface HomeRailsResult {

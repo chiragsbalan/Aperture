@@ -112,26 +112,39 @@ class Settings(BaseSettings):
     landing_posters_rate_limit_max_per_ip: int = 60
 
     # Home rails (TMDb pools; top movies/TV shuffle on serve). Used by signed-in
-    # `/` and guest `/` (public home). Shared display limit across the three rails.
-    # Per-IP RL is shared across top-movies / top-tv / now-in-theatres (each
-    # home load charges 3). Keep headroom for refresh, not scrapers.
+    # `/` and guest `/` (public home). Per-IP RL is shared across top-movies /
+    # top-tv / now-in-theatres (each home load charges 3). Keep headroom for
+    # refresh, not scrapers.
     top_movies_cache_ttl_seconds: int = 60 * 60 * 24
-    top_movies_pool_count: int = Field(default=100, ge=1, le=100)
+    # Cached TMDb top-rated pool for movies + TV browse shelves (auth can take
+    # up to ``top_movies_max_auth_limit`` from this pool).
+    top_movies_pool_count: int = Field(default=500, ge=1, le=500)
     top_movies_default_limit: int = Field(default=12, ge=1, le=100)
-    # Hard cap on public rail ``limit`` (and default) returned to clients.
+    # Hard cap on anonymous / home-rail ``limit`` returned to clients.
     top_movies_max_public_limit: int = Field(default=24, ge=1, le=100)
+    # Hard cap when a valid Bearer access token is present (browse shelves).
+    top_movies_max_auth_limit: int = Field(default=500, ge=1, le=500)
     top_movies_negative_cache_ttl_seconds: int = 60
     top_movies_rate_limit_window_seconds: int = 60
     top_movies_rate_limit_max_per_ip: int = 30
     # Now in theatres refreshes more often than all-time top lists.
     now_in_theatres_cache_ttl_seconds: int = 60 * 60 * 6
+    now_in_theatres_pool_count: int = Field(default=100, ge=1, le=500)
 
     @model_validator(mode='after')
     def validate_top_movies_public_limit(self) -> Self:
-        """Default display limit must not exceed the public max."""
+        """Keep rail display limits coherent with the cached pool size."""
         if self.top_movies_default_limit > self.top_movies_max_public_limit:
             raise ValueError(
                 'top_movies_default_limit must be <= top_movies_max_public_limit'
+            )
+        if self.top_movies_max_public_limit > self.top_movies_max_auth_limit:
+            raise ValueError(
+                'top_movies_max_public_limit must be <= top_movies_max_auth_limit'
+            )
+        if self.top_movies_max_auth_limit > self.top_movies_pool_count:
+            raise ValueError(
+                'top_movies_max_auth_limit must be <= top_movies_pool_count'
             )
         return self
 

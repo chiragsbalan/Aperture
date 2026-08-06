@@ -41,6 +41,8 @@ interface TitleShelfViewProps {
   renderGrid?: ReactNode;
   /** Extra content under the header (e.g. action error). */
   belowHeader?: ReactNode;
+  /** Extra content under the grid / Load more (e.g. guest login CTA). */
+  footer?: ReactNode;
 }
 
 function ShelfSkeleton() {
@@ -78,6 +80,7 @@ export function TitleShelfView({
   onLoadMore,
   renderGrid,
   belowHeader,
+  footer,
 }: TitleShelfViewProps) {
   const loadMoreStatusId = useId();
   const resolvedTotal = total ?? items.length;
@@ -185,7 +188,12 @@ export function TitleShelfView({
       {showLoadMore ? (
         <div className="mt-10">
           {describeLoadMore ? (
-            <span id={loadMoreStatusId} className="sr-only">
+            <span
+              id={loadMoreStatusId}
+              className="sr-only"
+              role="status"
+              aria-live="polite"
+            >
               Showing {items.length} of {resolvedTotal}
             </span>
           ) : null}
@@ -208,6 +216,8 @@ export function TitleShelfView({
           </button>
         </div>
       ) : null}
+
+      {footer}
     </div>
   );
 }

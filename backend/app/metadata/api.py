@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Path, Query, Request, Response, status
 from pydantic import ValidationError
 
+from app.auth.deps import OptionalIdentityDep
 from app.core.cache import CacheBackend, get_cache
 from app.core.config import Settings
 from app.core.deps import DbSessionDep, SettingsDep
@@ -198,8 +199,23 @@ def _filter_rail_titles(titles: list[TopMovie]) -> list[TopMovie]:
 
 def _public_rail_display_limit(limit: int | None, settings: Settings) -> int:
     """Clamp requested (or default) rail size to the public max."""
+    return _rail_display_limit(limit, settings, authenticated=False)
+
+
+def _rail_display_limit(
+    limit: int | None,
+    settings: Settings,
+    *,
+    authenticated: bool,
+) -> int:
+    """Clamp rail size: public max for anonymous, auth max when signed in."""
     requested = limit if limit is not None else settings.top_movies_default_limit
-    return min(requested, settings.top_movies_max_public_limit)
+    ceiling = (
+        settings.top_movies_max_auth_limit
+        if authenticated
+        else settings.top_movies_max_public_limit
+    )
+    return min(requested, ceiling)
 
 
 def _filter_top_movies(detail: TopMoviesResponse) -> TopMoviesResponse:
@@ -414,7 +430,7 @@ async def _load_now_in_theatres_pool(
     response: Response,
 ) -> NowInTheatresResponse:
     cache = get_cache()
-    key = now_in_theatres_key(count=settings.top_movies_pool_count)
+    key = now_in_theatres_key(count=settings.now_in_theatres_pool_count)
 
     hit = await _read_cached_now_in_theatres(cache, key)
     if hit is not None:
@@ -464,16 +480,17 @@ async def get_top_movies(
     request: Request,
     settings: SettingsDep,
     response: Response,
-    limit: int | None = Query(default=None, ge=1, le=100),
+    identity: OptionalIdentityDep,
+    limit: int | None = Query(default=None, ge=1, le=500),
 ) -> TopMoviesResponse:
     """Return a shuffled sample from TMDb's all-time top-rated movies.
 
-    Public (unauthenticated), like ``/landing/posters``. Served to signed-in
-    ``/`` and guest ``/`` (public home) via RSC (not the browser BFF proxy). Every
-    request is subject to a per-IP rate limit (HIT / BYPASS / MISS). The full
-    pool (default 100) is Redis-cached; each response reshuffles and truncates
-    to ``limit``. Degrades to an empty list when TMDb is unavailable so the
-    home rail can show an empty state.
+    Public (unauthenticated) up to ``top_movies_max_public_limit``; with a valid
+    Bearer access token up to ``top_movies_max_auth_limit`` (browse shelves).
+    Served via RSC (not the browser BFF proxy). Every request is subject to a
+    per-IP rate limit (HIT / BYPASS / MISS). The full pool is Redis-cached; each
+    response reshuffles and truncates to ``limit``. Degrades to an empty list
+    when TMDb is unavailable so the home rail can show an empty state.
     """
     client_ip = resolve_client_ip(request, settings)
     await enforce_top_movies_rate_limit(
@@ -481,7 +498,11 @@ async def get_top_movies(
         settings=settings,
         client_ip=client_ip,
     )
-    display_limit = _public_rail_display_limit(limit, settings)
+    display_limit = _rail_display_limit(
+        limit,
+        settings,
+        authenticated=identity is not None,
+    )
     pool = await _load_top_movies_pool(settings, response)
     response.headers['Cache-Control'] = _HOME_RAIL_CACHE_CONTROL
     return _shuffle_top_movies(pool, limit=display_limit)
@@ -492,7 +513,8 @@ async def get_top_tv_shows(
     request: Request,
     settings: SettingsDep,
     response: Response,
-    limit: int | None = Query(default=None, ge=1, le=100),
+    identity: OptionalIdentityDep,
+    limit: int | None = Query(default=None, ge=1, le=500),
 ) -> TopTvShowsResponse:
     """Return a shuffled sample from TMDb's all-time top-rated TV shows."""
     client_ip = resolve_client_ip(request, settings)
@@ -501,7 +523,11 @@ async def get_top_tv_shows(
         settings=settings,
         client_ip=client_ip,
     )
-    display_limit = _public_rail_display_limit(limit, settings)
+    display_limit = _rail_display_limit(
+        limit,
+        settings,
+        authenticated=identity is not None,
+    )
     pool = await _load_top_tv_shows_pool(settings, response)
     response.headers['Cache-Control'] = _HOME_RAIL_CACHE_CONTROL
     return _shuffle_top_tv_shows(pool, limit=display_limit)
