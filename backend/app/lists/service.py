@@ -15,7 +15,6 @@ from app.common.content_refs import (
     to_public_content_type,
 )
 from app.core.cache import CacheBackend, CacheBackendError
-from app.library import service as library_service
 from app.lists import repository as lists_repository
 from app.lists.cache_keys import system_list_key
 from app.lists.models import List, ListItem
@@ -27,7 +26,6 @@ from app.lists.schemas import (
     ListItemResponse,
     ProfileListIndexEntry,
     SystemListResponse,
-    TitleLibraryStatusResponse,
 )
 from app.metadata import service as metadata_service
 from app.users import service as users_service
@@ -940,45 +938,3 @@ async def custom_lists_membership_for_content(
     membership = {str(list_id): present for list_id, present in membership_raw.items()}
     item_ids = {str(list_id): item_id for list_id, item_id in item_ids_raw.items()}
     return membership, item_ids
-
-
-async def title_library_status(
-    session: AsyncSession,
-    *,
-    identity_id: uuid.UUID,
-    content_type: str,
-    content_id: uuid.UUID,
-) -> TitleLibraryStatusResponse:
-    """One-shot membership for title-page library action icons."""
-    ref = _parse_ref(content_type=content_type, content_id=content_id)
-    public_key = f'{ref.public_type}:{ref.content_id}'
-    watch_membership = await system_list_contains(
-        session,
-        identity_id=identity_id,
-        kind='watchlist',
-        refs=[(ref.public_type, ref.content_id)],
-    )
-    fav_membership = await system_list_contains(
-        session,
-        identity_id=identity_id,
-        kind='favorites',
-        refs=[(ref.public_type, ref.content_id)],
-    )
-    logged = await library_service.contains_logged_titles(
-        session,
-        identity_id=identity_id,
-        refs=[(ref.public_type, ref.content_id)],
-    )
-    list_membership, list_item_ids = await custom_lists_membership_for_content(
-        session,
-        identity_id=identity_id,
-        content_type=ref.public_type,
-        content_id=ref.content_id,
-    )
-    return TitleLibraryStatusResponse(
-        in_watchlist=bool(watch_membership.get(public_key)),
-        in_favorites=bool(fav_membership.get(public_key)),
-        has_logged=bool(logged.membership.get(public_key)),
-        list_membership=list_membership,
-        list_item_ids=list_item_ids,
-    )

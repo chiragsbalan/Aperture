@@ -11,6 +11,7 @@ from app.auth.deps import CurrentIdentityDep, OptionalIdentityDep
 from app.core.cache import get_cache
 from app.core.deps import DbSessionDep, SettingsDep
 from app.core.trusted_client import resolve_client_ip
+from app.library import service as library_service
 from app.lists import service as lists_service
 from app.lists.rate_limit import enforce_lists_write_rate_limit
 from app.lists.schemas import (
@@ -455,19 +456,60 @@ async def title_library_status(
     type: Annotated[str, Query(min_length=1, max_length=16)],
     id: Annotated[uuid.UUID, Query()],
 ) -> TitleLibraryStatusResponse:
-    """Combined watchlist / favorites / diary / custom-list status for one title."""
+    """Combined watchlist / favorites / diary / custom-list status for one title.
+
+    Orchestrated in the API layer so ``lists`` and ``library`` domain modules
+    stay independent (import-linter).
+    """
     try:
-        return await lists_service.title_library_status(
+        watch_membership = await lists_service.system_list_contains(
             session,
             identity_id=identity.id,
-            content_type=type,
-            content_id=id,
+            kind='watchlist',
+            refs=[(type, id)],
+        )
+        fav_membership = await lists_service.system_list_contains(
+            session,
+            identity_id=identity.id,
+            kind='favorites',
+            refs=[(type, id)],
+        )
+        logged = await library_service.contains_logged_titles(
+            session,
+            identity_id=identity.id,
+            refs=[(type, id)],
+        )
+        list_membership, list_item_ids = (
+            await lists_service.custom_lists_membership_for_content(
+                session,
+                identity_id=identity.id,
+                content_type=type,
+                content_id=id,
+            )
         )
     except Exception as exc:
         mapped = _map_domain_error(exc)
         if mapped is not None:
             raise mapped from exc
+        if isinstance(exc, library_service.ProfileRequiredError):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail='Profile not found',
+            ) from exc
+        if isinstance(exc, library_service.UnsupportedWatchContentError):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=str(exc) or 'Unsupported content type',
+            ) from exc
         raise
+    # Single-ref calls: membership dicts are keyed by normalized public type.
+    return TitleLibraryStatusResponse(
+        in_watchlist=any(watch_membership.values()),
+        in_favorites=any(fav_membership.values()),
+        has_logged=any(logged.membership.values()),
+        list_membership=list_membership,
+        list_item_ids=list_item_ids,
+    )
 
 
 @router.get('/lists/{list_id}', response_model=CustomListDetailResponse)
