@@ -479,13 +479,14 @@ async def title_library_status(
             identity_id=identity.id,
             refs=[(type, id)],
         )
-        list_membership, list_item_ids = (
-            await lists_service.custom_lists_membership_for_content(
-                session,
-                identity_id=identity.id,
-                content_type=type,
-                content_id=id,
-            )
+        (
+            list_membership,
+            list_item_ids,
+        ) = await lists_service.custom_lists_membership_for_content(
+            session,
+            identity_id=identity.id,
+            content_type=type,
+            content_id=id,
         )
     except Exception as exc:
         mapped = _map_domain_error(exc)
