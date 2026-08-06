@@ -52,8 +52,8 @@ P1.4 shipped a minimal public profile (`GET /users/{username}` → username / di
 - **pc.2** ships public Lists + always-public watchlist; favorites stay private; Activity verbs are reserved for pc.7 (no emit in pc.2).
 - Client diary caches are best-effort: TTL expiry plus clear-all on mutate/logout; logout-only clear is not a hard security boundary for previously viewed public pages.
 - Aggressive diary/list pagination shares the public IP budget — tune `USERS_PUBLIC_RATE_LIMIT_MAX_PER_IP` if legitimate browsing hits 429.
-- Diary half-star ratings on public walls are **[ADR-0008](ADR-0008-personal-library-lists.md) / pc.2** (optional `watch_entries.rating`), not ADR-0010.
-- ADRs 0010–0013 cover a dedicated title-level ratings product (if any), reviews, follows, and activity — not per-entry diary half-stars.
+- Diary half-star ratings on public walls are **[ADR-0008](ADR-0008-personal-library-lists.md) / pc.2** (optional `watch_entries.rating`), not a separate ratings ADR.
+- **ADR numbering note:** [ADR-0010](ADR-0010-guest-landing-home-shell.md) is guest/signed-in home shell; [ADR-0011](ADR-0011-title-poster-morph.md) / [ADR-0012](ADR-0012-brand-shell-atmosphere.md) are UI morph/atmosphere. Later profile slices (reviews, follows, activity, title-level ratings if any) take the **next free** ADR ids after 0012 — not the old “0010–0013” reservation.
 
 ## Future evolution
 

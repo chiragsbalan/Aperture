@@ -157,7 +157,7 @@ export function GuestLanding({
 
   return (
     <>
-      <section className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-5 py-24 sm:px-6 sm:py-28">
+      <section className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-5 py-24 sm:px-6 sm:py-28">
         <PosterMosaic posters={posters} />
         <div className="motion-fade-rise relative z-[1] w-full max-w-xl">
           <GuestLandingHero panel={panel} onPanelChange={setPanel} />

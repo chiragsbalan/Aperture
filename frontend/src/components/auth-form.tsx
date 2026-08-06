@@ -554,14 +554,14 @@ export function AuthForm({
                 onClick={() => {
                   onSwitchMode('login');
                 }}
-                className="text-foreground underline-offset-2 hover:underline"
+                className="text-foreground underline underline-offset-2"
               >
                 Log in
               </button>
             ) : (
               <Link
                 href="/login"
-                className="text-foreground underline-offset-2 hover:underline"
+                className="text-foreground underline underline-offset-2"
               >
                 Log in
               </Link>
@@ -576,14 +576,14 @@ export function AuthForm({
                 onClick={() => {
                   onSwitchMode('signup');
                 }}
-                className="text-foreground underline-offset-2 hover:underline"
+                className="text-foreground underline underline-offset-2"
               >
                 Sign up
               </button>
             ) : (
               <Link
                 href="/signup"
-                className="text-foreground underline-offset-2 hover:underline"
+                className="text-foreground underline underline-offset-2"
               >
                 Sign up
               </Link>
