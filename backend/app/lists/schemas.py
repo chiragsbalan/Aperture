@@ -149,3 +149,16 @@ class CustomListMembershipResponse(BaseModel):
         default_factory=dict,
         description='list_id → item_id when the content is on that list',
     )
+
+
+class TitleLibraryStatusResponse(BaseModel):
+    """Combined title-page membership for watchlist / favorites / diary / lists."""
+
+    in_watchlist: bool
+    in_favorites: bool
+    has_logged: bool
+    list_membership: dict[str, bool] = Field(default_factory=dict)
+    list_item_ids: dict[str, uuid.UUID] = Field(
+        default_factory=dict,
+        description='list_id → item_id when the content is on that custom list',
+    )

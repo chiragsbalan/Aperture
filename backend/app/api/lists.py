@@ -24,6 +24,7 @@ from app.lists.schemas import (
     ListItemResponse,
     PatchCustomListBody,
     SystemListResponse,
+    TitleLibraryStatusResponse,
 )
 from app.users.rate_limit import enforce_users_public_rate_limit
 
@@ -442,6 +443,31 @@ async def custom_lists_membership(
         membership=membership,
         item_ids=item_ids,
     )
+
+
+@router.get(
+    '/me/library-status',
+    response_model=TitleLibraryStatusResponse,
+)
+async def title_library_status(
+    identity: CurrentIdentityDep,
+    session: DbSessionDep,
+    type: Annotated[str, Query(min_length=1, max_length=16)],
+    id: Annotated[uuid.UUID, Query()],
+) -> TitleLibraryStatusResponse:
+    """Combined watchlist / favorites / diary / custom-list status for one title."""
+    try:
+        return await lists_service.title_library_status(
+            session,
+            identity_id=identity.id,
+            content_type=type,
+            content_id=id,
+        )
+    except Exception as exc:
+        mapped = _map_domain_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
 
 
 @router.get('/lists/{list_id}', response_model=CustomListDetailResponse)

@@ -353,7 +353,9 @@ async function fetchHomeRailTitles(
   const capped = Math.min(HOME_RAIL_MAX_PUBLIC_LIMIT, Math.max(1, limit));
   try {
     const res = await fetch(`${base}${path}?limit=${capped}`, {
-      cache: 'no-store',
+      ...(process.env.NODE_ENV === 'development'
+        ? { cache: 'no-store' as const }
+        : { next: { revalidate: 60 } }),
       headers: await catalogUpstreamHeaders(),
       signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS),
     });
@@ -400,6 +402,57 @@ export async function fetchNowInTheatres(limit = 12): Promise<TopMovie[]> {
     (body) => (body as NowInTheatresResponse).movies,
     limit,
   );
+}
+
+export interface HomeRailsResult {
+  inTheatres: TopMovie[];
+  movies: TopMovie[];
+  shows: TopMovie[];
+}
+
+/**
+ * Batched home rails (one upstream RTT). Prefer this over three separate
+ * rail fetches on `/`.
+ */
+export async function fetchHomeCatalogRails(
+  limit = 12,
+): Promise<HomeRailsResult> {
+  let base: string;
+  try {
+    base = upstreamApiBaseUrl();
+  } catch {
+    return { inTheatres: [], movies: [], shows: [] };
+  }
+
+  const capped = Math.min(HOME_RAIL_MAX_PUBLIC_LIMIT, Math.max(1, limit));
+  try {
+    const res = await fetch(
+      `${base}/api/v1/catalog/home-rails?limit=${capped}`,
+      {
+        ...(process.env.NODE_ENV === 'development'
+          ? { cache: 'no-store' as const }
+          : { next: { revalidate: 60 } }),
+        headers: await catalogUpstreamHeaders(),
+        signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS),
+      },
+    );
+    if (!res.ok) {
+      await res.text().catch(() => undefined);
+      return { inTheatres: [], movies: [], shows: [] };
+    }
+    const data = (await res.json()) as {
+      in_theatres?: TopMovie[];
+      movies?: TopMovie[];
+      shows?: TopMovie[];
+    };
+    return {
+      inTheatres: (data.in_theatres ?? []).filter(isHomeRailTitle),
+      movies: (data.movies ?? []).filter(isHomeRailTitle),
+      shows: (data.shows ?? []).filter(isHomeRailTitle),
+    };
+  } catch {
+    return { inTheatres: [], movies: [], shows: [] };
+  }
 }
 
 /** Dedupes generateMetadata + page fetch within one RSC request. */

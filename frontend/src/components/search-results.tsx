@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { TitlePosterLink } from '@/components/title-poster-link';
 import { POSTER_GRID_SIZES } from '@/lib/poster';
@@ -15,10 +15,23 @@ import {
 
 const DEBOUNCE_MS = 250;
 
-export function SearchResults({ query }: { query: string }) {
-  const [results, setResults] = useState<SearchHit[] | null>(null);
-  const [total, setTotal] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+export function SearchResults({
+  query,
+  initialResults = null,
+  initialTotal = 0,
+  initialError = null,
+}: {
+  query: string;
+  initialResults?: SearchHit[] | null;
+  initialTotal?: number;
+  initialError?: string | null;
+}) {
+  const ssrQueryRef = useRef(query.trim());
+  const [results, setResults] = useState<SearchHit[] | null>(
+    initialResults,
+  );
+  const [total, setTotal] = useState(initialTotal);
+  const [error, setError] = useState<string | null>(initialError);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -28,6 +41,15 @@ export function SearchResults({ query }: { query: string }) {
       setTotal(0);
       setError(null);
       setLoading(false);
+      return;
+    }
+
+    // First paint already has SSR results for this q — skip the debounce refetch.
+    if (
+      cleaned === ssrQueryRef.current &&
+      (initialResults != null || initialError != null)
+    ) {
+      ssrQueryRef.current = '';
       return;
     }
 
@@ -57,7 +79,7 @@ export function SearchResults({ query }: { query: string }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [query]);
+  }, [query, initialResults, initialError]);
 
   if (!query.trim()) {
     return (

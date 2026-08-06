@@ -1,3 +1,4 @@
+import { AuthProvider } from '@/components/auth-provider';
 import { ThemeSync } from '@/components/theme-sync';
 import { TitlePosterBackMorph } from '@/components/title-poster-back-morph';
 import { TitlePosterFlightAbandon } from '@/components/title-poster-flight-abandon';
@@ -44,10 +45,12 @@ export default function RootLayout({
             __html: SHELL_ATMOSPHERE_RANDOMIZE_SCRIPT,
           }}
         />
-        <ThemeSync />
-        <TitlePosterBackMorph />
-        <TitlePosterFlightAbandon />
-        {children}
+        <AuthProvider>
+          <ThemeSync />
+          <TitlePosterBackMorph />
+          <TitlePosterFlightAbandon />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

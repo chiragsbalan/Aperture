@@ -104,4 +104,10 @@ class ListItem(UuidPrimaryKeyMixin, TimestampMixin, Base):
             name='uq_list_items_list_content',
         ),
         Index('ix_list_items_list_id_position', 'list_id', 'position'),
+        Index(
+            'ix_list_items_list_id_created_at',
+            'list_id',
+            'created_at',
+            'id',
+        ),
     )

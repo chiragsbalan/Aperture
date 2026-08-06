@@ -6,10 +6,8 @@ import { HomeCatalogRails } from '@/components/home-catalog-rails';
 import { SiteHeader } from '@/components/site-header';
 import { refreshCookieName } from '@/lib/auth-cookies';
 import {
+  fetchHomeCatalogRails,
   fetchLandingPosterUrls,
-  fetchNowInTheatres,
-  fetchTopMovies,
-  fetchTopTvShows,
 } from '@/lib/catalog';
 import { shouldPrefetchHomeRails } from '@/lib/home-shell';
 import { shouldShowSignedInHome } from '@/lib/home-shell.server';
@@ -23,7 +21,7 @@ export const metadata: Metadata = {
  * Access-only session probe for the home shell (see `decideSignedInHomeShell`).
  *
  * Never calls refresh from RSC (Next cannot persist rotated cookies here).
- * SiteHeader refreshes via `/api/auth/me` on the client.
+ * SiteHeader refreshes via shared AuthProvider → `/api/auth/me`.
  *
  * Matrix:
  * - no cookies → guest
@@ -41,13 +39,12 @@ export default async function HomePage() {
   // Prefetch rails only when refresh is present. Access-only must never start
   // rail fetches — /me may 401 and demote to guest (guest path fetches rails).
   const railsPromise = shouldPrefetchHomeRails(hasRefreshCookie)
-    ? Promise.all([fetchNowInTheatres(), fetchTopMovies(), fetchTopTvShows()])
+    ? fetchHomeCatalogRails()
     : null;
 
   // Always resolve the session probe before choosing the shell.
   if (await shouldShowSignedInHome()) {
-    const [inTheatres, movies, shows] = await (railsPromise ??
-      Promise.all([fetchNowInTheatres(), fetchTopMovies(), fetchTopTvShows()]));
+    const rails = await (railsPromise ?? fetchHomeCatalogRails());
     return (
       <div className="layout-shell shell-atmosphere relative flex min-h-dvh flex-col items-center">
         <a href="#main-content" className="skip-link">
@@ -56,20 +53,18 @@ export default async function HomePage() {
         <SiteHeader />
         <main id="main-content" className="relative z-[1] w-full">
           <HomeCatalogRails
-            inTheatres={inTheatres}
-            movies={movies}
-            shows={shows}
+            inTheatres={rails.inTheatres}
+            movies={rails.movies}
+            shows={rails.shows}
           />
         </main>
       </div>
     );
   }
 
-  const [posters, inTheatres, movies, shows] = await Promise.all([
+  const [posters, rails] = await Promise.all([
     fetchLandingPosterUrls(),
-    fetchNowInTheatres(),
-    fetchTopMovies(),
-    fetchTopTvShows(),
+    fetchHomeCatalogRails(),
   ]);
 
   return (
@@ -81,9 +76,9 @@ export default async function HomePage() {
       <main id="main-content" className="relative flex flex-1 flex-col">
         <GuestLanding
           posters={posters}
-          inTheatres={inTheatres}
-          movies={movies}
-          shows={shows}
+          inTheatres={rails.inTheatres}
+          movies={rails.movies}
+          shows={rails.shows}
         />
       </main>
     </div>

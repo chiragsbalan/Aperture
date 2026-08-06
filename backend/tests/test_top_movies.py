@@ -11,7 +11,12 @@ from app.core.config import Settings, get_settings
 from app.core.security import hash_rate_limit_subject
 from app.metadata import service as metadata_service
 from app.metadata.cache_keys import top_movies_key
-from app.metadata.schemas import TopMovie, TopMoviesResponse
+from app.metadata.schemas import (
+    NowInTheatresResponse,
+    TopMovie,
+    TopMoviesResponse,
+    TopTvShowsResponse,
+)
 from app.metadata.tmdb.client import TmdbClient
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -518,6 +523,86 @@ def test_top_tv_and_theatres_empty_without_tmdb_key(
     theatres = client.get('/api/v1/catalog/now-in-theatres')
     assert theatres.status_code == 200, theatres.text
     assert theatres.json() == {'movies': []}
+
+
+def test_home_rails_batches_three_pools(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv('TMDB_API_KEY', 'test-tmdb-key')
+    get_settings.cache_clear()
+    init_cache('')
+
+    movies_pool = _sample_pool(size=10)
+    shows_pool = TopTvShowsResponse(
+        shows=[
+            TopMovie(
+                tmdb_id=2000 + i,
+                title=f'Show {i}',
+                poster_url=f'https://image.tmdb.org/t/p/w342/s{i}.jpg',
+                year=2010 + i,
+            )
+            for i in range(10)
+        ],
+    )
+    theatres_pool = NowInTheatresResponse(
+        movies=[
+            TopMovie(
+                tmdb_id=3000 + i,
+                title=f'Theatre {i}',
+                poster_url=f'https://image.tmdb.org/t/p/w342/t{i}.jpg',
+                year=2024,
+            )
+            for i in range(10)
+        ],
+    )
+
+    async def fake_movies(
+        settings: Settings,
+        *,
+        count: int | None = None,
+        client: TmdbClient | None = None,
+    ) -> TopMoviesResponse:
+        del settings, count, client
+        return movies_pool
+
+    async def fake_shows(
+        settings: Settings,
+        *,
+        count: int | None = None,
+        client: TmdbClient | None = None,
+    ) -> TopTvShowsResponse:
+        del settings, count, client
+        return shows_pool
+
+    async def fake_theatres(
+        settings: Settings,
+        *,
+        count: int | None = None,
+        client: TmdbClient | None = None,
+    ) -> NowInTheatresResponse:
+        del settings, count, client
+        return theatres_pool
+
+    monkeypatch.setattr(metadata_service, 'fetch_top_movies_pool', fake_movies)
+    monkeypatch.setattr(
+        metadata_service,
+        'fetch_top_tv_shows_pool',
+        fake_shows,
+    )
+    monkeypatch.setattr(
+        metadata_service,
+        'fetch_now_in_theatres_pool',
+        fake_theatres,
+    )
+
+    res = client.get('/api/v1/catalog/home-rails?limit=5')
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert len(body['movies']) == 5
+    assert len(body['shows']) == 5
+    assert len(body['in_theatres']) == 5
+    assert res.headers.get('cache-control') == 'private, no-store'
 
 
 def test_public_rail_display_limit_clamps() -> None:

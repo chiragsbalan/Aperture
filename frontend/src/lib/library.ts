@@ -253,6 +253,49 @@ export async function removeLibraryItem(
   return { ok: true };
 }
 
+export interface TitleLibraryStatus {
+  inWatchlist: boolean;
+  inFavorites: boolean;
+  hasLogged: boolean;
+  listMembership: Record<string, boolean>;
+  listItemIds: Record<string, string>;
+}
+
+/** One-shot title-page membership (watchlist / favorites / diary / lists). */
+export async function fetchTitleLibraryStatus(
+  type: LibraryContentType,
+  id: string,
+): Promise<
+  | { ok: true; status: TitleLibraryStatus }
+  | { ok: false; status: number }
+> {
+  const params = new URLSearchParams({ type, id });
+  const res = await fetch(
+    `/api/proxy/api/v1/me/library-status?${params.toString()}`,
+    { cache: 'no-store' },
+  );
+  if (!res.ok) {
+    return { ok: false, status: res.status };
+  }
+  const body = (await res.json()) as {
+    in_watchlist: boolean;
+    in_favorites: boolean;
+    has_logged: boolean;
+    list_membership?: Record<string, boolean>;
+    list_item_ids?: Record<string, string>;
+  };
+  return {
+    ok: true,
+    status: {
+      inWatchlist: Boolean(body.in_watchlist),
+      inFavorites: Boolean(body.in_favorites),
+      hasLogged: Boolean(body.has_logged),
+      listMembership: body.list_membership ?? {},
+      listItemIds: body.list_item_ids ?? {},
+    },
+  };
+}
+
 export async function fetchLibraryContains(
   kind: LibraryKind,
   refs: Array<{ type: LibraryContentType; id: string }>,

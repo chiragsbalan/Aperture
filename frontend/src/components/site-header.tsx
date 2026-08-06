@@ -2,17 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense } from 'react';
 
 import { AccountMenu } from '@/components/account-menu';
+import { useAuth } from '@/components/auth-provider';
 import { SiteSearch } from '@/components/site-search';
-
-type AuthState = 'loading' | 'signed_out' | 'signed_in';
-
-interface MeUser {
-  username: string | null;
-  display_name: string | null;
-}
 
 function HeaderSearch() {
   const pathname = usePathname();
@@ -27,40 +21,7 @@ function HeaderSearch() {
  * Guests use landing CTAs for auth (no header Sign in / Create account).
  */
 export function SiteHeader() {
-  const pathname = usePathname();
-  const [authState, setAuthState] = useState<AuthState>('loading');
-  const [meUser, setMeUser] = useState<MeUser | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadAuth() {
-      try {
-        const res = await fetch('/api/auth/me', { cache: 'no-store' });
-        if (cancelled) {
-          return;
-        }
-        if (!res.ok) {
-          setAuthState('signed_out');
-          setMeUser(null);
-          return;
-        }
-        const data = (await res.json()) as { user: MeUser | null };
-        setAuthState('signed_in');
-        setMeUser(data.user);
-      } catch {
-        if (!cancelled) {
-          setAuthState('signed_out');
-          setMeUser(null);
-        }
-      }
-    }
-
-    void loadAuth();
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname]);
+  const { status, me } = useAuth();
 
   return (
     <header className="absolute inset-x-0 top-0 z-[var(--z-header)] flex items-center gap-3 px-5 py-5 sm:gap-4 sm:px-8 sm:py-6">
@@ -82,10 +43,10 @@ export function SiteHeader() {
         >
           <HeaderSearch />
         </Suspense>
-        {authState === 'signed_in' ? (
+        {status === 'signed_in' ? (
           <AccountMenu
-            username={meUser?.username?.trim() || null}
-            displayName={meUser?.display_name ?? null}
+            username={me?.user?.username?.trim() || null}
+            displayName={me?.user?.display_name ?? null}
           />
         ) : null}
       </nav>

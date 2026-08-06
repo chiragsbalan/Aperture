@@ -218,3 +218,51 @@ def test_person_rejected_and_unknown_content_404(
 def test_unauthenticated_watchlist_401(api_client: TestClient) -> None:
     res = api_client.get('/api/v1/me/watchlist')
     assert res.status_code == 401
+
+
+@pytest.mark.integration
+def test_title_library_status_combined(
+    api_client: TestClient,
+    seeded_ids: dict[str, uuid.UUID],
+) -> None:
+    access = _register(api_client)
+    headers = {'Authorization': f'Bearer {access}'}
+    movie_id = str(seeded_ids['movie'])
+
+    assert (
+        api_client.post(
+            '/api/v1/me/watchlist/items',
+            headers=headers,
+            json={'type': 'movie', 'id': movie_id},
+        ).status_code
+        == 200
+    )
+    assert (
+        api_client.post(
+            '/api/v1/me/favorites/items',
+            headers=headers,
+            json={'type': 'movie', 'id': movie_id},
+        ).status_code
+        == 200
+    )
+
+    res = api_client.get(
+        '/api/v1/me/library-status',
+        headers=headers,
+        params={'type': 'movie', 'id': movie_id},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body['in_watchlist'] is True
+    assert body['in_favorites'] is True
+    assert body['has_logged'] is False
+    assert isinstance(body['list_membership'], dict)
+    assert isinstance(body['list_item_ids'], dict)
+
+    assert (
+        api_client.get(
+            '/api/v1/me/library-status',
+            params={'type': 'movie', 'id': movie_id},
+        ).status_code
+        == 401
+    )

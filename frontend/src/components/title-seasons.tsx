@@ -14,6 +14,7 @@ import { CatalogPoster } from '@/components/catalog-poster';
 import type { SeasonDetail } from '@/lib/catalog';
 import { MOTION_DURATION_MED_MS } from '@/lib/motion';
 import { useScrollFadeX } from '@/lib/scroll-fade';
+import { fetchTvSeasonClient } from '@/lib/tv-season';
 
 const MONTH_DAY_YEAR = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
@@ -53,7 +54,13 @@ function seasonTabLabel(season: SeasonDetail): string {
   return `Season ${season.season_number}`;
 }
 
-function SeasonPanel({ season }: { season: SeasonDetail }) {
+function SeasonPanel({
+  season,
+  loadingEpisodes,
+}: {
+  season: SeasonDetail;
+  loadingEpisodes?: boolean;
+}) {
   const year = seasonYear(season.air_date);
   const episodeCount =
     season.episode_count ??
@@ -94,7 +101,11 @@ function SeasonPanel({ season }: { season: SeasonDetail }) {
         </div>
       </div>
 
-      {season.episodes.length > 0 ? (
+      {loadingEpisodes ? (
+        <p className="mt-3 text-sm text-muted" role="status">
+          Loading episodes…
+        </p>
+      ) : season.episodes.length > 0 ? (
         <ul className="mt-3 space-y-0 text-left text-[0.68rem] leading-none sm:mt-3.5 sm:text-xs sm:leading-snug">
           {season.episodes.map((episode) => {
             const airDate = formatEpisodeDate(episode.air_date);
@@ -134,21 +145,44 @@ function SeasonPanel({ season }: { season: SeasonDetail }) {
 
 /**
  * Seasons section: horizontally scrollable season tabs + episode list.
+ * Detail payload ships stubs + episodes for the default season; other seasons
+ * lazy-load episodes when selected.
  */
-export function TitleSeasons({ seasons }: { seasons: SeasonDetail[] }) {
+export function TitleSeasons({
+  contentId,
+  seasons: initialSeasons,
+}: {
+  contentId: string;
+  seasons: SeasonDetail[];
+}) {
   const panelId = useId();
   const tablistRef = useRef<HTMLDivElement | null>(null);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const skipPanelAnimRef = useRef(true);
-  const [activeId, setActiveId] = useState(seasons[0]?.id ?? '');
-  const [panelIdState, setPanelIdState] = useState(seasons[0]?.id ?? '');
-  const panelIdRef = useRef(seasons[0]?.id ?? '');
+  const [seasons, setSeasons] = useState(initialSeasons);
+  const [loadingSeasonId, setLoadingSeasonId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState(initialSeasons[0]?.id ?? '');
+  const [panelIdState, setPanelIdState] = useState(
+    initialSeasons[0]?.id ?? '',
+  );
+  const panelIdRef = useRef(initialSeasons[0]?.id ?? '');
   const [outgoingId, setOutgoingId] = useState<string | null>(null);
   const [stageHeight, setStageHeight] = useState<number | undefined>();
   const [indicator, setIndicator] = useState({ left: 0, width: 0 });
   const [indicatorReady, setIndicatorReady] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    setSeasons(initialSeasons);
+    setActiveId(initialSeasons[0]?.id ?? '');
+    setPanelIdState(initialSeasons[0]?.id ?? '');
+    panelIdRef.current = initialSeasons[0]?.id ?? '';
+    setOutgoingId(null);
+    setLoadingSeasonId(null);
+    // Reset when navigating to another title (not on every parent re-render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- contentId gate
+  }, [contentId]);
 
   const active =
     seasons.find((season) => season.id === activeId) ?? seasons[0] ?? null;
@@ -162,6 +196,48 @@ export function TitleSeasons({ seasons }: { seasons: SeasonDetail[] }) {
       ? (seasons.find((season) => season.id === outgoingId) ?? null)
       : null;
   const isCrossfading = outgoingId != null;
+
+  useEffect(() => {
+    if (active == null) {
+      return;
+    }
+    if (active.episodes.length > 0) {
+      return;
+    }
+    const expectedCount = active.episode_count ?? 0;
+    if (expectedCount <= 0) {
+      return;
+    }
+
+    let cancelled = false;
+    const seasonId = active.id;
+    const seasonNumber = active.season_number;
+    setLoadingSeasonId(seasonId);
+
+    void (async () => {
+      const result = await fetchTvSeasonClient(contentId, seasonNumber);
+      if (cancelled) {
+        return;
+      }
+      setLoadingSeasonId((current) =>
+        current === seasonId ? null : current,
+      );
+      if (!result.ok) {
+        return;
+      }
+      setSeasons((prev) =>
+        prev.map((season) =>
+          season.id === seasonId
+            ? { ...season, episodes: result.data.episodes }
+            : season,
+        ),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [active, contentId]);
 
   useEffect(() => {
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -343,7 +419,14 @@ export function TitleSeasons({ seasons }: { seasons: SeasonDetail[] }) {
   }
 
   function renderSeason(season: SeasonDetail): ReactNode {
-    return <SeasonPanel season={season} />;
+    return (
+      <SeasonPanel
+        season={season}
+        loadingEpisodes={
+          loadingSeasonId === season.id && season.episodes.length === 0
+        }
+      />
+    );
   }
 
   return (
