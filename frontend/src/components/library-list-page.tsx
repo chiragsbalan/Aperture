@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { ActionToast } from '@/components/action-toast';
 import { LibraryNav } from '@/components/library-nav';
@@ -17,6 +17,13 @@ import {
   type LibraryKind,
   type LibraryListItem,
 } from '@/lib/library';
+import {
+  dedupeLibraryListItems,
+  nextShelfPage,
+  nextShelfWindowLimit,
+  TITLE_SHELF_PAGE_SIZE,
+  TITLE_SHELF_SYSTEM_MAX_FETCH,
+} from '@/lib/title-shelf';
 
 type LoadState =
   | { status: 'loading' }
@@ -50,12 +57,20 @@ export function LibraryListPage({
   const [loadingMore, setLoadingMore] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [undo, setUndo] = useState<UndoState | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      const result = await fetchSystemList(kind);
+      const result = await fetchSystemList(kind, 1, TITLE_SHELF_PAGE_SIZE);
       if (cancelled) {
         return;
       }
@@ -69,7 +84,7 @@ export function LibraryListPage({
       }
       setState({
         status: 'ready',
-        items: result.data.items,
+        items: dedupeLibraryListItems(result.data.items),
         total: result.data.total,
         page: result.data.page,
         limit: result.data.limit,
@@ -83,7 +98,7 @@ export function LibraryListPage({
   }, [kind]);
 
   useEffect(() => {
-    if (state.status === 'ready' && state.items.length === 0) {
+    if (state.status === 'ready' && state.total === 0) {
       setEditing(false);
     }
   }, [state]);
@@ -178,21 +193,53 @@ export function LibraryListPage({
     if (state.status !== 'ready' || loadingMore) {
       return;
     }
+    if (state.items.length >= state.total) {
+      return;
+    }
     setLoadingMore(true);
     setActionError(null);
-    const nextPage = state.page + 1;
-    const result = await fetchSystemList(kind, nextPage, state.limit);
+    // Below system max: expand page=1 window (safe after removes).
+    // At/above max: append the next page and dedupe.
+    const useWindow = state.items.length < TITLE_SHELF_SYSTEM_MAX_FETCH;
+    const result = useWindow
+      ? await fetchSystemList(
+          kind,
+          1,
+          nextShelfWindowLimit(
+            state.items.length,
+            TITLE_SHELF_SYSTEM_MAX_FETCH,
+          ),
+        )
+      : await fetchSystemList(
+          kind,
+          nextShelfPage(state.items.length),
+          TITLE_SHELF_PAGE_SIZE,
+        );
+    if (!mountedRef.current) {
+      return;
+    }
     setLoadingMore(false);
     if (!result.ok) {
       setActionError(result.error);
       return;
     }
-    setState({
-      status: 'ready',
-      items: [...state.items, ...result.data.items],
-      total: result.data.total,
-      page: result.data.page,
-      limit: result.data.limit,
+    setState((current) => {
+      if (current.status !== 'ready') {
+        return current;
+      }
+      const items = useWindow
+        ? dedupeLibraryListItems(result.data.items)
+        : dedupeLibraryListItems([
+            ...current.items,
+            ...result.data.items,
+          ]);
+      return {
+        status: 'ready',
+        items,
+        total: result.data.total,
+        page: result.data.page,
+        limit: result.data.limit,
+      };
     });
   }
 
@@ -200,7 +247,7 @@ export function LibraryListPage({
     <div className="layout-content motion-fade-rise text-left">
       <div className="flex items-start justify-between gap-4">
         <h1 className="type-page-lg text-foreground">{title}</h1>
-        {state.status === 'ready' && state.items.length > 0 ? (
+        {state.status === 'ready' && state.total > 0 ? (
           <button
             type="button"
             aria-label={editing ? 'Done' : 'Edit'}
@@ -246,40 +293,45 @@ export function LibraryListPage({
         </p>
       ) : null}
 
-      {state.status === 'ready' && state.items.length === 0 ? (
+      {state.status === 'ready' && state.total === 0 ? (
         <p className="mt-10 text-muted">{emptyMessage}</p>
       ) : null}
 
+      {state.status === 'ready' && state.total > 0 && state.items.length === 0 ? (
+        <p className="mt-10 text-muted" role="status">
+          Load more to see the rest of this list.
+        </p>
+      ) : null}
+
       {state.status === 'ready' && state.items.length > 0 ? (
-        <>
-          <ul className="poster-grid mt-10">
-            {state.items.map((item) => (
-              <li key={item.item_id} className="min-w-0">
-                <LibraryPosterCell
-                  item={item}
-                  editing={editing}
-                  removePending={pendingId === item.item_id}
-                  onRemove={() => {
-                    void handleRemove(item);
-                  }}
-                />
-              </li>
-            ))}
-          </ul>
-          {state.items.length < state.total ? (
-            <button
-              type="button"
-              className="btn btn-lg mt-8"
-              disabled={loadingMore}
-              aria-busy={loadingMore}
-              onClick={() => {
-                void handleLoadMore();
-              }}
-            >
-              {loadingMore ? 'Loading…' : 'Load more'}
-            </button>
-          ) : null}
-        </>
+        <ul className="poster-grid mt-10">
+          {state.items.map((item) => (
+            <li key={item.item_id} className="min-w-0">
+              <LibraryPosterCell
+                item={item}
+                editing={editing}
+                removePending={pendingId === item.item_id}
+                onRemove={() => {
+                  void handleRemove(item);
+                }}
+              />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {state.status === 'ready' && state.items.length < state.total ? (
+        <button
+          type="button"
+          className="btn btn-lg mt-8"
+          disabled={loadingMore}
+          aria-busy={loadingMore}
+          onClick={() => {
+            void handleLoadMore();
+          }}
+        >
+          {loadingMore ? 'Loading…' : 'Load more'}
+        </button>
       ) : null}
 
       {undo != null ? (

@@ -649,6 +649,21 @@
     row-gap: 1rem;
   }
 
+  /*
+   * Off-screen shelf cells stay cheap to keep in the DOM (paginated Load more
+   * can still grow to hundreds). Intrinsic size ≈ 2:3 poster + desktop meta.
+   */
+  .poster-grid > li {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 12.5rem;
+  }
+
+  @media (min-width: 1024px) {
+    .poster-grid > li {
+      contain-intrinsic-size: auto 14.5rem;
+    }
+  }
+
   @media (min-width: 640px) {
     .poster-grid {
       column-gap: 0.75rem;

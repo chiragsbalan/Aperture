@@ -1,6 +1,7 @@
 import { HomeCatalogRail } from '@/components/home-catalog-rail';
 import type { TopMovie } from '@/lib/catalog';
 import { HOME_CATALOG_RAIL_HEADINGS } from '@/lib/home-shell';
+import { BROWSE_SHELF_ROUTES } from '@/lib/title-shelf';
 
 interface HomeCatalogRailsProps {
   inTheatres: TopMovie[];
@@ -33,6 +34,7 @@ export function HomeCatalogRails({
         emptyMessage="Now in theatres is unavailable right now. Try again shortly."
         items={inTheatres}
         kind="movie"
+        seeAllHref={BROWSE_SHELF_ROUTES.nowInTheatres}
       />
       <HomeCatalogRail
         headingId="top-movies-heading"
@@ -41,6 +43,7 @@ export function HomeCatalogRails({
         emptyMessage="Top movies are unavailable right now. Try again shortly."
         items={movies}
         kind="movie"
+        seeAllHref={BROWSE_SHELF_ROUTES.topMovies}
       />
       <HomeCatalogRail
         headingId="top-tv-shows-heading"
@@ -49,6 +52,7 @@ export function HomeCatalogRails({
         emptyMessage="Top TV shows are unavailable right now. Try again shortly."
         items={shows}
         kind="tv"
+        seeAllHref={BROWSE_SHELF_ROUTES.topTv}
       />
     </div>
   );

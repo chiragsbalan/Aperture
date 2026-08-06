@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { TitleNavPoster } from '@/components/title-nav-poster';
 import type { TopMovie } from '@/lib/catalog';
 import { POSTER_GRID_SIZES } from '@/lib/poster';
@@ -10,6 +12,8 @@ interface HomeCatalogRailProps {
   emptyMessage: string;
   items: TopMovie[];
   kind: 'movie' | 'tv';
+  /** Full shelf page for this rail (See all). */
+  seeAllHref: string;
   /** First home rail owns the page h1; later rails use h2. */
   headingLevel?: 'h1' | 'h2';
 }
@@ -25,19 +29,31 @@ export function HomeCatalogRail({
   emptyMessage,
   items,
   kind,
+  seeAllHref,
   headingLevel = 'h2',
 }: HomeCatalogRailProps) {
   const HeadingTag = headingLevel;
 
   return (
     <section className="w-full text-left" aria-labelledby={headingId}>
-      <div className="border-b border-[var(--color-border)] pb-2">
-        <HeadingTag id={headingId} className="type-rail text-foreground">
-          {title}
-        </HeadingTag>
-        {items.length === 0 ? null : (
-          <p className="mt-1 text-sm text-muted">{description}</p>
-        )}
+      <div className="flex items-baseline justify-between gap-3 border-b border-[var(--color-border)] pb-2">
+        <div className="min-w-0">
+          <HeadingTag id={headingId} className="type-rail text-foreground">
+            {title}
+          </HeadingTag>
+          {items.length === 0 ? null : (
+            <p className="mt-1 text-sm text-muted">{description}</p>
+          )}
+        </div>
+        {items.length > 0 ? (
+          <Link
+            href={seeAllHref}
+            aria-label={`See all ${title}`}
+            className="shrink-0 text-sm text-muted underline-offset-2 transition hover:text-foreground hover:underline"
+          >
+            See all
+          </Link>
+        ) : null}
       </div>
       {items.length === 0 ? (
         <p className="mt-5 text-sm text-muted sm:mt-6" role="status">

@@ -83,6 +83,7 @@ export function TitlePosterLink({
       href={href}
       aria-label={ariaLabel}
       className={className}
+      prefetch={false}
       onClick={onClick}
     >
       {posterFrameClassName != null ? (
