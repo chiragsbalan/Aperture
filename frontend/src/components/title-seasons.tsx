@@ -244,6 +244,15 @@ export function TitleSeasons({
         attemptedSeasonIdsRef.current.delete(seasonId);
         return;
       }
+      // Empty list while episode_count > 0 is not a successful hydrate —
+      // clear attempted so a later tab visit can retry.
+      if (
+        result.data.episodes.length === 0 &&
+        (result.data.episode_count ?? expectedCount) > 0
+      ) {
+        attemptedSeasonIdsRef.current.delete(seasonId);
+        return;
+      }
       setSeasons((prev) =>
         prev.map((season) =>
           season.id === seasonId
@@ -255,6 +264,8 @@ export function TitleSeasons({
 
     return () => {
       cancelled = true;
+      // Mid-fetch tab switch must not permanently block a later retry.
+      attemptedSeasonIdsRef.current.delete(seasonId);
     };
   }, [active, contentId]);
 

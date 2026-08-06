@@ -675,6 +675,7 @@ async def get_tv(
     response_model=SeasonDetail,
 )
 async def get_tv_season(
+    request: Request,
     content_id: uuid.UUID,
     season_number: Annotated[int, Path(ge=0, le=200)],
     session: DbSessionDep,
@@ -683,8 +684,15 @@ async def get_tv_season(
 ) -> SeasonDetail:
     """Return one TV season with full episodes (lazy tab load).
 
-    Cold stub seasons may trigger an on-demand TMDb season hydrate.
+    Cold stub seasons may trigger an on-demand TMDb season hydrate
+    (ingest-equivalent per-IP rate limit + process single-flight).
     """
+    client_ip = resolve_client_ip(request, settings)
+    await enforce_resolve_rate_limit(
+        get_cache(),
+        settings=settings,
+        client_ip=client_ip,
+    )
     response.headers['Cache-Control'] = _CACHE_CONTROL
     try:
         return await metadata_service.get_tv_season_detail(
@@ -692,11 +700,12 @@ async def get_tv_season(
             content_id,
             season_number,
             settings=settings,
+            client_ip=client_ip,
         )
     except metadata_service.CatalogNotFoundError as exc:
         raise _not_found('TV season not found') from exc
     except metadata_service.CatalogUnavailableError as exc:
-        raise _unavailable(str(exc)) from exc
+        raise _unavailable('Catalog temporarily unavailable') from exc
 
 
 @router.get('/people/{person_id}', response_model=PersonDetail)

@@ -34,12 +34,14 @@ def _clear_settings_cache() -> Iterator[None]:
     from app.lists.rate_limit import reset_lists_rate_limit_fallback
     from app.metadata import resolve as metadata_resolve
     from app.metadata.rate_limit import reset_metadata_rate_limit_fallback
+    from app.metadata.tv_season_hydrate import reset_tv_season_hydrate_flights
     from app.search.rate_limit import reset_search_rate_limit_fallback
     from app.users.rate_limit import reset_users_public_rate_limit_fallback
 
     get_settings.cache_clear()
     reset_cache()
     metadata_resolve._resolve_flights.clear()
+    reset_tv_season_hydrate_flights()
     reset_refresh_grace_l1()
     reset_search_rate_limit_fallback()
     reset_lists_rate_limit_fallback()
@@ -50,6 +52,7 @@ def _clear_settings_cache() -> Iterator[None]:
     get_settings.cache_clear()
     reset_cache()
     metadata_resolve._resolve_flights.clear()
+    reset_tv_season_hydrate_flights()
     reset_refresh_grace_l1()
     reset_search_rate_limit_fallback()
     reset_lists_rate_limit_fallback()

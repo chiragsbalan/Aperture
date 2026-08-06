@@ -8,10 +8,12 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import get_cache
 from app.core.config import Settings
 from app.metadata import repository as metadata_repository
 from app.metadata.images import InvalidImagePathError, tmdb_image_url
 from app.metadata.models import ContentCredit, ContentItem, Person
+from app.metadata.rate_limit import enforce_season_hydrate_rate_limit
 from app.metadata.schemas import (
     AlternativeTitle,
     CollectionRef,
@@ -813,11 +815,14 @@ async def get_tv_season_detail(
     season_number: int,
     *,
     settings: Settings,
+    client_ip: str | None = None,
 ) -> SeasonDetail:
     """Return one season with full episodes for lazy title-page tab loads.
 
     When the season stub exists but episodes were never hydrated (cold
     stub-only resolve), fetch that season from TMDb on demand and persist.
+    Upstream / config failures raise :class:`CatalogUnavailableError` (503)
+    so clients can retry instead of caching an empty episode list.
     """
     season = await metadata_repository.get_tv_season_by_number(
         session,
@@ -829,10 +834,18 @@ async def get_tv_season_detail(
     if season.episodes or (season.episode_count or 0) <= 0:
         return _season_detail(season, include_episodes=True)
 
+    await enforce_season_hydrate_rate_limit(
+        get_cache(),
+        settings=settings,
+        client_ip=client_ip,
+    )
+
     try:
         client = TmdbClient.from_settings(settings)
-    except TmdbConfigError:
-        return _season_detail(season, include_episodes=True)
+    except TmdbConfigError as exc:
+        raise CatalogUnavailableError(
+            'Catalog temporarily unavailable',
+        ) from exc
 
     try:
         season = await hydrate_tv_season_episodes(
@@ -841,12 +854,25 @@ async def get_tv_season_detail(
             season_number=season_number,
             client=client,
         )
-    except TmdbNotFoundError:
-        return _season_detail(season, include_episodes=True)
+    except TmdbNotFoundError as exc:
+        raise CatalogUnavailableError(
+            'Catalog temporarily unavailable',
+        ) from exc
     except TmdbUnavailableError as exc:
-        raise CatalogUnavailableError(str(exc)) from exc
-    except LookupError:
-        return _season_detail(season, include_episodes=True)
+        raise CatalogUnavailableError(
+            'Catalog temporarily unavailable',
+        ) from exc
+    except LookupError as exc:
+        raise CatalogUnavailableError(
+            'Catalog temporarily unavailable',
+        ) from exc
+    except RuntimeError as exc:
+        raise CatalogUnavailableError(
+            'Catalog temporarily unavailable',
+        ) from exc
+
+    if not season.episodes and (season.episode_count or 0) > 0:
+        raise CatalogUnavailableError('Catalog temporarily unavailable')
 
     return _season_detail(season, include_episodes=True)
 

@@ -6,6 +6,7 @@ are not silently disabled (per-instance only while Redis is down).
 
 Keys are ``metadata:rl:resolve:ip:{sha256}``,
 ``metadata:rl:ingest:ip:{sha256}``,
+``metadata:rl:season-hydrate:ip:{sha256}``,
 ``metadata:rl:landing:ip:{sha256}``, and
 ``metadata:rl:top-movies:ip:{sha256}``. Missing/empty client IPs use the shared
 ``unknown`` subject so limits still apply.
@@ -102,6 +103,27 @@ async def enforce_resolve_ingest_rate_limit(
         max_per_ip=settings.metadata_resolve_ingest_rate_limit_max_per_ip,
         window_seconds=settings.metadata_resolve_rate_limit_window_seconds,
         detail='Too many catalog ingest requests. Try again later.',
+    )
+
+
+async def enforce_season_hydrate_rate_limit(
+    cache: CacheBackend,
+    *,
+    settings: Settings,
+    client_ip: str | None,
+) -> None:
+    """Raise 429 when an IP exceeds the on-demand season-hydrate window.
+
+    Uses the same max as resolve-ingest (TMDb write path) with a dedicated
+    bucket so season tab loads do not share counters with resolve.
+    """
+    await _enforce(
+        cache,
+        client_ip=client_ip,
+        bucket='season-hydrate',
+        max_per_ip=settings.metadata_resolve_ingest_rate_limit_max_per_ip,
+        window_seconds=settings.metadata_resolve_rate_limit_window_seconds,
+        detail='Too many season hydrate requests. Try again later.',
     )
 
 
