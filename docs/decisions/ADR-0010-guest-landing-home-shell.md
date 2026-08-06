@@ -2,8 +2,9 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-06
-- **Related:** [ADR-0003](ADR-0003-hosting-and-bff.md) (BFF deny-list, landing/rail RL); [ADR-0004](ADR-0004-content-identity.md) (home discovery rails); [ADR-0005](ADR-0005-auth.md) (in-place auth BFF routes); `pc.2` public library / discovery
+- **Related:** [ADR-0003](ADR-0003-hosting-and-bff.md) (BFF deny-list, landing/rail RL); [ADR-0004](ADR-0004-content-identity.md) (home discovery rails); [ADR-0005](ADR-0005-auth.md) (in-place auth BFF routes); [ADR-0012](ADR-0012-brand-shell-atmosphere.md) (shell atmosphere — guest excluded); `pc.2` public library / discovery
 - **Implements in:** Guest browse landing (`feature/guest-browse-home` / PR #34)
+- **Amended:** 2026-08-06 — guest mosaic only (no shell atmosphere); hero uses stable `svh` so mosaic does not resize with mobile browser chrome
 
 ## Context
 
@@ -24,6 +25,8 @@ After pc.2 shipped cold TMDb discovery rails for signed-in home, the logged-out 
 - **Guest header:** brand + search only (no Sign in / Create account in the header; auth starts from Get started / in-place panels).
 - **Logout** (settings and account panel) returns to **`/`** (guest landing), not `/login`.
 - Dedicated `/login` and `/signup` routes remain for deep links / OAuth error landings; in-place panels on `/` use the same `AuthForm` + `/api/auth/*` BFF routes.
+- **Guest visual shell:** poster mosaic + veil on charcoal page background only. Guest `/` and `(guest-shell)` **do not** use randomized purple/blue `.shell-atmosphere` lobes (see [ADR-0012](ADR-0012-brand-shell-atmosphere.md) for where atmosphere applies).
+- **Guest hero height:** `min-h-svh` (small viewport height) so the mosaic box stays stable when mobile browser chrome shows/hides. Do **not** use `min-h-dvh` for the mosaic hero — dynamic viewport growth on scroll reflows the mosaic and looks like elongation.
 
 ### Session shell matrix (RSC)
 
@@ -56,6 +59,7 @@ After pc.2 shipped cold TMDb discovery rails for signed-in home, the logged-out 
 
 - Guest `/` is the conversion surface; signed-in `/` stays discovery-only.
 - Home shell and rail prefetch rules are table-tested; regressions show up as guest↔signed-in flicker or wasted RL charges.
+- Guest mosaic must not grow mid-scroll on mobile; regressions show as sudden tile-row growth when the URL bar collapses.
 - OAuth error URLs, `?auth=` deep links, middleware soft-gates for library/settings, and mosaic pause controls remain product follow-ups (not locked here).
 - ADR-0003 / ADR-0004 / ADR-0005 amendments for deny-list, rails, and in-place auth remain authoritative for those layers; **this ADR is authoritative for guest vs signed-in `/` product shell**.
 

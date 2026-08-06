@@ -15,7 +15,7 @@ export default async function GuestShellLayout({
   const posters = await fetchLandingPosterUrls();
 
   return (
-    <div className="shell-atmosphere shell-atmosphere-mosaic relative flex min-h-dvh flex-col overflow-hidden">
+    <div className="relative flex min-h-svh flex-col overflow-hidden bg-[var(--color-bg)]">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>

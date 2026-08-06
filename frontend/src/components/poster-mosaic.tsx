@@ -263,7 +263,7 @@ function maxConcurrentFlips(tileCount: number, profile: FlipProfile): number {
 
 /**
  * Decorative low-opacity poster grid for landing / auth shells.
- * Sits above `.shell-atmosphere` so the brand glow shows through.
+ * Guest surfaces use mosaic + veil only (no page-level shell atmosphere).
  * A circular cluster of posters near the pointer gently magnifies.
  * Tiles occasionally swap to another poster, avoiding nearby duplicates.
  */
