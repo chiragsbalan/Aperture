@@ -260,8 +260,7 @@ async def count_stale_stubs(
             & (ExternalId.source_namespace.in_(('movie', 'tv'))),
         )
         .where(
-            (ContentItem.refreshed_at.is_(None))
-            | (ContentItem.refreshed_at < cutoff)
+            (ContentItem.refreshed_at.is_(None)) | (ContentItem.refreshed_at < cutoff)
         )
         .order_by(nullsfirst(ContentItem.refreshed_at.asc()))
         .limit(limit)
@@ -293,8 +292,7 @@ async def refresh_stale_stubs_batch(
             & (ExternalId.entity_type == 'content_item'),
         )
         .where(
-            (ContentItem.refreshed_at.is_(None))
-            | (ContentItem.refreshed_at < cutoff)
+            (ContentItem.refreshed_at.is_(None)) | (ContentItem.refreshed_at < cutoff)
         )
         .order_by(nullsfirst(ContentItem.refreshed_at.asc()))
         .limit(limit)

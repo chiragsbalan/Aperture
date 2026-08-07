@@ -98,9 +98,17 @@ def merge_enrichment_extras(
             if value:
                 out[key] = value
             continue
-        if key in ('genres', 'keywords', 'studios', 'networks', 'countries',
-                   'spoken_languages', 'alternative_titles', 'releases',
-                   'videos'):
+        if key in (
+            'genres',
+            'keywords',
+            'studios',
+            'networks',
+            'countries',
+            'spoken_languages',
+            'alternative_titles',
+            'releases',
+            'videos',
+        ):
             if isinstance(value, list) and value:
                 out[key] = value
             continue

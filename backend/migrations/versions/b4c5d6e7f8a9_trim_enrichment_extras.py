@@ -22,6 +22,7 @@ down_revision: str | Sequence[str] | None = 'a3b4c5d6e7f8'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+
 def upgrade() -> None:
     """Strip enrichment keys from all catalog extras documents."""
     # jsonb - text removes one key; chain for all enrichment keys.
