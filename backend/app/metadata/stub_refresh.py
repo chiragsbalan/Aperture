@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import nullsfirst, select
@@ -59,8 +59,8 @@ def stub_is_stale(item: ContentItem, *, max_age_days: int) -> bool:
     if anchor is None:
         return True
     if anchor.tzinfo is None:
-        anchor = anchor.replace(tzinfo=timezone.utc)
-    age = datetime.now(timezone.utc) - anchor
+        anchor = anchor.replace(tzinfo=UTC)
+    age = datetime.now(UTC) - anchor
     return age >= timedelta(days=max_age_days)
 
 
@@ -92,7 +92,7 @@ async def refresh_stub_from_tmdb(
     except ValueError:
         return None
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if source_namespace == 'movie':
         movie = await client.get_movie_for_stub_refresh(tmdb_id)
         item = await metadata_repository.upsert_movie(
@@ -247,7 +247,7 @@ async def count_stale_stubs(
     limit: int = 50,
 ) -> int:
     """Count stubs that would be refreshed (for CLI ``--dry-run``)."""
-    cutoff = datetime.now(timezone.utc) - timedelta(
+    cutoff = datetime.now(UTC) - timedelta(
         days=settings.metadata_stub_max_age_days,
     )
     result = await session.execute(
@@ -281,7 +281,7 @@ async def refresh_stale_stubs_batch(
     except TmdbConfigError as exc:
         raise RuntimeError(str(exc)) from exc
 
-    cutoff = datetime.now(timezone.utc) - timedelta(
+    cutoff = datetime.now(UTC) - timedelta(
         days=settings.metadata_stub_max_age_days,
     )
     result = await session.execute(

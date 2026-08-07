@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -32,7 +32,7 @@ def test_stub_is_stale_when_refreshed_at_missing() -> None:
 
 
 def test_stub_is_fresh_within_max_age() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     item = SimpleNamespace(
         refreshed_at=now - timedelta(days=10),
         updated_at=now - timedelta(days=200),
@@ -41,7 +41,7 @@ def test_stub_is_fresh_within_max_age() -> None:
 
 
 def test_stub_is_stale_past_max_age() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     item = SimpleNamespace(
         refreshed_at=now - timedelta(days=160),
         updated_at=now,
@@ -113,7 +113,7 @@ async def test_maybe_refresh_degrades_on_unexpected_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     reset_stub_refresh_flights()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     item = SimpleNamespace(
         id=uuid.uuid4(),
         refreshed_at=now - timedelta(days=200),
@@ -150,7 +150,7 @@ async def test_stub_refresh_coalesce_shares_success_token_not_orm(
 ) -> None:
     reset_stub_refresh_flights()
     content_id = uuid.uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stale = SimpleNamespace(
         id=content_id,
         refreshed_at=now - timedelta(days=200),
@@ -277,7 +277,7 @@ async def test_maybe_refresh_degrades_on_tmdb_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     reset_stub_refresh_flights()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     item = SimpleNamespace(
         id=uuid.uuid4(),
         refreshed_at=now - timedelta(days=200),

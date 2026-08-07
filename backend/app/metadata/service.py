@@ -50,13 +50,13 @@ from app.metadata.schemas import (
     WatchProvider,
     WatchProviderRegion,
 )
+from app.metadata.stub_refresh import maybe_refresh_stale_stub
 from app.metadata.tmdb.client import (
     TmdbClient,
     TmdbConfigError,
     TmdbNotFoundError,
     TmdbUnavailableError,
 )
-from app.metadata.stub_refresh import maybe_refresh_stale_stub
 from app.metadata.tv_season_hydrate import hydrate_tv_season_episodes
 
 logger = logging.getLogger(__name__)

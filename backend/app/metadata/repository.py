@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -391,7 +391,7 @@ async def upsert_movie(
         item.popularity = popularity
         if extras is not None:
             item.extras = lean_extras_for_persist(extras)
-        item.refreshed_at = datetime.now(timezone.utc)
+        item.refreshed_at = datetime.now(UTC)
         assert item.movie is not None
         item.movie.release_date = release_date
         item.movie.runtime_minutes = runtime_minutes
@@ -408,7 +408,7 @@ async def upsert_movie(
         backdrop_path=backdrop_path,
         popularity=popularity,
         extras=lean_extras_for_persist(extras),
-        refreshed_at=datetime.now(timezone.utc),
+        refreshed_at=datetime.now(UTC),
     )
     session.add(item)
     await session.flush()
@@ -478,7 +478,7 @@ async def upsert_tv_show(
         item.popularity = popularity
         if extras is not None:
             item.extras = lean_extras_for_persist(extras)
-        item.refreshed_at = datetime.now(timezone.utc)
+        item.refreshed_at = datetime.now(UTC)
         assert item.tv_show is not None
         item.tv_show.first_air_date = first_air_date
         item.tv_show.last_air_date = last_air_date
@@ -497,7 +497,7 @@ async def upsert_tv_show(
         backdrop_path=backdrop_path,
         popularity=popularity,
         extras=lean_extras_for_persist(extras),
-        refreshed_at=datetime.now(timezone.utc),
+        refreshed_at=datetime.now(UTC),
     )
     session.add(item)
     await session.flush()

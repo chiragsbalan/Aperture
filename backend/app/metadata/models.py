@@ -8,11 +8,9 @@ and credits are first-class tables outside the content_items hierarchy.
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
-
-from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
