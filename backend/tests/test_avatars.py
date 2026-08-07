@@ -234,3 +234,140 @@ async def test_confirm_rejects_foreign_key() -> None:
                 identity_id=identity_id,
                 key=foreign_key,
             )
+
+
+def test_is_allowed_google_picture_url() -> None:
+    assert avatars_service.is_allowed_google_picture_url(
+        'https://lh3.googleusercontent.com/a/ABC123=s96-c',
+    )
+    assert avatars_service.is_allowed_google_picture_url(
+        'https://lh3.googleusercontent.com/a-/path',
+    )
+    assert not avatars_service.is_allowed_google_picture_url(
+        'http://lh3.googleusercontent.com/a/x',
+    )
+    assert not avatars_service.is_allowed_google_picture_url(
+        'https://evil.com/a/x',
+    )
+    assert not avatars_service.is_allowed_google_picture_url(
+        'https://googleusercontent.com.evil.com/a/x',
+    )
+    assert not avatars_service.is_allowed_google_picture_url(
+        'https://notgoogleusercontent.com/a/x',
+    )
+    assert not avatars_service.is_allowed_google_picture_url(
+        'https://lh3.googleusercontent.com/',
+    )
+    assert not avatars_service.is_allowed_google_picture_url('')
+
+
+@pytest.mark.asyncio
+async def test_ingest_google_picture_happy_path() -> None:
+    settings = _settings()
+    identity_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    jpeg = b'\xff\xd8\xff\xe0' + b'\x00' * 64
+    picture = 'https://lh3.googleusercontent.com/a/photo=s96-c'
+
+    user = MagicMock()
+    user.id = user_id
+    user.username = 'ada'
+    user.avatar_url = None
+
+    async def _get_user(*_a: Any, **_k: Any) -> MagicMock:
+        return user
+
+    async def _update(*_a: Any, **kwargs: Any) -> MagicMock:
+        if 'avatar_url' in kwargs:
+            user.avatar_url = kwargs['avatar_url']
+        return user
+
+    session = MagicMock()
+
+    async def _commit() -> None:
+        return None
+
+    session.commit = _commit  # type: ignore[method-assign]
+
+    with (
+        patch(
+            'app.users.avatars.users_repository.get_user_by_identity_id',
+            side_effect=_get_user,
+        ),
+        patch(
+            'app.users.avatars.users_repository.update_user_profile',
+            side_effect=_update,
+        ),
+        patch(
+            'app.users.avatars._fetch_google_picture_bytes',
+            return_value=jpeg,
+        ) as fetch_mock,
+        patch(
+            'app.users.avatars.r2_store.put_object',
+            return_value=None,
+        ) as put_mock,
+    ):
+        ok = await avatars_service.ingest_google_picture_if_empty(
+            session,
+            settings,
+            identity_id=identity_id,
+            picture_url=picture,
+        )
+
+    assert ok is True
+    assert user.avatar_url is not None
+    assert user.avatar_url.startswith('https://media.example.com/avatars/')
+    fetch_mock.assert_awaited_once()
+    put_mock.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_ingest_google_picture_skips_when_avatar_set() -> None:
+    settings = _settings()
+    identity_id = uuid.uuid4()
+    user = MagicMock()
+    user.id = uuid.uuid4()
+    user.username = 'ada'
+    user.avatar_url = 'https://media.example.com/avatars/x/y.webp'
+
+    async def _get_user(*_a: Any, **_k: Any) -> MagicMock:
+        return user
+
+    session = MagicMock()
+    with (
+        patch(
+            'app.users.avatars.users_repository.get_user_by_identity_id',
+            side_effect=_get_user,
+        ),
+        patch(
+            'app.users.avatars._fetch_google_picture_bytes',
+        ) as fetch_mock,
+    ):
+        ok = await avatars_service.ingest_google_picture_if_empty(
+            session,
+            settings,
+            identity_id=identity_id,
+            picture_url='https://lh3.googleusercontent.com/a/photo',
+        )
+
+    assert ok is False
+    fetch_mock.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_ingest_google_picture_skips_without_r2() -> None:
+    settings = _settings(
+        r2_account_id='',
+        r2_access_key_id='',
+        r2_secret_access_key='',
+        r2_bucket='',
+        r2_public_base_url='',
+    )
+    session = MagicMock()
+    ok = await avatars_service.ingest_google_picture_if_empty(
+        session,
+        settings,
+        identity_id=uuid.uuid4(),
+        picture_url='https://lh3.googleusercontent.com/a/photo',
+    )
+    assert ok is False

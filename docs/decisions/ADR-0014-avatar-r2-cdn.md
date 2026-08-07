@@ -26,6 +26,7 @@ Profiles already store optional `users.avatar_url`, but upload/CDN was deferred.
 | Confirm | HeadObject + **magic-byte sniff** (JPEG/PNG/WebP); reject Content-Type spoofing |
 | Abuse | Per-identity rate limit on upload-url / confirm / delete (`AVATAR_RATE_LIMIT_*`) |
 | CSP | `img-src` media host; `connect-src` only `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com` |
+| Google sign-in | BFF forwards id_token `picture`; API **best-effort ingests** into R2 when `avatar_url` is empty (never overwrites; never fails login). Skipped when R2 unset. |
 
 Upload flow:
 
@@ -34,7 +35,13 @@ Upload flow:
 3. Client PUTs bytes directly to R2 (CORS on the bucket).
 4. Client calls confirm; API `HeadObject`s, validates type/size, sets `avatar_url`, deletes previous first-party object best-effort.
 
-When R2 env vars are unset, upload endpoints return **503** (local/dev without Cloudflare).
+When R2 env vars are unset, upload endpoints return **503** (local/dev without Cloudflare). Google `picture` import is skipped in that case (we do not store third-party Google URLs in `avatar_url` once first-party storage is the product path).
+
+Google avatar ingest (server-side):
+
+1. After successful Google sign-in / link (and on later logins if still empty), API fetches the allowlisted `*.googleusercontent.com` HTTPS URL.
+2. Magic-byte sniff + size check; `PutObject` to `avatars/{user_id}/{uuid}.{ext}`.
+3. Set `users.avatar_url` to the CDN URL. Existing avatars are left alone so Settings uploads win.
 
 ## Alternatives considered
 

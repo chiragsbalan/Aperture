@@ -7,7 +7,9 @@ import re
 import uuid
 from contextlib import suppress
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import r2 as r2_store
@@ -16,6 +18,9 @@ from app.users import repository as users_repository
 from app.users.service import OwnedProfile, ProfileNotFoundError, get_owned_profile
 
 logger = logging.getLogger(__name__)
+
+_GOOGLE_PICTURE_FETCH_TIMEOUT = httpx.Timeout(8.0, connect=3.0)
+_GOOGLE_PICTURE_MAX_REDIRECTS = 3
 
 ALLOWED_AVATAR_CONTENT_TYPES: frozenset[str] = frozenset(
     {
@@ -295,3 +300,150 @@ async def delete_avatar(
                 logger.warning('failed to delete avatar object key=%s', old_key)
 
     return await get_owned_profile(session, identity_id=identity_id)
+
+
+def is_allowed_google_picture_url(url: str) -> bool:
+    """True when ``url`` is HTTPS on an allowlisted Google photo host."""
+    cleaned = url.strip()
+    if not cleaned or len(cleaned) > 512:
+        return False
+    parsed = urlparse(cleaned)
+    if parsed.scheme != 'https' or parsed.username or parsed.password:
+        return False
+    host = (parsed.hostname or '').lower()
+    # Require exact apex or a real subdomain (reject notgoogleusercontent.com).
+    if host != 'googleusercontent.com' and not host.endswith(
+        '.googleusercontent.com',
+    ):
+        return False
+    # Reject weird paths that are not typical photo URLs.
+    if parsed.path in {'', '/'}:
+        return False
+    return True
+
+
+async def _fetch_google_picture_bytes(
+    picture_url: str,
+    *,
+    max_bytes: int,
+) -> bytes:
+    """Download a Google profile photo with host allowlist + size cap."""
+    if not is_allowed_google_picture_url(picture_url):
+        raise AvatarValidationError('unsupported google picture url')
+
+    current = picture_url.strip()
+    async with httpx.AsyncClient(
+        timeout=_GOOGLE_PICTURE_FETCH_TIMEOUT,
+        follow_redirects=False,
+    ) as client:
+        for _ in range(_GOOGLE_PICTURE_MAX_REDIRECTS + 1):
+            if not is_allowed_google_picture_url(current):
+                raise AvatarValidationError('unsupported google picture redirect')
+            async with client.stream('GET', current) as response:
+                if response.is_redirect:
+                    location = response.headers.get('location')
+                    if not location:
+                        raise AvatarValidationError(
+                            'google picture redirect missing location',
+                        )
+                    current = str(httpx.URL(current).join(location))
+                    continue
+                if response.status_code != 200:
+                    raise AvatarStorageError(
+                        f'google picture fetch failed ({response.status_code})',
+                    )
+                declared = response.headers.get('content-length')
+                if declared is not None:
+                    with suppress(ValueError):
+                        if int(declared) > max_bytes:
+                            raise AvatarValidationError(
+                                'google picture exceeds size limit',
+                            )
+                chunks: list[bytes] = []
+                total = 0
+                async for chunk in response.aiter_bytes():
+                    if not chunk:
+                        continue
+                    total += len(chunk)
+                    if total > max_bytes:
+                        raise AvatarValidationError(
+                            'google picture exceeds size limit',
+                        )
+                    chunks.append(chunk)
+                body = b''.join(chunks)
+                if len(body) < 1:
+                    raise AvatarValidationError('google picture is empty')
+                return body
+    raise AvatarValidationError('google picture too many redirects')
+
+
+async def ingest_google_picture_if_empty(
+    session: AsyncSession,
+    settings: Settings,
+    *,
+    identity_id: uuid.UUID,
+    picture_url: str | None,
+) -> bool:
+    """Copy a Google ``picture`` into R2 when the profile has no avatar yet.
+
+    Returns True when ``avatar_url`` was set. No-ops (False) when R2 is unset,
+    the URL is missing/invalid, or the user already has an avatar. Callers should
+    treat failures as best-effort (never fail Google login).
+    """
+    if not picture_url or not picture_url.strip():
+        return False
+    if not r2_store.r2_configured(settings):
+        return False
+    if not is_allowed_google_picture_url(picture_url):
+        logger.info('skipping google picture ingest: url not allowlisted')
+        return False
+
+    user_peek = await users_repository.get_user_by_identity_id(session, identity_id)
+    if user_peek is None or user_peek.username is None:
+        return False
+    if user_peek.avatar_url:
+        return False
+
+    body = await _fetch_google_picture_bytes(
+        picture_url,
+        max_bytes=settings.avatar_max_bytes,
+    )
+    sniffed = sniff_image_content_type(body[:16])
+    if sniffed is None:
+        raise AvatarValidationError('google picture is not a valid image')
+
+    key = build_avatar_key(user_id=user_peek.id, content_type=sniffed)
+    try:
+        await r2_store.put_object(
+            settings,
+            key,
+            body=body,
+            content_type=sniffed,
+        )
+    except r2_store.R2ObjectError as exc:
+        raise AvatarStorageError('avatar storage temporarily unavailable') from exc
+
+    public_url = r2_store.public_object_url(settings, key)
+
+    user = await users_repository.get_user_by_identity_id(
+        session,
+        identity_id,
+        for_update=True,
+    )
+    if user is None or user.username is None:
+        with suppress(Exception):
+            await r2_store.delete_object(settings, key)
+        return False
+    # Another request may have set an avatar while we fetched; do not overwrite.
+    if user.avatar_url:
+        with suppress(Exception):
+            await r2_store.delete_object(settings, key)
+        return False
+
+    await users_repository.update_user_profile(
+        session,
+        user,
+        avatar_url=public_url,
+    )
+    await session.commit()
+    return True

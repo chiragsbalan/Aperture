@@ -20,6 +20,8 @@ export interface GoogleProfile {
   email: string;
   given_name: string | null;
   family_name: string | null;
+  /** Google profile photo URL from the id_token `picture` claim, when present. */
+  picture: string | null;
 }
 
 const OAUTH_COOKIE_MAX_AGE_SECONDS = 600;
@@ -142,6 +144,7 @@ export async function verifyGoogleIdToken(
       typeof payload.given_name === 'string' ? payload.given_name : null,
     family_name:
       typeof payload.family_name === 'string' ? payload.family_name : null,
+    picture: typeof payload.picture === 'string' ? payload.picture : null,
   };
 }
 
@@ -153,6 +156,7 @@ export function mockGoogleProfile(code: string): GoogleProfile {
     email: `mock-${safe.toLowerCase()}@example.com`,
     given_name: 'Mock',
     family_name: 'User',
+    picture: null,
   };
 }
 

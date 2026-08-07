@@ -99,6 +99,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         email: profile.email,
         given_name: profile.given_name,
         family_name: profile.family_name,
+        picture: profile.picture,
         intent,
       }),
     });

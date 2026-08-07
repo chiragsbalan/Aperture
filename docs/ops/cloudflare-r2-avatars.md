@@ -90,9 +90,10 @@ Restart the API and rebuild/redeploy the frontend after changing `NEXT_PUBLIC_*`
 
 ## 7. Verify
 
-1. Sign in → **Settings** → **Upload photo**.
-2. Network: `POST …/avatar/upload-url` → `PUT` to `*.r2.cloudflarestorage.com` → `POST …/avatar/confirm`.
-3. Profile shows the image; object appears under `avatars/{user_id}/…` in the bucket.
+1. Sign in with Google (account that has a Google profile photo) → avatar should appear without a Settings upload (object under `avatars/{user_id}/…`).
+2. Or: **Settings** → **Upload photo**.
+3. Network (manual upload): `POST …/avatar/upload-url` → `PUT` to `*.r2.cloudflarestorage.com` → `POST …/avatar/confirm`.
+4. Profile shows the image; replacing via Settings must not be overwritten by a later Google login.
 
 ## 8. Optional lifecycle
 

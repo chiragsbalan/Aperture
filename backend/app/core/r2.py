@@ -180,6 +180,37 @@ def _delete_object_sync(settings: Settings, key: str) -> None:
     client.delete_object(Bucket=settings.r2_bucket.strip(), Key=key)
 
 
+def _put_object_sync(
+    settings: Settings,
+    key: str,
+    *,
+    body: bytes,
+    content_type: str,
+) -> None:
+    client = get_s3_client(settings)
+    try:
+        client.put_object(
+            Bucket=settings.r2_bucket.strip(),
+            Key=key,
+            Body=body,
+            ContentType=content_type,
+            CacheControl=AVATAR_CACHE_CONTROL,
+        )
+    except ClientError as exc:
+        code = ''
+        response_meta = exc.response if isinstance(exc.response, dict) else {}
+        err = response_meta.get('Error')
+        if isinstance(err, dict):
+            raw_code = err.get('Code')
+            if isinstance(raw_code, str):
+                code = raw_code
+        http_status = response_meta.get('ResponseMetadata', {}).get(
+            'HTTPStatusCode',
+        )
+        detail = code or http_status
+        raise R2ObjectError(f'put_object failed: {key} ({detail})') from exc
+
+
 def _get_object_prefix_sync(settings: Settings, key: str, *, max_bytes: int) -> bytes:
     client = get_s3_client(settings)
     end = max(0, max_bytes - 1)
@@ -234,3 +265,20 @@ async def get_object_prefix(
 async def delete_object(settings: Settings, key: str) -> None:
     """Best-effort DeleteObject in a worker thread."""
     await asyncio.to_thread(_delete_object_sync, settings, key)
+
+
+async def put_object(
+    settings: Settings,
+    key: str,
+    *,
+    body: bytes,
+    content_type: str,
+) -> None:
+    """Server-side PutObject (e.g. Google avatar ingest) in a worker thread."""
+    await asyncio.to_thread(
+        _put_object_sync,
+        settings,
+        key,
+        body=body,
+        content_type=content_type,
+    )

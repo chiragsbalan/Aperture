@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -28,8 +29,11 @@ from app.auth.security import (
 from app.core.cache import InMemoryCacheBackend, run_coro_sync
 from app.core.config import Settings
 from app.core.ids import new_uuid7
+from app.users import avatars as avatars_service
 from app.users import service as users_service
 from app.users.service import UserProfile
+
+logger = logging.getLogger(__name__)
 
 # Process-local L1 only — never Redis (tokens must not leave the API process).
 _REFRESH_GRACE_L1 = InMemoryCacheBackend()
@@ -560,6 +564,31 @@ async def get_me(
     return AuthContext(identity=identity, user=user, providers=providers)
 
 
+async def _best_effort_import_google_avatar(
+    session: AsyncSession,
+    *,
+    settings: Settings,
+    identity_id: uuid.UUID,
+    picture: str | None,
+) -> None:
+    """Ingest Google ``picture`` into R2 when avatar is empty; never raise."""
+    if not picture:
+        return
+    try:
+        await avatars_service.ingest_google_picture_if_empty(
+            session,
+            settings,
+            identity_id=identity_id,
+            picture_url=picture,
+        )
+    except Exception:
+        logger.warning(
+            'google avatar ingest failed identity_id=%s',
+            identity_id,
+            exc_info=True,
+        )
+
+
 async def google_sign_in(
     session: AsyncSession,
     *,
@@ -568,6 +597,7 @@ async def google_sign_in(
     email: str,
     given_name: str | None = None,
     family_name: str | None = None,
+    picture: str | None = None,
     user_agent: str | None = None,
     client_ip: str | None = None,
 ) -> IssuedTokens:
@@ -607,6 +637,13 @@ async def google_sign_in(
             user_agent=user_agent,
         )
         await session.commit()
+        # Backfill empty avatars on later Google logins (never overwrite).
+        await _best_effort_import_google_avatar(
+            session,
+            settings=settings,
+            identity_id=identity.id,
+            picture=picture,
+        )
         return tokens
 
     email_identity = await auth_repository.get_identity_by_email(session, normalized)
@@ -658,6 +695,12 @@ async def google_sign_in(
                     user_agent=user_agent,
                 )
                 await session.commit()
+                await _best_effort_import_google_avatar(
+                    session,
+                    settings=settings,
+                    identity_id=identity.id,
+                    picture=picture,
+                )
                 return tokens
         message = str(getattr(exc, 'orig', exc)).lower()
         if 'username' in message or 'uq_users_username' in message:
@@ -669,6 +712,12 @@ async def google_sign_in(
             status_code=status.HTTP_409_CONFLICT,
             detail=_EMAIL_EXISTS_NO_AUTO_LINK,
         ) from exc
+    await _best_effort_import_google_avatar(
+        session,
+        settings=settings,
+        identity_id=identity.id,
+        picture=picture,
+    )
     return tokens
 
 
@@ -679,6 +728,7 @@ async def google_link(
     identity: Identity,
     sub: str,
     email: str,
+    picture: str | None = None,
     user_agent: str | None = None,
     client_ip: str | None = None,
 ) -> IssuedTokens:
@@ -713,6 +763,12 @@ async def google_link(
                 user_agent=user_agent,
             )
             await session.commit()
+            await _best_effort_import_google_avatar(
+                session,
+                settings=settings,
+                identity_id=identity.id,
+                picture=picture,
+            )
             return tokens
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -753,6 +809,12 @@ async def google_link(
             status_code=status.HTTP_409_CONFLICT,
             detail=_GOOGLE_ALREADY_LINKED,
         ) from exc
+    await _best_effort_import_google_avatar(
+        session,
+        settings=settings,
+        identity_id=identity.id,
+        picture=picture,
+    )
     return tokens
 
 

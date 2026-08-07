@@ -94,6 +94,7 @@ class GoogleAuthRequest(BaseModel):
     email: EmailStr
     given_name: str | None = Field(default=None, max_length=120)
     family_name: str | None = Field(default=None, max_length=120)
+    picture: str | None = Field(default=None, max_length=512)
     intent: Literal['sign_in', 'link'] = 'sign_in'
 
     @field_validator('sub')
@@ -107,6 +108,14 @@ class GoogleAuthRequest(BaseModel):
     @field_validator('given_name', 'family_name')
     @classmethod
     def optional_name_trim(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        return trimmed if trimmed else None
+
+    @field_validator('picture')
+    @classmethod
+    def optional_picture_trim(cls, value: str | None) -> str | None:
         if value is None:
             return None
         trimmed = value.strip()
