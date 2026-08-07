@@ -45,10 +45,7 @@ export function nextShelfWindowLimit(
   loadedCount: number,
   maxFetch: number = TITLE_SHELF_MAX_FETCH,
 ): number {
-  return Math.min(
-    Math.max(loadedCount, 0) + TITLE_SHELF_PAGE_SIZE,
-    maxFetch,
-  );
+  return Math.min(Math.max(loadedCount, 0) + TITLE_SHELF_PAGE_SIZE, maxFetch);
 }
 
 /**

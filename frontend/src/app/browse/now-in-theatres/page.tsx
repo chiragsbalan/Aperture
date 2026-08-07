@@ -1,8 +1,5 @@
 import { BrowseShelfPage } from '@/components/browse-shelf-page';
-import {
-  fetchNowInTheatres,
-  HOME_RAIL_MAX_PUBLIC_LIMIT,
-} from '@/lib/catalog';
+import { fetchNowInTheatres, HOME_RAIL_MAX_PUBLIC_LIMIT } from '@/lib/catalog';
 import { HOME_CATALOG_RAIL_HEADINGS } from '@/lib/home-shell';
 import type { Metadata } from 'next';
 

@@ -33,9 +33,7 @@ export default async function TvSimilarPage({ params }: TvSimilarPageProps) {
     if (result.status === 404) {
       notFound();
     }
-    return (
-      <SimilarTitlesPage sourceTitle="this show" kind="tv" similar={[]} />
-    );
+    return <SimilarTitlesPage sourceTitle="this show" kind="tv" similar={[]} />;
   }
 
   return (

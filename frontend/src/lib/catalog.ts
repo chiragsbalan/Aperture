@@ -471,9 +471,7 @@ export async function fetchTopTvShows(
  * Most popular movies currently in theatres (TMDb now_playing, popularity
  * order). Same default count as top movies / top TV. Always public-capped.
  */
-export async function fetchNowInTheatres(
-  limit = 12,
-): Promise<TopMovie[]> {
+export async function fetchNowInTheatres(limit = 12): Promise<TopMovie[]> {
   const result = await fetchHomeRailTitles(
     '/api/v1/catalog/now-in-theatres',
     (body) => (body as NowInTheatresResponse).movies,

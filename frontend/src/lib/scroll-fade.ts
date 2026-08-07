@@ -3,7 +3,7 @@
  * with scroll position.
  *
  * Pair with the utilities in `globals.css`. Strength tokens in `tokens.css`:
- * `--scroll-fade-size` (horizontal fallback unused for tablists), 
+ * `--scroll-fade-size` (horizontal fallback unused for tablists),
  * `--scroll-fade-size-y` (vertical = half a people row via
  * `--scroll-fade-people-row`). Scrollbars stay hidden; fades appear on edges
  * that still have overflow in that direction.
@@ -143,7 +143,7 @@ function useScrollFade(
     };
 
     sync();
-    element.addEventListener('scroll', sync, {passive: true});
+    element.addEventListener('scroll', sync, { passive: true });
     window.addEventListener('resize', sync);
 
     const resizeObserver = new ResizeObserver(sync);
@@ -164,7 +164,7 @@ function useScrollFade(
         }
       }
     });
-    mutationObserver.observe(element, {childList: true, subtree: true});
+    mutationObserver.observe(element, { childList: true, subtree: true });
 
     return () => {
       element.removeEventListener('scroll', sync);

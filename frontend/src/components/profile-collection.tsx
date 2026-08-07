@@ -23,8 +23,7 @@ export interface ProfileCollectionPersonItem {
 }
 
 export type ProfileCollectionItem =
-  | ProfileCollectionTitleItem
-  | ProfileCollectionPersonItem;
+  ProfileCollectionTitleItem | ProfileCollectionPersonItem;
 
 interface ProfileCollectionViewProps {
   title: string;

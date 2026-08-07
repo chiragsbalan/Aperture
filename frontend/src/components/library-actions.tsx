@@ -436,7 +436,10 @@ export function LibraryActions({
       setListItemIds(refreshed.itemIds);
     } else {
       setListMembership((current) => ({ ...current, [list.id]: true }));
-      setListItemIds((current) => ({ ...current, [list.id]: result.item.item_id }));
+      setListItemIds((current) => ({
+        ...current,
+        [list.id]: result.item.item_id,
+      }));
     }
   }
 
@@ -456,7 +459,10 @@ export function LibraryActions({
       setError(result.error);
       return;
     }
-    setListItemIds((current) => ({ ...current, [list.id]: result.item.item_id }));
+    setListItemIds((current) => ({
+      ...current,
+      [list.id]: result.item.item_id,
+    }));
     const refreshed = await fetchCustomListsMembership(libraryType, contentId);
     if (refreshed.ok) {
       setListMembership(refreshed.membership);

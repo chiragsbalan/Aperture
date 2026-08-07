@@ -326,8 +326,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
   }
 
   const ready = state.status === 'ready' ? state : null;
-  const hasMore =
-    ready != null && ready.items.length < ready.total;
+  const hasMore = ready != null && ready.items.length < ready.total;
 
   return (
     <>
@@ -409,11 +408,7 @@ export function CustomListDetailPage({ listId }: { listId: string }) {
               </p>
             ) : null
           }
-          items={
-            ready != null
-              ? shelfItemsFromLibraryList(ready.items)
-              : []
-          }
+          items={ready != null ? shelfItemsFromLibraryList(ready.items) : []}
           renderGrid={
             ready != null &&
             ready.isOwner &&

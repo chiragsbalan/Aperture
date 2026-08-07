@@ -232,10 +232,7 @@ export function LibraryListPage({
         }
         const items = useWindow
           ? dedupeLibraryListItems(result.data.items)
-          : dedupeLibraryListItems([
-              ...current.items,
-              ...result.data.items,
-            ]);
+          : dedupeLibraryListItems([...current.items, ...result.data.items]);
         return {
           status: 'ready',
           items,
@@ -301,7 +298,9 @@ export function LibraryListPage({
         <p className="mt-10 text-muted">{emptyMessage}</p>
       ) : null}
 
-      {state.status === 'ready' && state.total > 0 && state.items.length === 0 ? (
+      {state.status === 'ready' &&
+      state.total > 0 &&
+      state.items.length === 0 ? (
         <p className="mt-10 text-muted" role="status">
           Loading more of this list…
         </p>

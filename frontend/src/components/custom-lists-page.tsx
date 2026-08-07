@@ -8,10 +8,7 @@ import { CreateCustomListSheet } from '@/components/create-custom-list-sheet';
 import { LibraryNav } from '@/components/library-nav';
 import { ListTitleWithVisibility } from '@/components/list-title-with-visibility';
 import { PlusOutlineIcon } from '@/components/shelf-chrome-icons';
-import {
-  fetchMyCustomLists,
-  type CustomListSummary,
-} from '@/lib/library';
+import { fetchMyCustomLists, type CustomListSummary } from '@/lib/library';
 import { listDetailHref } from '@/lib/list-nav';
 
 type LoadState =

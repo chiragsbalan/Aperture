@@ -314,7 +314,7 @@ export function TitleSeasons({
       const maxScroll = Math.max(0, list.scrollWidth - list.clientWidth);
       const nextLeft = Math.min(Math.max(0, targetLeft), maxScroll);
       if (Math.abs(nextLeft - list.scrollLeft) > 1) {
-        list.scrollTo({left: nextLeft, behavior: 'smooth'});
+        list.scrollTo({ left: nextLeft, behavior: 'smooth' });
       }
     }
 
@@ -494,9 +494,7 @@ export function TitleSeasons({
                   onTabKeyDown(event, index);
                 }}
                 className={`shrink-0 whitespace-nowrap pb-1.5 text-xs font-semibold tracking-[0.03em] transition-colors duration-[var(--duration-med)] sm:pb-2 sm:text-sm sm:tracking-[0.08em] ${
-                  selected
-                    ? 'text-accent'
-                    : 'text-muted hover:text-foreground'
+                  selected ? 'text-accent' : 'text-muted hover:text-foreground'
                 }`}
               >
                 {label}

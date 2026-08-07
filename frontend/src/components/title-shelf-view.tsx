@@ -112,7 +112,9 @@ export function TitleShelfView({
           ) : null}
         </div>
         {headerActions != null ? (
-          <div className="flex shrink-0 items-center gap-1">{headerActions}</div>
+          <div className="flex shrink-0 items-center gap-1">
+            {headerActions}
+          </div>
         ) : null}
       </div>
 
@@ -141,9 +143,7 @@ export function TitleShelfView({
         <ul className="poster-grid mt-10">
           {items.map((item, index) => {
             const ariaLabel =
-              item.year != null
-                ? `${item.title} (${item.year})`
-                : item.title;
+              item.year != null ? `${item.title} (${item.year})` : item.title;
             return (
               <li key={item.key} className="min-w-0">
                 <TitleNavPoster
