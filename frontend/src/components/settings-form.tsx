@@ -317,64 +317,6 @@ export function SettingsForm() {
           <legend className="type-subsection text-foreground">Profile</legend>
 
           <div>
-            <label htmlFor={usernameId} className="text-sm text-muted">
-              Username
-            </label>
-            <input
-              id={usernameId}
-              name="username"
-              autoComplete="username"
-              value={username}
-              onChange={(event) => {
-                setUsername(event.target.value);
-              }}
-              readOnly={renameLocked}
-              aria-invalid={error ? true : undefined}
-              aria-describedby={usernameDescribedBy}
-              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground read-only:opacity-70"
-            />
-            <p id={usernameHintId} className="mt-1 text-xs text-muted">
-              {renameLocked
-                ? `Username can change again after ${new Date(renameAvailableAt!).toLocaleString()}.`
-                : '3–32 characters: a–z, 0–9, underscore. Once every 30 days.'}
-            </p>
-          </div>
-
-          <div>
-            <label htmlFor={displayNameId} className="text-sm text-muted">
-              Display name
-            </label>
-            <input
-              id={displayNameId}
-              name="display_name"
-              autoComplete="nickname"
-              value={displayName}
-              onChange={(event) => {
-                setDisplayName(event.target.value);
-              }}
-              maxLength={120}
-              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-            />
-          </div>
-
-          <div>
-            <label htmlFor={bioId} className="text-sm text-muted">
-              Bio
-            </label>
-            <textarea
-              id={bioId}
-              name="bio"
-              value={bio}
-              onChange={(event) => {
-                setBio(event.target.value);
-              }}
-              maxLength={500}
-              rows={4}
-              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-            />
-          </div>
-
-          <div>
             <p className="text-sm text-muted" id={`${avatarId}-label`}>
               Profile photo
             </p>
@@ -431,6 +373,64 @@ export function SettingsForm() {
                 ) : null}
               </div>
             </div>
+          </div>
+
+          <div>
+            <label htmlFor={usernameId} className="text-sm text-muted">
+              Username
+            </label>
+            <input
+              id={usernameId}
+              name="username"
+              autoComplete="username"
+              value={username}
+              onChange={(event) => {
+                setUsername(event.target.value);
+              }}
+              readOnly={renameLocked}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={usernameDescribedBy}
+              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground read-only:opacity-70"
+            />
+            <p id={usernameHintId} className="mt-1 text-xs text-muted">
+              {renameLocked
+                ? `Username can change again after ${new Date(renameAvailableAt!).toLocaleString()}.`
+                : '3–32 characters: a–z, 0–9, underscore. Once every 30 days.'}
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor={displayNameId} className="text-sm text-muted">
+              Display name
+            </label>
+            <input
+              id={displayNameId}
+              name="display_name"
+              autoComplete="nickname"
+              value={displayName}
+              onChange={(event) => {
+                setDisplayName(event.target.value);
+              }}
+              maxLength={120}
+              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+            />
+          </div>
+
+          <div>
+            <label htmlFor={bioId} className="text-sm text-muted">
+              Bio
+            </label>
+            <textarea
+              id={bioId}
+              name="bio"
+              value={bio}
+              onChange={(event) => {
+                setBio(event.target.value);
+              }}
+              maxLength={500}
+              rows={4}
+              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
+            />
           </div>
 
           <div>
