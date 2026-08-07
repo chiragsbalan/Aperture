@@ -6,9 +6,12 @@ import uuid
 from typing import Any, cast
 
 import pytest
+from app.auth.deps import get_optional_identity
+from app.auth.models import Identity
 from app.core.cache import get_cache, init_cache, run_coro_sync
 from app.core.config import Settings, get_settings
 from app.core.security import hash_rate_limit_subject
+from app.main import app
 from app.metadata import service as metadata_service
 from app.metadata.cache_keys import top_movies_key
 from app.metadata.schemas import (
@@ -667,7 +670,11 @@ def test_top_movies_auth_allows_higher_limit(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Bearer auth raises the clamp to max_auth_limit."""
+    """Authenticated identity raises the clamp to max_auth_limit.
+
+    Uses dependency override so this unit test does not need a migrated DB
+    or real register (non-integration suite).
+    """
     monkeypatch.setenv('TMDB_API_KEY', 'test-tmdb-key')
     monkeypatch.setenv('TOP_MOVIES_MAX_PUBLIC_LIMIT', '24')
     monkeypatch.setenv('TOP_MOVIES_MAX_AUTH_LIMIT', '500')
@@ -691,34 +698,27 @@ def test_top_movies_auth_allows_higher_limit(
         fake_fetch,
     )
 
-    register = client.post(
-        '/api/v1/auth/register',
-        json={
-            'email': f'topmovies-{uuid.uuid4().hex[:10]}@example.com',
-            'username': f'tm_{uuid.uuid4().hex[:10]}',
-            'password': 'secure-pass-1',
-        },
-    )
-    assert register.status_code == 201, register.text
-    access = register.json()['access_token']
-
     anon = client.get('/api/v1/catalog/top-movies?limit=80')
     assert anon.status_code == 200, anon.text
     assert len(anon.json()['movies']) == 24
 
-    authed = client.get(
-        '/api/v1/catalog/top-movies?limit=80',
-        headers={'Authorization': f'Bearer {access}'},
-    )
-    assert authed.status_code == 200, authed.text
-    assert len(authed.json()['movies']) == 80
+    async def fake_authed_identity() -> Identity:
+        return Identity(email='rail-auth@example.com', status='active')
+
+    app.dependency_overrides[get_optional_identity] = fake_authed_identity
+    try:
+        authed = client.get('/api/v1/catalog/top-movies?limit=80')
+        assert authed.status_code == 200, authed.text
+        assert len(authed.json()['movies']) == 80
+    finally:
+        app.dependency_overrides.pop(get_optional_identity, None)
 
 
 def test_top_tv_auth_allows_higher_limit(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Bearer auth raises the top-TV clamp to max_auth_limit."""
+    """Authenticated identity raises the top-TV clamp to max_auth_limit."""
     monkeypatch.setenv('TMDB_API_KEY', 'test-tmdb-key')
     monkeypatch.setenv('TOP_MOVIES_MAX_PUBLIC_LIMIT', '24')
     monkeypatch.setenv('TOP_MOVIES_MAX_AUTH_LIMIT', '500')
@@ -743,27 +743,20 @@ def test_top_tv_auth_allows_higher_limit(
         fake_fetch,
     )
 
-    register = client.post(
-        '/api/v1/auth/register',
-        json={
-            'email': f'toptv-{uuid.uuid4().hex[:10]}@example.com',
-            'username': f'tv_{uuid.uuid4().hex[:10]}',
-            'password': 'secure-pass-1',
-        },
-    )
-    assert register.status_code == 201, register.text
-    access = register.json()['access_token']
-
     anon = client.get('/api/v1/catalog/top-tv-shows?limit=80')
     assert anon.status_code == 200, anon.text
     assert len(anon.json()['shows']) == 24
 
-    authed = client.get(
-        '/api/v1/catalog/top-tv-shows?limit=80',
-        headers={'Authorization': f'Bearer {access}'},
-    )
-    assert authed.status_code == 200, authed.text
-    assert len(authed.json()['shows']) == 80
+    async def fake_authed_identity() -> Identity:
+        return Identity(email='rail-tv-auth@example.com', status='active')
+
+    app.dependency_overrides[get_optional_identity] = fake_authed_identity
+    try:
+        authed = client.get('/api/v1/catalog/top-tv-shows?limit=80')
+        assert authed.status_code == 200, authed.text
+        assert len(authed.json()['shows']) == 80
+    finally:
+        app.dependency_overrides.pop(get_optional_identity, None)
 
 
 def test_top_movies_invalid_bearer_returns_401(
