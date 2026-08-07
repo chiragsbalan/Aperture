@@ -318,3 +318,38 @@ class ContentCredit(UuidPrimaryKeyMixin, TimestampMixin, Base):
 
     content_item: Mapped[ContentItem] = relationship(back_populates='credits')
     person: Mapped[Person] = relationship(back_populates='credits')
+
+
+class ContentRatingStats(Base):
+    """Community rating aggregate for one catalog title.
+
+    ``rating_count`` / ``rating_sum`` reflect one vote per user: that user's
+    latest non-null ``watch_entries.rating`` for the title (maintained by
+    the library domain on diary writes).
+    """
+
+    __tablename__ = 'content_rating_stats'
+
+    content_type: Mapped[str] = mapped_column(String(32), primary_key=True)
+    content_id: Mapped[uuid.UUID] = mapped_column(Uuid(), primary_key=True)
+    rating_count: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
+    rating_sum: Mapped[Decimal] = mapped_column(
+        Numeric(12, 1),
+        nullable=False,
+        default=Decimal('0'),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "content_type IN ('movie', 'tv_show')",
+            name='content_rating_stats_content_type',
+        ),
+        CheckConstraint(
+            'rating_count >= 0',
+            name='content_rating_stats_rating_count_nonneg',
+        ),
+    )

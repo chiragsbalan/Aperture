@@ -114,6 +114,9 @@ class Settings(BaseSettings):
 
     # Redis (P2.4). Empty = in-memory CacheBackend (tests / local without Redis).
     redis_url: str = ''
+    # Switch from TMDB fallback to Aperture community average when a title
+    # has at least this many distinct user ratings (latest diary rating / user).
+    aperture_rating_switch_threshold: int = Field(default=100, ge=1, le=100_000)
     # Metadata detail cache TTL (seconds) — assembled MovieDetail / TvDetail.
     metadata_cache_ttl_seconds: int = 600
     # Enrichment section cache (providers / similar / meta tabs). Longer than

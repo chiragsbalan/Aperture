@@ -8,9 +8,11 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
 from app.auth.deps import CurrentIdentityDep
+from app.common.content_refs import to_db_content_type
 from app.core.cache import get_cache
 from app.core.deps import DbSessionDep, SettingsDep
 from app.core.trusted_client import resolve_client_ip
+from app.library import rating_stats as rating_stats_service
 from app.library import service as library_service
 from app.library.rate_limit import enforce_watch_entries_contains_rate_limit
 from app.library.schemas import (
@@ -197,6 +199,11 @@ async def create_watch_entry(
                 cache,
                 user_id=owner_user_id,
                 kind='watchlist',
+            )
+        if body.rating is not None:
+            await rating_stats_service.invalidate_title_detail_cache(
+                content_type=to_db_content_type(body.type),
+                content_id=body.id,
             )
         return entry
     except Exception as exc:

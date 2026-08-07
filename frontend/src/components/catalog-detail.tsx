@@ -12,6 +12,7 @@ import { TitleAtmosphere } from '@/components/title-atmosphere';
 import { TitleMetaTabs } from '@/components/title-meta-tabs';
 import { TitleOverview } from '@/components/title-overview';
 import { TitlePosterLink } from '@/components/title-poster-link';
+import { TitleScore } from '@/components/title-score';
 import { TitleSeasons } from '@/components/title-seasons';
 import { WhereToWatch } from '@/components/where-to-watch';
 import type {
@@ -20,9 +21,11 @@ import type {
   PersonDetail,
   SeasonDetail,
   TitleExtras,
+  TitleRating,
   TvDetail,
 } from '@/lib/catalog';
 import { POSTER_GRID_SIZES } from '@/lib/poster';
+import { formatTvStatusLabel } from '@/lib/tv-status';
 
 const MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'long',
@@ -109,9 +112,17 @@ function HomeLink() {
   );
 }
 
+function TitleMetaStack({ children }: { children: ReactNode }) {
+  return (
+    <div className="mt-2 flex flex-col gap-y-1 text-xs text-muted sm:mt-3 sm:gap-y-1.5 sm:text-sm">
+      {children}
+    </div>
+  );
+}
+
 function TitleMetaRow({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-xs text-muted sm:mt-3 sm:gap-x-3 sm:text-sm">
+    <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 sm:gap-x-3">
       {children}
     </div>
   );
@@ -209,6 +220,7 @@ function TitleDetailShell({
   meta,
   overview,
   tagline,
+  rating,
   contentId,
   contentType,
   status,
@@ -225,6 +237,7 @@ function TitleDetailShell({
   meta: ReactNode;
   overview: string | null;
   tagline: string | null;
+  rating?: TitleRating | null;
   contentId: string;
   contentType: 'movie' | 'tv_show';
   status: string | null;
@@ -283,18 +296,25 @@ function TitleDetailShell({
             </div>
 
             <div className="motion-fade-rise col-span-2 col-start-1 row-start-3 min-w-0 sm:col-span-1 sm:row-start-2 sm:mt-1">
+              {rating != null ? <TitleScore rating={rating} /> : null}
               {tagline ? (
-                <p className="type-eyebrow text-muted">{tagline}</p>
+                <p
+                  className={`type-eyebrow text-muted${
+                    rating != null ? ' mt-3 sm:mt-4' : ''
+                  }`}
+                >
+                  {tagline}
+                </p>
               ) : null}
               {overview ? (
                 <TitleOverview
                   text={overview}
-                  className={tagline ? 'mt-2.5 sm:mt-4' : ''}
+                  className={tagline || rating != null ? 'mt-2.5 sm:mt-4' : ''}
                 />
               ) : (
                 <p
                   className={`text-xs text-muted sm:text-sm ${
-                    tagline ? 'mt-2.5 sm:mt-7' : 'sm:mt-7'
+                    tagline || rating != null ? 'mt-2.5 sm:mt-7' : 'sm:mt-7'
                   }`}
                 >
                   No overview yet.
@@ -348,19 +368,26 @@ export function MovieDetailView({ movie }: { movie: MovieDetail }) {
       crew={movie.crew}
       extras={movie.extras}
       tagline={movie.extras.tagline}
+      rating={movie.rating}
       heading={<h1 className="type-title text-foreground">{movie.title}</h1>}
       meta={
-        <TitleMetaRow>
-          {releaseLabel ? <span>{releaseLabel}</span> : null}
-          {movie.runtime_minutes != null ? (
-            <span>{movie.runtime_minutes} min</span>
+        <TitleMetaStack>
+          {releaseLabel || movie.runtime_minutes != null ? (
+            <TitleMetaRow>
+              {releaseLabel ? <span>{releaseLabel}</span> : null}
+              {movie.runtime_minutes != null ? (
+                <span>{movie.runtime_minutes} min</span>
+              ) : null}
+            </TitleMetaRow>
           ) : null}
           {directors.length > 0 ? (
-            <span>
-              Directed by <PersonLinks people={directors} />
-            </span>
+            <TitleMetaRow>
+              <span>
+                Directed by <PersonLinks people={directors} />
+              </span>
+            </TitleMetaRow>
           ) : null}
-        </TitleMetaRow>
+        </TitleMetaStack>
       }
       overview={movie.overview}
     />
@@ -376,8 +403,12 @@ export function TvDetailView({ show }: { show: TvDetail }) {
       : firstAir || lastAir;
   const creators = creatorsFromCrew(show.crew);
   const episodeRuntime = show.extras.episode_runtime_minutes;
-  const statusLabel = show.status?.trim() || null;
-  const hasCounts = show.number_of_seasons != null;
+  const statusLabel = formatTvStatusLabel(show.status);
+  const hasSeasons = show.number_of_seasons != null;
+  const hasEpisodes = show.number_of_episodes != null;
+  const hasPrimaryMeta =
+    airLabel != null || hasSeasons || episodeRuntime != null;
+  const hasEpisodeStatusRow = hasEpisodes || statusLabel != null;
 
   return (
     <TitleDetailShell
@@ -393,27 +424,43 @@ export function TvDetailView({ show }: { show: TvDetail }) {
       extras={show.extras}
       seasons={show.seasons}
       tagline={show.extras.tagline}
+      rating={show.rating}
       heading={<h1 className="type-title text-foreground">{show.title}</h1>}
       meta={
-        <TitleMetaRow>
-          {airLabel ? <span>{airLabel}</span> : null}
-          {hasCounts ? (
-            <span>
-              {show.number_of_seasons} season
-              {show.number_of_seasons === 1 ? '' : 's'}
-              {show.number_of_episodes != null
-                ? ` · ${show.number_of_episodes} episodes`
-                : ''}
-            </span>
+        <TitleMetaStack>
+          {hasPrimaryMeta ? (
+            <TitleMetaRow>
+              {airLabel ? <span>{airLabel}</span> : null}
+              {hasSeasons ? (
+                <span>
+                  {show.number_of_seasons} season
+                  {show.number_of_seasons === 1 ? '' : 's'}
+                </span>
+              ) : null}
+              {episodeRuntime != null ? (
+                <span>~{episodeRuntime} min</span>
+              ) : null}
+            </TitleMetaRow>
           ) : null}
-          {statusLabel ? <span>{statusLabel}</span> : null}
-          {episodeRuntime != null ? <span>~{episodeRuntime} min</span> : null}
+          {hasEpisodeStatusRow ? (
+            <TitleMetaRow>
+              {hasEpisodes ? (
+                <span>
+                  {show.number_of_episodes} episode
+                  {show.number_of_episodes === 1 ? '' : 's'}
+                </span>
+              ) : null}
+              {statusLabel ? <span>{statusLabel}</span> : null}
+            </TitleMetaRow>
+          ) : null}
           {creators.length > 0 ? (
-            <span>
-              Created by <PersonLinks people={creators} />
-            </span>
+            <TitleMetaRow>
+              <span>
+                Created by <PersonLinks people={creators} />
+              </span>
+            </TitleMetaRow>
           ) : null}
-        </TitleMetaRow>
+        </TitleMetaStack>
       }
       overview={show.overview}
     />

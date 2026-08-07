@@ -63,6 +63,7 @@ Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
 | [ADR-0012](ADR-0012-brand-shell-atmosphere.md) | Purple brand + shell atmosphere (guest mosaic excluded) |
 | [ADR-0013](ADR-0013-lean-catalog-option-b.md) | Lean Postgres stubs + Redis/TMDb enrichment (Option B) |
 | [ADR-0014](ADR-0014-avatar-r2-cdn.md) | Profile avatars via Cloudflare R2 + custom-domain CDN |
+| [ADR-0015](ADR-0015-title-ratings.md) | Hybrid title ratings (TMDB → Aperture @ 100) |
 
 Reserved / not yet written: **ADR-0007** — OpenSearch hosting (due at P5 exit per PLAN).
 ## Template

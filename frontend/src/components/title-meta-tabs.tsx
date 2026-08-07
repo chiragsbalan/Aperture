@@ -15,6 +15,8 @@ import {
 
 import type { CreditPersonRef, TitleExtras } from '@/lib/catalog';
 import { MOTION_DURATION_MED_MS } from '@/lib/motion';
+import { useScrollFadeX } from '@/lib/scroll-fade';
+import { formatTvStatusLabel } from '@/lib/tv-status';
 
 type MetaTab = 'cast' | 'crew' | 'details' | 'genres' | 'releases';
 type TitleContentType = 'movie' | 'tv_show';
@@ -156,10 +158,11 @@ function DetailsList({
   const isTv = contentType === 'tv_show';
   const networks = extras.networks ?? [];
 
-  if (isTv && status?.trim()) {
+  const statusLabel = formatTvStatusLabel(status);
+  if (isTv && statusLabel) {
     rows.push({
       key: 'status',
-      node: <DetailRow label="Status" value={status.trim()} />,
+      node: <DetailRow label="Status" value={statusLabel} />,
     });
   }
   if (isTv && networks.length > 0) {
@@ -470,6 +473,7 @@ export function TitleMetaTabs({
   const [tab, setTab] = useState<MetaTab>(tabs[0]?.id ?? 'details');
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const tablistRef = useRef<HTMLDivElement | null>(null);
+  const tablistHostRef = useRef<HTMLDivElement | null>(null);
   const active = tabs.some((item) => item.id === tab)
     ? tab
     : (tabs[0]?.id ?? 'details');
@@ -496,14 +500,17 @@ export function TitleMetaTabs({
     };
   }, []);
 
+  useScrollFadeX(tablistRef, tabs.length, tablistHostRef);
+
   useLayoutEffect(() => {
     const list = tablistRef.current;
     if (!list) {
       return;
     }
 
+    const activeIndex = tabs.findIndex((item) => item.id === active);
+
     const syncIndicator = () => {
-      const activeIndex = tabs.findIndex((item) => item.id === active);
       const activeTab = tabRefs.current[activeIndex];
       if (!activeTab) {
         setIndicator({ left: 0, width: 0 });
@@ -517,6 +524,19 @@ export function TitleMetaTabs({
     };
 
     syncIndicator();
+
+    const activeTab = tabRefs.current[activeIndex];
+    if (activeTab && activeIndex >= 0) {
+      // Center the selected tab (or as far as scroll bounds allow).
+      const tabCenter = activeTab.offsetLeft + activeTab.offsetWidth / 2;
+      const targetLeft = tabCenter - list.clientWidth / 2;
+      const maxScroll = Math.max(0, list.scrollWidth - list.clientWidth);
+      const nextLeft = Math.min(Math.max(0, targetLeft), maxScroll);
+      if (Math.abs(nextLeft - list.scrollLeft) > 1) {
+        list.scrollTo({ left: nextLeft, behavior: 'smooth' });
+      }
+    }
+
     const observer = new ResizeObserver(syncIndicator);
     observer.observe(list);
     for (const button of tabRefs.current) {
@@ -763,59 +783,63 @@ export function TitleMetaTabs({
 
   return (
     <section className="mt-5 text-left sm:mt-7">
-      <div
-        ref={tablistRef}
-        role="tablist"
-        aria-label="Title metadata"
-        aria-orientation="horizontal"
-        className="relative flex w-full flex-nowrap items-end justify-between gap-0.5 border-b border-[var(--color-border)] sm:justify-start sm:gap-6"
-      >
-        {tabs.map((item, index) => {
-          const selected = active === item.id;
-          const ariaLabel =
-            item.ariaLabel ??
-            (item.count != null ? `${item.label}, ${item.count}` : item.label);
-          return (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-label={ariaLabel}
-              tabIndex={selected ? 0 : -1}
-              id={`title-tab-${item.id}`}
-              aria-controls={panelId}
-              ref={(element) => {
-                tabRefs.current[index] = element;
-              }}
-              onClick={() => {
-                setTab(item.id);
-              }}
-              onKeyDown={(event) => {
-                onTabKeyDown(event, index);
-              }}
-              className={`min-w-0 flex-1 whitespace-nowrap pb-1.5 text-center text-xs font-semibold tracking-[0.03em] transition-colors duration-[var(--duration-med)] sm:flex-none sm:pb-2 sm:text-left sm:text-sm sm:tracking-[0.12em] ${
-                selected ? 'text-accent' : 'text-muted hover:text-foreground'
-              }`}
-            >
-              {item.label}
-              {item.count != null ? (
-                <span className="ml-1 hidden font-normal tracking-normal text-muted sm:ml-2 sm:inline">
-                  {item.count}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-        <span
-          aria-hidden
-          className="title-tab-indicator pointer-events-none absolute bottom-0 h-0.5 bg-accent"
-          style={{
-            width: indicator.width,
-            transform: `translateX(${indicator.left}px)`,
-            opacity: indicatorReady ? 1 : 0,
-          }}
-        />
+      <div ref={tablistHostRef} className="scroll-fade-x-host">
+        <div
+          ref={tablistRef}
+          role="tablist"
+          aria-label="Title metadata"
+          aria-orientation="horizontal"
+          className="scroll-fade-x relative flex w-full flex-nowrap items-end gap-4 border-b border-[var(--color-border)] pb-px sm:gap-6"
+        >
+          {tabs.map((item, index) => {
+            const selected = active === item.id;
+            const ariaLabel =
+              item.ariaLabel ??
+              (item.count != null
+                ? `${item.label}, ${item.count}`
+                : item.label);
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-label={ariaLabel}
+                tabIndex={selected ? 0 : -1}
+                id={`title-tab-${item.id}`}
+                aria-controls={panelId}
+                ref={(element) => {
+                  tabRefs.current[index] = element;
+                }}
+                onClick={() => {
+                  setTab(item.id);
+                }}
+                onKeyDown={(event) => {
+                  onTabKeyDown(event, index);
+                }}
+                className={`shrink-0 whitespace-nowrap pb-1.5 text-xs font-semibold tracking-[0.03em] transition-colors duration-[var(--duration-med)] sm:pb-2 sm:text-sm sm:tracking-[0.12em] ${
+                  selected ? 'text-accent' : 'text-muted hover:text-foreground'
+                }`}
+              >
+                {item.label}
+                {item.count != null ? (
+                  <span className="ml-1 hidden font-normal tracking-normal text-muted sm:ml-2 sm:inline">
+                    {item.count}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+          <span
+            aria-hidden
+            className="title-tab-indicator pointer-events-none absolute bottom-0 h-0.5 bg-accent"
+            style={{
+              width: indicator.width,
+              transform: `translateX(${indicator.left}px)`,
+              opacity: indicatorReady ? 1 : 0,
+            }}
+          />
+        </div>
       </div>
 
       <div

@@ -157,6 +157,13 @@ export interface TitleExtras {
   similar: SimilarTitle[];
 }
 
+/** Hybrid community / TMDB score on the product 0–5 scale. */
+export interface TitleRating {
+  value: number;
+  source: 'tmdb' | 'aperture';
+  count: number;
+}
+
 export interface MovieDetail {
   type: 'movie';
   id: string;
@@ -172,6 +179,7 @@ export interface MovieDetail {
   cast: CreditPersonRef[];
   crew: CreditPersonRef[];
   extras: TitleExtras;
+  rating?: TitleRating | null;
 }
 
 export interface TvDetail {
@@ -192,6 +200,7 @@ export interface TvDetail {
   cast: CreditPersonRef[];
   crew: CreditPersonRef[];
   extras: TitleExtras;
+  rating?: TitleRating | null;
 }
 
 export interface PersonCreditRef {

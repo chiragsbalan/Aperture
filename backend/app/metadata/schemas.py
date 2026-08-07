@@ -240,6 +240,14 @@ class TitleExtras(BaseModel):
     similar: list[SimilarTitle] = Field(default_factory=list)
 
 
+class TitleRating(BaseModel):
+    """Community or TMDB score on the product 0–5 scale."""
+
+    value: float = Field(ge=0, le=5)
+    source: str = Field(examples=['tmdb', 'aperture'])
+    count: int = Field(ge=0)
+
+
 class MovieDetail(BaseModel):
     """Curated movie detail response."""
 
@@ -259,6 +267,7 @@ class MovieDetail(BaseModel):
     cast: list[CreditPersonRef] = Field(default_factory=list)
     crew: list[CreditPersonRef] = Field(default_factory=list)
     extras: TitleExtras = Field(default_factory=TitleExtras)
+    rating: TitleRating | None = None
 
 
 class TvDetail(BaseModel):
@@ -283,6 +292,7 @@ class TvDetail(BaseModel):
     cast: list[CreditPersonRef] = Field(default_factory=list)
     crew: list[CreditPersonRef] = Field(default_factory=list)
     extras: TitleExtras = Field(default_factory=TitleExtras)
+    rating: TitleRating | None = None
 
 
 class PersonCreditRef(BaseModel):

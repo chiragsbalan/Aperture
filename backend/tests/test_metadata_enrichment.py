@@ -98,6 +98,8 @@ def test_lean_extras_for_persist_is_always_empty() -> None:
         {
             'tagline': 'Hope',
             'genres': [{'id': 18, 'name': 'Drama'}],
+            'vote_average': 8.2,
+            'vote_count': 100,
             'watch/providers': {
                 'results': {
                     'US': {
@@ -128,6 +130,13 @@ def test_lean_extras_for_persist_is_always_empty() -> None:
     assert lean_extras_for_persist(full) == {}
     assert extras_need_live_enrichment({}) is True
     assert extras_need_live_enrichment(full) is False
+    # Legacy fat chrome without votes still needs a live enrich pass.
+    assert (
+        extras_need_live_enrichment(
+            {'tagline': 'Hope', 'genres': [{'id': 18, 'name': 'Drama'}]},
+        )
+        is True
+    )
 
 
 def test_merge_enrichment_extras_overlays_chrome_fields() -> None:
@@ -137,12 +146,16 @@ def test_merge_enrichment_extras_overlays_chrome_fields() -> None:
         'genres': [{'id': 18, 'name': 'Drama'}],
         'watch_providers': {'US': {'flatrate': [{'provider_name': 'Netflix'}]}},
         'similar': [{'tmdb_id': 1, 'title': 'Other'}],
+        'tmdb_vote_average': 8.2,
+        'tmdb_vote_count': 500,
     }
     merged = merge_enrichment_extras(base, overlay)
     assert merged['tagline'] == 'Hope'
     assert merged['genres'][0]['name'] == 'Drama'
     assert merged['watch_providers']['US']['flatrate'][0]['provider_name'] == 'Netflix'
     assert merged['similar'][0]['title'] == 'Other'
+    assert merged['tmdb_vote_average'] == 8.2
+    assert merged['tmdb_vote_count'] == 500
 
 
 def test_movie_enrich_append_includes_meta_fields() -> None:
