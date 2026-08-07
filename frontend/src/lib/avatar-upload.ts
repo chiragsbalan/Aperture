@@ -37,7 +37,10 @@ export async function prepareAvatarBlob(file: File): Promise<{
 
   const bitmap = await createImageBitmap(file);
   try {
-    const scale = Math.min(1, MAX_EDGE_PX / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(
+      1,
+      MAX_EDGE_PX / Math.max(bitmap.width, bitmap.height),
+    );
     const width = Math.max(1, Math.round(bitmap.width * scale));
     const height = Math.max(1, Math.round(bitmap.height * scale));
     const canvas = document.createElement('canvas');
@@ -68,7 +71,9 @@ export async function prepareAvatarBlob(file: File): Promise<{
       );
     });
     if (blob.size > MAX_BYTES) {
-      throw new AvatarUploadError('Image is still too large after resize (max 2MB).');
+      throw new AvatarUploadError(
+        'Image is still too large after resize (max 2MB).',
+      );
     }
     return { blob, contentType };
   } finally {
@@ -92,7 +97,9 @@ export async function requestAvatarUploadUrl(
     );
   }
   if (!res.ok) {
-    throw new AvatarUploadError(apiErrorMessage(data, 'Could not start upload'));
+    throw new AvatarUploadError(
+      apiErrorMessage(data, 'Could not start upload'),
+    );
   }
   return data as AvatarUploadSlot;
 }
@@ -114,7 +121,9 @@ export async function putAvatarToR2(
     body: blob,
   });
   if (!res.ok) {
-    throw new AvatarUploadError(`Upload to storage failed (HTTP ${res.status}).`);
+    throw new AvatarUploadError(
+      `Upload to storage failed (HTTP ${res.status}).`,
+    );
   }
 }
 
@@ -137,7 +146,9 @@ export async function deleteAvatar(): Promise<OwnedProfile> {
   });
   const data: unknown = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new AvatarUploadError(apiErrorMessage(data, 'Could not remove avatar'));
+    throw new AvatarUploadError(
+      apiErrorMessage(data, 'Could not remove avatar'),
+    );
   }
   return data as OwnedProfile;
 }
@@ -150,12 +161,7 @@ export async function uploadAvatarFile(file: File): Promise<OwnedProfile> {
       `Image is too large after resize (max ${Math.floor(slot.max_bytes / (1024 * 1024))}MB).`,
     );
   }
-  await putAvatarToR2(
-    slot.upload_url,
-    blob,
-    contentType,
-    slot.cache_control,
-  );
+  await putAvatarToR2(slot.upload_url, blob, contentType, slot.cache_control);
   return confirmAvatarUpload(slot.key);
 }
 

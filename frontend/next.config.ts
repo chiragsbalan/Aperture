@@ -11,7 +11,9 @@ const mediaHost = /^[a-z0-9.-]+$/i.test(rawMediaHost) ? rawMediaHost : '';
 // Cloudflare account id for presigned PUTs (S3 API host). Prefer this over a
 // wildcard connect-src. Set NEXT_PUBLIC_R2_ACCOUNT_ID (same value as R2_ACCOUNT_ID).
 const rawR2AccountId = (process.env.NEXT_PUBLIC_R2_ACCOUNT_ID ?? '').trim();
-const r2AccountId = /^[a-f0-9]{32}$/i.test(rawR2AccountId) ? rawR2AccountId : '';
+const r2AccountId = /^[a-f0-9]{32}$/i.test(rawR2AccountId)
+  ? rawR2AccountId
+  : '';
 const r2ConnectSrc = r2AccountId
   ? `https://${r2AccountId}.r2.cloudflarestorage.com`
   : '';

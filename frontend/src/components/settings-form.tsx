@@ -365,9 +365,14 @@ export function SettingsForm() {
                     </button>
                   ) : null}
                 </div>
-                <p className="text-xs text-muted">JPEG, PNG, or WebP up to 2MB.</p>
+                <p className="text-xs text-muted">
+                  JPEG, PNG, or WebP up to 2MB.
+                </p>
                 {avatarError ? (
-                  <p role="alert" className="text-xs text-[var(--color-danger)]">
+                  <p
+                    role="alert"
+                    className="text-xs text-[var(--color-danger)]"
+                  >
                     {avatarError}
                   </p>
                 ) : null}
