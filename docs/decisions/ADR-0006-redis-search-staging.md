@@ -5,6 +5,7 @@
 - **Related:** Search LLD; Technical Architecture Part 2; Database Design; Development Roadmap; PLAN.md P2 / P5–P6 / P11
 - **Implements in:** Redis cache P2.4; PG FTS P2.3; OpenSearch dual-write P6; Redis harden P11
 - **Follow-on:** OpenSearch **hosting** choice deferred to **ADR-0007** at P5 exit
+- **Amended:** 2026-08-07 — Option B title detail hybrid read + enrichment section keys; Redis remains non-authoritative ([ADR-0013](ADR-0013-lean-catalog-option-b.md))
 
 ## Context
 
@@ -66,14 +67,16 @@ Local Compose adds Redis when P2.4 lands. Cloud Redis provider/tier is chosen at
 
 ### Title detail hybrid read (Option B)
 
+Authoritative rules (negative cache, coalesce, stub-refresh invalidation): [ADR-0013](ADR-0013-lean-catalog-option-b.md).
+
 `GET /movies|{tv}/{uuid}`:
 
 1. Redis full-detail DTO HIT → return (TTL default 600s).
-2. MISS → assemble core from Postgres lean stub (`extras` is `{}`).
+2. MISS → per-`content_id` singleflight assemble from Postgres lean stub (`extras` is `{}`).
 3. Enrichment section key HIT (`meta:movie|tv:enrich:v1:{uuid}`, default 6h) → merge.
-4. Else single-flight TMDb enrichment → section SET → merge into response → full DTO SET.
-5. Optionally lazy-refresh lean stub columns when `refreshed_at` exceeds `metadata_stub_max_age_days` (default 150).
-6. TMDb/Redis failure → serve stub with empty enrichment sections (HTTP 200).
+4. Else single-flight TMDb enrichment → section SET → merge → full DTO SET.
+5. Lazy-refresh lean stub columns when `refreshed_at` exceeds `metadata_stub_max_age_days` (default 150); invalidate **detail** keys only (never enrichment keys).
+6. Enrichment failure → short negative sentinel (`{"_neg": true}`, default 60s) + empty sections (HTTP 200).
 
 Home rails remain TMDb-pool cached (rebuild from TMDb on miss), unchanged.
 
@@ -82,4 +85,4 @@ Home rails remain TMDb-pool cached (rebuild from TMDb on miss), unchanged.
 - ADR-0007: OpenSearch provider, sizing, and network placement (P5 exit).
 - **P11:** Redis HA, eviction policy review, cache hit SLOs; **migrate auth rate-limit counters** to shared Redis `CacheBackend` (ADR-0005); keep Postgres counters as durable audit/backup if useful.
 - Vector/semantic index (P8+) should reuse the same “derived index + API façade” pattern; supersede or extend this ADR if the fallback matrix changes.
-- Optional per-section Redis keys / TTLs for providers vs similar (today: full DTO cache after hybrid assemble).
+- Finer enrichment subsection keys / distributed locks — see ADR-0013 Future evolution.

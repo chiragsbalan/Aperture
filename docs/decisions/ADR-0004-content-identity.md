@@ -5,8 +5,8 @@
 - **Related:** Domain Model PDF; Database Design PDFs; Metadata LLD; PLAN.md P2.1+; [ADR-0008](ADR-0008-personal-library-lists.md) (list content-ref typing)
 - **Implements in:** P2 (canonical catalog + detail UX); later domains reference these ids
 - **Amended:** 2026-08-05 — guest landing on `/` (hero + rails) + signed-in `/` discovery rails (cold TMDb cards; server-only TMDb; shared IP RL default 30); `/home` redirects to `/`
-- **Amended:** 2026-08-07 — Option B lean catalog: durable stub + lean extras in Postgres; volatile enrichment (providers / similar / galleries) via Redis ↔ TMDb (see Future evolution + [ADR-0006](ADR-0006-redis-search-staging.md))
-- **See also:** [ADR-0010](ADR-0010-guest-landing-home-shell.md) (guest vs signed-in `/` product shell); [ADR-0011](ADR-0011-title-poster-morph.md) (cold resolve under poster morph)
+- **Amended:** 2026-08-07 — Option B lean catalog: durable stub + empty `extras` in Postgres; volatile enrichment via Redis ↔ TMDb — see [ADR-0013](ADR-0013-lean-catalog-option-b.md) and [ADR-0006](ADR-0006-redis-search-staging.md)
+- **See also:** [ADR-0010](ADR-0010-guest-landing-home-shell.md) (guest vs signed-in `/` product shell); [ADR-0011](ADR-0011-title-poster-morph.md) (cold resolve under poster morph); [ADR-0013](ADR-0013-lean-catalog-option-b.md) (lean stub / enrichment split)
 
 ## Context
 
@@ -77,7 +77,7 @@ Cold **TMDb-id card** rails (not Aperture UUID shelves):
 
 ### Lean catalog projection (Option B)
 
-Canonical identity remains in Postgres. Persisted title rows are a **lean stub**, not a full TMDb warehouse:
+Canonical identity remains in Postgres. Persisted title rows are a **lean stub**, not a full TMDb warehouse. **Authoritative detail for the split, hybrid read, migrations, and refresh ops:** [ADR-0013](ADR-0013-lean-catalog-option-b.md).
 
 | Durable in Postgres | Not durable (Redis ↔ TMDb enrichment) |
 |---|---|
@@ -85,10 +85,10 @@ Canonical identity remains in Postgres. Persisted title rows are a **lean stub**
 | subtype year/date columns (`movies.release_date`, `tv_shows.first_air_date`, …) | tagline, genres, keywords, studios, networks, releases, … |
 | `external_ids` (TMDb ↔ UUID) | `videos`, `images` galleries |
 | `content_items.refreshed_at` (lean-stub ToS refresh clock) | |
-| `content_items.extras` stays `{}` | |
+| `content_items.extras` always `{}` | |
 | People shells + `content_credits`; TV season stubs | |
 
-Enrichment is cached under section keys (`meta:movie|tv:enrich:v1:{uuid}`, default 6h TTL) separately from the full detail DTO (600s). Stale stubs refresh lazily on detail read and via CLI (`refresh-stale`, `refresh-changes` using TMDb `/changes`).
+Enrichment uses section keys (`meta:movie|tv:enrich:v1:{uuid}`) separate from the full detail DTO. Stale stubs refresh lazily on detail read and via CLI (`refresh-stale`, `refresh-changes`).
 
 **Library soft-refs** still point at Aperture UUIDs; shelf cards use `get_content_summaries` (title / year / poster) from the stub. Warm `/movies|{tv}/{uuid}` must remain usable from the stub when TMDb is down; enrichment sections may degrade empty.
 
@@ -101,4 +101,4 @@ Enrichment is cached under section keys (`meta:movie|tv:enrich:v1:{uuid}`, defau
 - If a true merge of two canonical items is ever required, prefer an explicit merge/redirect procedure over silently changing PKs—document in a superseding ADR if needed.
 - Broader alignment of detail DTO `tv_show` with public `tv` across all surfaces may land later; list APIs already normalize per ADR-0008.
 - Optional batched `GET /catalog/home-rails` to collapse the three rail RTTs.
-- Optional `content_items.refreshed_at` + TMDb `/changes` (or lazy refresh) for ≤6‑month ToS compliance on durable lean fields.
+- Lean-catalog follow-ons (distributed enrich locks, `refreshed_at` index, finer section TTLs) — see ADR-0013 Future evolution.
