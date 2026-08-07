@@ -14,6 +14,7 @@ from app.common.content_refs import (
     to_db_content_type,
     to_public_content_type,
 )
+from app.library import rating_stats as rating_stats_service
 from app.library import repository as library_repository
 from app.library.models import WatchEntry
 from app.library.schemas import (
@@ -160,6 +161,7 @@ async def create_entry(
         identity_id=identity_id,
     )
     day = watched_at or dt.datetime.now(dt.UTC).date()
+    normalized_rating = _normalize_rating(rating)
     entry = await library_repository.insert_entry(
         session,
         owner_user_id=owner_user_id,
@@ -167,10 +169,21 @@ async def create_entry(
         content_id=ref.content_id,
         watched_at=day,
         note=_normalize_note(note),
-        rating=_normalize_rating(rating),
+        rating=normalized_rating,
     )
+    if normalized_rating is not None:
+        await rating_stats_service.recompute_for_title(
+            session,
+            content_type=ref.db_type,
+            content_id=ref.content_id,
+        )
     if commit:
         await session.commit()
+        if normalized_rating is not None:
+            await rating_stats_service.invalidate_title_detail_cache(
+                content_type=ref.db_type,
+                content_id=ref.content_id,
+            )
     else:
         await session.flush()
 
@@ -330,7 +343,20 @@ async def patch_entry(
         entry.note = _normalize_note(note)
     if rating_set:
         entry.rating = _normalize_rating(rating)
+    # Rating or watch day can change which diary row is "latest" for the user.
+    refresh_stats = rating_set or watched_at is not None
+    if refresh_stats:
+        await rating_stats_service.recompute_for_title(
+            session,
+            content_type=entry.content_type,
+            content_id=entry.content_id,
+        )
     await session.commit()
+    if refresh_stats:
+        await rating_stats_service.invalidate_title_detail_cache(
+            content_type=entry.content_type,
+            content_id=entry.content_id,
+        )
     await session.refresh(entry)
     summaries = await metadata_service.get_content_summaries(
         session,
@@ -350,6 +376,16 @@ async def delete_entry(
         session,
         identity_id=identity_id,
     )
+    entry = await library_repository.get_entry_for_owner(
+        session,
+        owner_user_id=owner_user_id,
+        entry_id=entry_id,
+    )
+    if entry is None:
+        raise WatchEntryNotFoundError('entry not found')
+    content_type = entry.content_type
+    content_id = entry.content_id
+    had_rating = entry.rating is not None
     deleted = await library_repository.delete_entry_for_owner(
         session,
         owner_user_id=owner_user_id,
@@ -357,4 +393,15 @@ async def delete_entry(
     )
     if not deleted:
         raise WatchEntryNotFoundError('entry not found')
+    if had_rating:
+        await rating_stats_service.recompute_for_title(
+            session,
+            content_type=content_type,
+            content_id=content_id,
+        )
     await session.commit()
+    if had_rating:
+        await rating_stats_service.invalidate_title_detail_cache(
+            content_type=content_type,
+            content_id=content_id,
+        )

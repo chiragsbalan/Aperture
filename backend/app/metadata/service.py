@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import get_cache
 from app.core.config import Settings
+from app.metadata import rating_stats as rating_stats_service
 from app.metadata import repository as metadata_repository
 from app.metadata.cache_keys import movie_enrichment_key, tv_enrichment_key
 from app.metadata.enrichment import (
@@ -43,6 +44,7 @@ from app.metadata.schemas import (
     SimilarTitle,
     StudioRef,
     TitleExtras,
+    TitleRating,
     TopMovie,
     TopMoviesResponse,
     TopTvShowsResponse,
@@ -51,6 +53,7 @@ from app.metadata.schemas import (
     WatchProviderRegion,
 )
 from app.metadata.stub_refresh import maybe_refresh_stale_stub
+from app.metadata.title_rating import resolve_title_rating
 from app.metadata.tmdb.client import (
     TmdbClient,
     TmdbConfigError,
@@ -982,6 +985,30 @@ async def get_content_summaries(
     ]
 
 
+async def _attach_title_rating(
+    session: AsyncSession,
+    *,
+    content_type: str,
+    content_id: uuid.UUID,
+    extras_doc: dict[str, Any] | None,
+    settings: Settings | None,
+) -> TitleRating | None:
+    """Resolve hybrid TMDB / Aperture score for a title detail DTO."""
+    stats = await rating_stats_service.get_stats(
+        session,
+        content_type=content_type,
+        content_id=content_id,
+    )
+    threshold = (
+        settings.aperture_rating_switch_threshold if settings is not None else 100
+    )
+    return resolve_title_rating(
+        extras_doc=extras_doc,
+        stats=stats,
+        switch_threshold=threshold,
+    )
+
+
 async def get_movie_detail(
     session: AsyncSession,
     content_item_id: uuid.UUID,
@@ -1026,7 +1053,14 @@ async def get_movie_detail(
             detail.extras,
             source_namespace='movie',
         )
-    return detail
+    rating = await _attach_title_rating(
+        session,
+        content_type='movie',
+        content_id=content_item_id,
+        extras_doc=extras_doc,
+        settings=settings,
+    )
+    return detail.model_copy(update={'rating': rating})
 
 
 async def get_tv_detail(
@@ -1085,7 +1119,14 @@ async def get_tv_detail(
             detail.extras,
             source_namespace='tv',
         )
-    return detail
+    rating = await _attach_title_rating(
+        session,
+        content_type='tv_show',
+        content_id=content_item_id,
+        extras_doc=extras_doc,
+        settings=settings,
+    )
+    return detail.model_copy(update={'rating': rating})
 
 
 async def get_tv_season_detail(

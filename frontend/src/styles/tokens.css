@@ -42,6 +42,8 @@
   --color-action-favorites: #e07a8a;
   --color-action-lists: #6a9ec9;
   --color-action-log: #6fbf73;
+  /* Title score tone mid-band (red/yellow/green reuse danger / watchlist / log) */
+  --color-rating-orange: #e0954a;
 
   /*
    * Atmosphere — distinct purple + blue lobes via `.shell-atmosphere`
@@ -258,6 +260,7 @@
   --color-action-favorites: #c45c6a;
   --color-action-lists: #3d6f94;
   --color-action-log: #2f8f45;
+  --color-rating-orange: #c47a28;
 
   --bg-glow-purple: rgba(130, 100, 190, 0.16);
   --bg-glow-blue: rgba(60, 120, 190, 0.14);

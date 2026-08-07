@@ -6,22 +6,23 @@ import uuid
 
 
 def movie_detail_key(content_id: uuid.UUID) -> str:
-    return f'meta:movie:{content_id}'
+    # v2: hybrid title ``rating`` (TMDB / Aperture) on the detail DTO.
+    return f'meta:movie:v2:{content_id}'
 
 
 def tv_detail_key(content_id: uuid.UUID) -> str:
-    # v3: thin season graph + preferred-season episode embed (S1).
-    return f'meta:tv:v3:{content_id}'
+    # v4: hybrid title ``rating`` on the detail DTO (was v3 season embed).
+    return f'meta:tv:v4:{content_id}'
 
 
 def movie_enrichment_key(content_id: uuid.UUID) -> str:
-    """Volatile title chrome (providers / similar / meta tabs)."""
-    return f'meta:movie:enrich:v1:{content_id}'
+    """Volatile title chrome (providers / similar / meta tabs / TMDB votes)."""
+    return f'meta:movie:enrich:v2:{content_id}'
 
 
 def tv_enrichment_key(content_id: uuid.UUID) -> str:
-    """Volatile title chrome (providers / similar / meta tabs)."""
-    return f'meta:tv:enrich:v1:{content_id}'
+    """Volatile title chrome (providers / similar / meta tabs / TMDB votes)."""
+    return f'meta:tv:enrich:v2:{content_id}'
 
 
 def person_detail_key(person_id: uuid.UUID) -> str:

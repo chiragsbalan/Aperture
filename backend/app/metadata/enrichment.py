@@ -52,8 +52,28 @@ ENRICHMENT_EXTRAS_KEYS: frozenset[str] = frozenset(
         'videos',
         'images',
         'similar',
+        'tmdb_vote_average',
+        'tmdb_vote_count',
     }
 )
+
+
+def _tmdb_vote_average(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    average = float(value)
+    if average < 0 or average > 10:
+        return None
+    return average
+
+
+def _tmdb_vote_count(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    count = int(value)
+    if count < 0:
+        return None
+    return count
 
 
 def lean_extras_for_persist(_extras: dict[str, Any] | None) -> dict[str, Any]:
@@ -62,7 +82,11 @@ def lean_extras_for_persist(_extras: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def extras_need_live_enrichment(extras: dict[str, Any] | None) -> bool:
-    """True when extras lack enough chrome for a useful detail page."""
+    """True when extras lack enough chrome for a useful detail page.
+
+    Also true when TMDB vote fields are missing so hybrid title ratings can
+    resolve (legacy fat Postgres rows often have genres/tagline but no votes).
+    """
     if not isinstance(extras, dict) or not extras:
         return True
     providers = extras.get('watch_providers')
@@ -73,7 +97,13 @@ def extras_need_live_enrichment(extras: dict[str, Any] | None) -> bool:
     has_similar = isinstance(similar, list) and bool(similar)
     has_genres = isinstance(genres, list) and bool(genres)
     has_tagline = isinstance(tagline, str) and bool(tagline.strip())
-    return not (has_providers or has_similar or has_genres or has_tagline)
+    has_chrome = has_providers or has_similar or has_genres or has_tagline
+    vote_avg = extras.get('tmdb_vote_average')
+    vote_count = extras.get('tmdb_vote_count')
+    has_votes = isinstance(vote_avg, (int, float)) and isinstance(
+        vote_count, (int, float)
+    )
+    return not (has_chrome and has_votes)
 
 
 def merge_enrichment_extras(
@@ -129,6 +159,13 @@ def merge_enrichment_extras(
             continue
         if key == 'collection' and isinstance(value, dict) and value.get('name'):
             out[key] = value
+            continue
+        if key == 'tmdb_vote_average' and isinstance(value, (int, float)):
+            out[key] = float(value)
+            continue
+        if key == 'tmdb_vote_count' and isinstance(value, (int, float)):
+            out[key] = int(value)
+            continue
     return out
 
 
@@ -378,4 +415,6 @@ def build_extras_from_tmdb_payload(
         'images': {'backdrops': backdrops, 'posters': posters},
         'watch_providers': providers_out,
         'similar': similar,
+        'tmdb_vote_average': _tmdb_vote_average(payload.get('vote_average')),
+        'tmdb_vote_count': _tmdb_vote_count(payload.get('vote_count')),
     }
