@@ -98,9 +98,10 @@ def extras_need_live_enrichment(extras: dict[str, Any] | None) -> bool:
     has_genres = isinstance(genres, list) and bool(genres)
     has_tagline = isinstance(tagline, str) and bool(tagline.strip())
     has_chrome = has_providers or has_similar or has_genres or has_tagline
-    has_votes = isinstance(extras.get('tmdb_vote_average'), (int, float)) and isinstance(
-        extras.get('tmdb_vote_count'),
-        (int, float),
+    vote_avg = extras.get('tmdb_vote_average')
+    vote_count = extras.get('tmdb_vote_count')
+    has_votes = isinstance(vote_avg, (int, float)) and isinstance(
+        vote_count, (int, float)
     )
     return not (has_chrome and has_votes)
 

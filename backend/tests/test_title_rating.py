@@ -88,9 +88,8 @@ async def test_get_stats_missing_table_is_soft_fail() -> None:
     """App-ahead-of-migrate: missing table must not break title detail."""
     from unittest.mock import AsyncMock
 
-    from sqlalchemy.exc import ProgrammingError
-
     from app.metadata import rating_stats as rating_stats_service
+    from sqlalchemy.exc import ProgrammingError
 
     class _MissingTable(Exception):
         def __str__(self) -> str:
