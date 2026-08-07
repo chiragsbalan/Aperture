@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
+import { SearchResultsSkeleton } from '@/components/skeleton';
 import { TitlePosterLink } from '@/components/title-poster-link';
 import { POSTER_GRID_SIZES } from '@/lib/poster';
 import {
@@ -88,7 +89,7 @@ export function SearchResults({
   }
 
   if (loading && results == null) {
-    return <p className="text-muted">Searching…</p>;
+    return <SearchResultsSkeleton />;
   }
 
   if (error) {

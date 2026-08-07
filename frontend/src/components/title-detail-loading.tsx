@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 
 import { SharedTitlePoster } from '@/components/shared-title-poster';
+import { SkeletonBlock, SkeletonPoster } from '@/components/skeleton';
 import { SiteHeader } from '@/components/site-header';
 import { TitlePosterFlightTarget } from '@/components/title-poster-flight-target';
 import {
@@ -67,29 +68,20 @@ export function TitleDetailLoading({
                   />
                 </TitlePosterFlightTarget>
               ) : (
-                <div
-                  aria-hidden
-                  className="aspect-[2/3] w-full rounded-[var(--radius-sm)] bg-[var(--color-bg-elevated)] ring-1 ring-[var(--color-border)]"
-                />
+                <SkeletonPoster className="ring-1 ring-[var(--color-border)]" />
               )}
             </div>
             <div className="motion-fade-in col-start-1 row-span-2 row-start-1 flex min-w-0 flex-col justify-center space-y-3 py-0.5 sm:row-span-1 sm:justify-start sm:space-y-4 sm:py-0">
-              <div
-                aria-hidden
-                className="h-8 w-full max-w-[12rem] bg-[var(--color-bg-elevated)] sm:h-10 sm:max-w-md"
-              />
-              <div
-                aria-hidden
-                className="h-3 w-28 bg-[var(--color-bg-elevated)] sm:h-4 sm:w-48"
-              />
+              <SkeletonBlock className="h-8 w-full max-w-[12rem] rounded-sm sm:h-10 sm:max-w-md" />
+              <SkeletonBlock className="h-3 w-28 rounded-sm sm:h-4 sm:w-48" />
             </div>
             <div
               aria-hidden
               className="motion-fade-in col-span-2 col-start-1 row-start-3 space-y-2 sm:col-span-1 sm:row-start-2 sm:mt-1 sm:max-w-2xl"
             >
-              <div className="h-3 w-full bg-[var(--color-bg-elevated)] sm:h-4" />
-              <div className="h-3 w-11/12 bg-[var(--color-bg-elevated)] sm:h-4" />
-              <div className="h-3 w-4/5 bg-[var(--color-bg-elevated)] sm:h-4" />
+              <SkeletonBlock className="h-3 w-full rounded-sm sm:h-4" />
+              <SkeletonBlock className="h-3 w-11/12 rounded-sm sm:h-4" />
+              <SkeletonBlock className="h-3 w-4/5 rounded-sm sm:h-4" />
             </div>
           </div>
         </div>

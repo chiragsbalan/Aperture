@@ -14,6 +14,7 @@ import {
 } from '@/lib/avatar-upload';
 import { useAuth } from '@/components/auth-provider';
 import { ProfileAvatar } from '@/components/profile-avatar';
+import { FormSkeleton } from '@/components/skeleton';
 import { invalidatePublicWatchEntries } from '@/lib/library';
 import { applyThemePreference } from '@/lib/theme';
 import Link from 'next/link';
@@ -262,11 +263,7 @@ export function SettingsForm() {
   }
 
   if (state.status === 'loading') {
-    return (
-      <p className="mt-8 text-muted" role="status">
-        Loading settings…
-      </p>
-    );
+    return <FormSkeleton />;
   }
 
   if (state.status === 'error') {

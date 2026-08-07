@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { ListTitleWithVisibility } from '@/components/list-title-with-visibility';
+import { ListRowsSkeleton } from '@/components/skeleton';
 import { fetchProfileLists, type ProfileListIndexEntry } from '@/lib/library';
 import { listDetailHref } from '@/lib/list-nav';
 
@@ -46,9 +47,10 @@ export function ProfileLists({ username }: { username: string }) {
 
   if (state.status === 'loading') {
     return (
-      <p className="mt-6 text-muted" role="status">
-        Loading lists…
-      </p>
+      <div role="status" aria-busy="true">
+        <span className="sr-only">Loading lists…</span>
+        <ListRowsSkeleton />
+      </div>
     );
   }
 

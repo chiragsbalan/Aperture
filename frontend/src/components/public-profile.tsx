@@ -17,6 +17,7 @@ import {
   type PeopleCollection,
 } from '@/components/profile-people-sheet';
 import { ProfileTabStage } from '@/components/profile-tab-stage';
+import { ProfileHeaderSkeleton } from '@/components/skeleton';
 import {
   apiErrorMessage,
   PROFILE_COLLECTIONS,
@@ -300,15 +301,15 @@ export function PublicProfileView({
           </dl>
         </header>
       ) : (
-        <p className="mt-8 text-muted" role="status">
-          Loading profile…
-        </p>
+        <ProfileHeaderSkeleton />
       )}
 
-      <ProfileOwnerContext.Provider value={{ isOwner }}>
-        <ProfileNav username={username} />
-        <ProfileTabStage>{children}</ProfileTabStage>
-      </ProfileOwnerContext.Provider>
+      {profile != null ? (
+        <ProfileOwnerContext.Provider value={{ isOwner }}>
+          <ProfileNav username={username} />
+          <ProfileTabStage>{children}</ProfileTabStage>
+        </ProfileOwnerContext.Provider>
+      ) : null}
 
       <ProfilePeopleSheet
         username={username}

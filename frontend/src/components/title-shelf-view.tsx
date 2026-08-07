@@ -4,11 +4,11 @@ import { type ReactNode } from 'react';
 
 import { ListTitleWithVisibility } from '@/components/list-title-with-visibility';
 import { ShelfInfiniteScroll } from '@/components/shelf-infinite-scroll';
+import { PosterGridSkeleton } from '@/components/skeleton';
 import { TitleNavPoster } from '@/components/title-nav-poster';
 import type { ListVisibility } from '@/lib/library';
 import { POSTER_GRID_SIZES } from '@/lib/poster';
 import {
-  TITLE_SHELF_PAGE_SIZE,
   TITLE_SHELF_PRIORITY_COUNT,
   type TitleShelfItem,
   type TitleShelfStatus,
@@ -44,22 +44,6 @@ interface TitleShelfViewProps {
   belowHeader?: ReactNode;
   /** Extra content under the grid / infinite scroll (e.g. guest login CTA). */
   footer?: ReactNode;
-}
-
-function ShelfSkeleton() {
-  return (
-    <ul className="poster-grid mt-10" aria-hidden>
-      {Array.from({ length: TITLE_SHELF_PAGE_SIZE }, (_, index) => (
-        <li key={index} className="min-w-0">
-          <div className="aspect-[2/3] w-full rounded-[var(--radius-sm)] bg-[var(--color-bg-elevated)]" />
-          <div className="poster-meta mt-2 space-y-1">
-            <div className="h-3.5 w-[80%] rounded-sm bg-[var(--color-bg-elevated)]" />
-            <div className="h-3 w-[33%] rounded-sm bg-[var(--color-bg-elevated)]" />
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
 }
 
 /**
@@ -123,7 +107,7 @@ export function TitleShelfView({
       {status === 'loading' ? (
         <div role="status" aria-busy="true">
           <span className="sr-only">Loading titles…</span>
-          <ShelfSkeleton />
+          <PosterGridSkeleton />
         </div>
       ) : null}
 

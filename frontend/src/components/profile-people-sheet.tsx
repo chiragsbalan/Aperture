@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { CollectionSheet } from '@/components/collection-sheet';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import type { ProfileCollectionPersonItem } from '@/components/profile-collection';
+import { ListRowsSkeleton } from '@/components/skeleton';
 import {
   apiErrorMessage,
   PROFILE_COLLECTIONS,
@@ -109,9 +110,10 @@ export function ProfilePeopleSheet({
       onClose={onClose}
     >
       {state.status === 'loading' ? (
-        <p className="text-muted" role="status">
-          Loading…
-        </p>
+        <div role="status" aria-busy="true">
+          <span className="sr-only">Loading…</span>
+          <ListRowsSkeleton rows={5} className="mt-0" />
+        </div>
       ) : null}
 
       {state.status === 'error' ? (

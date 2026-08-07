@@ -1,4 +1,5 @@
 import { AccountPanel } from '@/components/account-panel';
+import { FormSkeleton } from '@/components/skeleton';
 import { SiteHeader } from '@/components/site-header';
 import { Suspense } from 'react';
 
@@ -17,13 +18,7 @@ export default function AccountPage() {
         <p className="mt-2 text-muted">
           Your library, account details, and settings.
         </p>
-        <Suspense
-          fallback={
-            <p className="mt-8 text-muted" role="status">
-              Loading account…
-            </p>
-          }
-        >
+        <Suspense fallback={<FormSkeleton rows={3} />}>
           <AccountPanel />
         </Suspense>
       </main>

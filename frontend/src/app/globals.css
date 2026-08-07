@@ -1811,6 +1811,23 @@
   }
 }
 
+/* Soft loading pulse for skeleton bars / posters (see ``skeleton.tsx``). */
+.skeleton-pulse {
+  background-color: var(--color-bg-elevated);
+  animation: skeleton-pulse 1.35s var(--ease-out, ease-in-out) infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .motion-fade-rise,
   .motion-fade-rise-delay,
@@ -1822,8 +1839,13 @@
   .overlay-panel-motion.is-leaving,
   .diary-entry-item,
   .diary-entry-item.is-leaving,
-  .status-pulse::before {
+  .status-pulse::before,
+  .skeleton-pulse {
     animation: none !important;
+  }
+
+  .skeleton-pulse {
+    opacity: 0.72;
   }
 
   .title-tab-indicator,

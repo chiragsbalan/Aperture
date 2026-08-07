@@ -2,23 +2,12 @@
 
 import { useEffect, useRef } from 'react';
 
+import { PosterGridSkeleton } from '@/components/skeleton';
 import { TITLE_SHELF_PRIORITY_COUNT } from '@/lib/title-shelf';
 
 /** One desktop poster row of placeholders while the next page loads. */
 function LoadMoreSkeletonRow() {
-  return (
-    <ul className="poster-grid" aria-hidden>
-      {Array.from({ length: TITLE_SHELF_PRIORITY_COUNT }, (_, index) => (
-        <li key={index} className="min-w-0">
-          <div className="aspect-[2/3] w-full animate-pulse rounded-[var(--radius-sm)] bg-[var(--color-bg-elevated)]" />
-          <div className="poster-meta mt-2 space-y-1">
-            <div className="h-3.5 w-[80%] animate-pulse rounded-sm bg-[var(--color-bg-elevated)]" />
-            <div className="h-3 w-[33%] animate-pulse rounded-sm bg-[var(--color-bg-elevated)]" />
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
+  return <PosterGridSkeleton count={TITLE_SHELF_PRIORITY_COUNT} className="" />;
 }
 
 /**
