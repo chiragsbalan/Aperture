@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.orm.attributes import set_committed_value
 
+from app.metadata.enrichment import lean_extras_for_persist
 from app.metadata.models import (
     ContentCredit,
     ContentItem,
@@ -364,8 +365,11 @@ async def upsert_movie(
     status: str | None = None,
     extras: dict[str, Any] | None = None,
 ) -> ContentItem:
-    """Create or update a movie + content_item by TMDb (or fixture) id."""
-    extras_doc = extras if extras is not None else {}
+    """Create or update a movie + content_item by TMDb (or fixture) id.
+
+    ``extras`` is persisted as a lean projection (Option B). Passing ``None``
+    on update leaves the existing JSONB unchanged (never wipe).
+    """
     mapping = await get_external_id(
         session,
         source=source,
@@ -385,7 +389,9 @@ async def upsert_movie(
         item.poster_path = poster_path
         item.backdrop_path = backdrop_path
         item.popularity = popularity
-        item.extras = extras_doc
+        if extras is not None:
+            item.extras = lean_extras_for_persist(extras)
+        item.refreshed_at = datetime.now(timezone.utc)
         assert item.movie is not None
         item.movie.release_date = release_date
         item.movie.runtime_minutes = runtime_minutes
@@ -401,7 +407,8 @@ async def upsert_movie(
         poster_path=poster_path,
         backdrop_path=backdrop_path,
         popularity=popularity,
-        extras=extras_doc,
+        extras=lean_extras_for_persist(extras),
+        refreshed_at=datetime.now(timezone.utc),
     )
     session.add(item)
     await session.flush()
@@ -445,8 +452,11 @@ async def upsert_tv_show(
     number_of_episodes: int | None = None,
     extras: dict[str, Any] | None = None,
 ) -> ContentItem:
-    """Create or update a TV show + content_item by provider id."""
-    extras_doc = extras if extras is not None else {}
+    """Create or update a TV show + content_item by provider id.
+
+    ``extras`` is persisted as a lean projection (Option B). Passing ``None``
+    on update leaves the existing JSONB unchanged (never wipe).
+    """
     mapping = await get_external_id(
         session,
         source=source,
@@ -466,7 +476,9 @@ async def upsert_tv_show(
         item.poster_path = poster_path
         item.backdrop_path = backdrop_path
         item.popularity = popularity
-        item.extras = extras_doc
+        if extras is not None:
+            item.extras = lean_extras_for_persist(extras)
+        item.refreshed_at = datetime.now(timezone.utc)
         assert item.tv_show is not None
         item.tv_show.first_air_date = first_air_date
         item.tv_show.last_air_date = last_air_date
@@ -484,7 +496,8 @@ async def upsert_tv_show(
         poster_path=poster_path,
         backdrop_path=backdrop_path,
         popularity=popularity,
-        extras=extras_doc,
+        extras=lean_extras_for_persist(extras),
+        refreshed_at=datetime.now(timezone.utc),
     )
     session.add(item)
     await session.flush()

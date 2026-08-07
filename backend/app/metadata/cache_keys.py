@@ -14,6 +14,16 @@ def tv_detail_key(content_id: uuid.UUID) -> str:
     return f'meta:tv:v3:{content_id}'
 
 
+def movie_enrichment_key(content_id: uuid.UUID) -> str:
+    """Volatile title chrome (providers / similar / meta tabs)."""
+    return f'meta:movie:enrich:v1:{content_id}'
+
+
+def tv_enrichment_key(content_id: uuid.UUID) -> str:
+    """Volatile title chrome (providers / similar / meta tabs)."""
+    return f'meta:tv:enrich:v1:{content_id}'
+
+
 def person_detail_key(person_id: uuid.UUID) -> str:
     return f'meta:person:{person_id}'
 

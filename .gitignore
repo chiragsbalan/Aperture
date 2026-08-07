@@ -4,6 +4,7 @@ phases/
 PLAN.md
 CONTRIBUTING.md
 FUTURE.md
+architecture-update.md
 
 # Optional agent skill installs (local / npx skills)
 .agents/

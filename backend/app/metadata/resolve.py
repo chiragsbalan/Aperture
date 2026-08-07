@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -148,7 +149,7 @@ async def _ingest_movie(
         raise CatalogUnavailableError(str(exc)) from exc
 
     try:
-        content_id = await metadata_ingest.ensure_movie_from_tmdb(
+        content_id, ingest_extras = await metadata_ingest.ensure_movie_from_tmdb(
             session,
             tmdb_id,
             client=client,
@@ -158,7 +159,12 @@ async def _ingest_movie(
     except TmdbUnavailableError as exc:
         raise CatalogUnavailableError(str(exc)) from exc
 
-    await _warm_movie_detail_cache(session, settings, content_id)
+    await _warm_movie_detail_cache(
+        session,
+        settings,
+        content_id,
+        enrichment_extras=ingest_extras,
+    )
     return content_id
 
 
@@ -181,7 +187,7 @@ async def _ingest_tv(
         raise CatalogUnavailableError(str(exc)) from exc
 
     try:
-        content_id = await metadata_ingest.ensure_tv_from_tmdb(
+        content_id, ingest_extras = await metadata_ingest.ensure_tv_from_tmdb(
             session,
             tmdb_id,
             client=client,
@@ -191,7 +197,12 @@ async def _ingest_tv(
     except TmdbUnavailableError as exc:
         raise CatalogUnavailableError(str(exc)) from exc
 
-    await _warm_tv_detail_cache(session, settings, content_id)
+    await _warm_tv_detail_cache(
+        session,
+        settings,
+        content_id,
+        enrichment_extras=ingest_extras,
+    )
     return content_id
 
 
@@ -199,6 +210,8 @@ async def _warm_movie_detail_cache(
     session: AsyncSession,
     settings: Settings,
     content_id: uuid.UUID,
+    *,
+    enrichment_extras: dict[str, Any] | None = None,
 ) -> None:
     """Write-through detail cache so the post-redirect GET is a HIT."""
     try:
@@ -206,6 +219,8 @@ async def _warm_movie_detail_cache(
             session,
             content_id,
             resolve_similar=True,
+            settings=settings,
+            enrichment_extras=enrichment_extras,
         )
     except CatalogNotFoundError:
         return
@@ -220,6 +235,8 @@ async def _warm_tv_detail_cache(
     session: AsyncSession,
     settings: Settings,
     content_id: uuid.UUID,
+    *,
+    enrichment_extras: dict[str, Any] | None = None,
 ) -> None:
     """Write-through detail cache so the post-redirect GET is a HIT."""
     try:
@@ -227,6 +244,8 @@ async def _warm_tv_detail_cache(
             session,
             content_id,
             resolve_similar=True,
+            settings=settings,
+            enrichment_extras=enrichment_extras,
         )
     except CatalogNotFoundError:
         return

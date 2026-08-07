@@ -10,6 +10,12 @@ from sqlalchemy.engine.url import make_url
 _LOCAL_HOSTS = frozenset({'localhost', '127.0.0.1', '::1', 'db'})
 
 
+def is_local_database_url(database_url: str) -> bool:
+    """True when the URL host is loopback / Compose ``db`` (or ``*.local``)."""
+    host = (make_url(database_url).host or '').lower()
+    return host in _LOCAL_HOSTS or host.endswith('.local')
+
+
 def _supabase_compatible_ssl_context() -> ssl.SSLContext:
     """TLS encrypt without CA verification (Postgres ``sslmode=require``).
 
@@ -31,7 +37,6 @@ def asyncpg_connect_args(database_url: str) -> dict[str, object]:
     loopback do not. Prefer this over ``?ssl=require`` query params, which are
     unreliable with ``postgresql+asyncpg``.
     """
-    host = (make_url(database_url).host or '').lower()
-    if host in _LOCAL_HOSTS or host.endswith('.local'):
+    if is_local_database_url(database_url):
         return {}
     return {'ssl': _supabase_compatible_ssl_context()}

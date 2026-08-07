@@ -12,9 +12,12 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
+from datetime import datetime
+
 from sqlalchemy import (
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Integer,
@@ -51,6 +54,11 @@ class ContentItem(UuidPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         default=dict,
         server_default='{}',
+    )
+    # Last time lean stub fields were refreshed from TMDb (Option B / ToS).
+    refreshed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
 
     __table_args__ = (

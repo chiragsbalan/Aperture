@@ -16,8 +16,10 @@ from app.core.cache import get_cache
 from app.metadata import repository as metadata_repository
 from app.metadata.cache_keys import (
     movie_detail_key,
+    movie_enrichment_key,
     person_detail_key,
     tv_detail_key,
+    tv_enrichment_key,
 )
 from app.metadata.models import ContentItem
 from app.metadata.tmdb.client import TmdbClient
@@ -359,12 +361,14 @@ async def ensure_movie_from_tmdb(
     tmdb_id: int,
     *,
     client: TmdbClient,
-) -> uuid.UUID:
-    """Return catalog id for a TMDb movie, ingesting on first resolve.
+) -> tuple[uuid.UUID, dict[str, Any] | None]:
+    """Return ``(catalog id, ingest extras|None)`` for a TMDb movie.
 
-    Concurrent inserts may race on ``external_ids`` uniqueness; on
-    ``IntegrityError`` we rollback, re-read the winner's mapping, and retry
-    the full ensure once (max 2 attempts).
+    Extras are the full in-memory enrichment document from ingest (providers /
+    similar included). Callers may warm the detail cache with them; Postgres
+    only stores the lean projection. Concurrent inserts may race on
+    ``external_ids`` uniqueness; on ``IntegrityError`` we rollback, re-read
+    the winner's mapping, and retry the full ensure once (max 2 attempts).
     """
     for attempt in range(2):
         mapping = await metadata_repository.get_external_id(
@@ -374,7 +378,7 @@ async def ensure_movie_from_tmdb(
             external_id=str(tmdb_id),
         )
         if mapping is not None and mapping.content_item_id is not None:
-            return mapping.content_item_id
+            return mapping.content_item_id, None
 
         try:
             movie = await client.get_movie_for_ingest(tmdb_id)
@@ -384,7 +388,8 @@ async def ensure_movie_from_tmdb(
                 trim_credits=True,
             )
             await session.commit()
-            return item.id
+            extras = movie.extras if isinstance(movie.extras, dict) else None
+            return item.id, extras
         except IntegrityError:
             await session.rollback()
             mapping = await metadata_repository.get_external_id(
@@ -394,7 +399,7 @@ async def ensure_movie_from_tmdb(
                 external_id=str(tmdb_id),
             )
             if mapping is not None and mapping.content_item_id is not None:
-                return mapping.content_item_id
+                return mapping.content_item_id, None
             if attempt == 0:
                 continue
             raise
@@ -406,12 +411,10 @@ async def ensure_tv_from_tmdb(
     tmdb_id: int,
     *,
     client: TmdbClient,
-) -> uuid.UUID:
-    """Return catalog id for a TMDb TV show, ingesting on first resolve.
+) -> tuple[uuid.UUID, dict[str, Any] | None]:
+    """Return ``(catalog id, ingest extras|None)`` for a TMDb TV show.
 
-    Concurrent inserts may race on ``external_ids`` uniqueness; on
-    ``IntegrityError`` we rollback, re-read the winner's mapping, and retry
-    the full ensure once (max 2 attempts).
+    See :func:`ensure_movie_from_tmdb` for lean-persist / cache-warm notes.
     """
     for attempt in range(2):
         mapping = await metadata_repository.get_external_id(
@@ -421,7 +424,7 @@ async def ensure_tv_from_tmdb(
             external_id=str(tmdb_id),
         )
         if mapping is not None and mapping.content_item_id is not None:
-            return mapping.content_item_id
+            return mapping.content_item_id, None
 
         try:
             show = await client.get_tv_for_ingest(tmdb_id)
@@ -431,7 +434,8 @@ async def ensure_tv_from_tmdb(
                 trim_credits=True,
             )
             await session.commit()
-            return item.id
+            extras = _tv_extras_with_show_fields(show)
+            return item.id, extras
         except IntegrityError:
             await session.rollback()
             mapping = await metadata_repository.get_external_id(
@@ -441,7 +445,7 @@ async def ensure_tv_from_tmdb(
                 external_id=str(tmdb_id),
             )
             if mapping is not None and mapping.content_item_id is not None:
-                return mapping.content_item_id
+                return mapping.content_item_id, None
             if attempt == 0:
                 continue
             raise
@@ -503,6 +507,7 @@ async def _invalidate_detail_cache(
         )
         if ext is not None and ext.content_item_id is not None:
             await cache.delete(movie_detail_key(ext.content_item_id))
+            await cache.delete(movie_enrichment_key(ext.content_item_id))
     for show in shows:
         ext = await metadata_repository.get_external_id(
             session,
@@ -512,6 +517,7 @@ async def _invalidate_detail_cache(
         )
         if ext is not None and ext.content_item_id is not None:
             await cache.delete(tv_detail_key(ext.content_item_id))
+            await cache.delete(tv_enrichment_key(ext.content_item_id))
     for person in people:
         ext = await metadata_repository.get_external_id(
             session,
