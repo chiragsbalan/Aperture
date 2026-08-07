@@ -257,11 +257,12 @@ def test_ensure_movie_integrity_error_recovers_winner(
     async def _run() -> uuid.UUID:
         async with session_scope() as session:
             client = TmdbClient.from_settings(get_settings())
-            return await ensure_movie_from_tmdb(
+            content_id, _extras = await ensure_movie_from_tmdb(
                 session,
                 tmdb_id,
                 client=client,
             )
+            return content_id
 
     init_db()
     try:

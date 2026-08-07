@@ -8,13 +8,14 @@ and credits are first-class tables outside the content_items hierarchy.
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Integer,
@@ -51,6 +52,11 @@ class ContentItem(UuidPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         default=dict,
         server_default='{}',
+    )
+    # Last time lean stub fields were refreshed from TMDb (Option B / ToS).
+    refreshed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
 
     __table_args__ = (

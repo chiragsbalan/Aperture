@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import random
 import uuid
+from collections.abc import Awaitable, Callable
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Path, Query, Request, Response, status
@@ -59,6 +60,19 @@ _landing_singleflight = asyncio.Lock()
 _top_movies_singleflight = asyncio.Lock()
 _top_tv_shows_singleflight = asyncio.Lock()
 _now_in_theatres_singleflight = asyncio.Lock()
+
+# Per-content_id detail MISS coalesce (JSON payload — never ORM).
+_movie_detail_flights: dict[uuid.UUID, asyncio.Future[str]] = {}
+_tv_detail_flights: dict[uuid.UUID, asyncio.Future[str]] = {}
+_detail_flights_lock = asyncio.Lock()
+
+
+def reset_detail_flights() -> None:
+    """Clear detail MISS coalesce maps (tests; fresh lock for new event loops)."""
+    global _detail_flights_lock
+    _movie_detail_flights.clear()
+    _tv_detail_flights.clear()
+    _detail_flights_lock = asyncio.Lock()
 
 
 def _not_found(detail: str) -> HTTPException:
@@ -585,6 +599,47 @@ async def resolve_tv(
         raise _unavailable(str(exc)) from exc
 
 
+async def _coalesce_detail_miss(
+    *,
+    content_id: uuid.UUID,
+    flights: dict[uuid.UUID, asyncio.Future[str]],
+    leader_work: Callable[[], Awaitable[str]],
+) -> tuple[str, bool]:
+    """Run one detail assemble+SET per content id; waiters share JSON.
+
+    Returns ``(payload, is_leader)``. Detail SF is outermost relative to stub
+    coalesce inside assemble — stub flights must never wait on this map.
+    """
+    loop = asyncio.get_running_loop()
+    async with _detail_flights_lock:
+        existing = flights.get(content_id)
+        if existing is not None:
+            waiter: asyncio.Future[str] = existing
+            is_leader = False
+        else:
+            waiter = loop.create_future()
+            flights[content_id] = waiter
+            is_leader = True
+
+    if not is_leader:
+        return await asyncio.shield(waiter), False
+
+    try:
+        payload = await leader_work()
+    except BaseException as exc:
+        if not waiter.done():
+            waiter.set_exception(exc)
+        raise
+    else:
+        if not waiter.done():
+            waiter.set_result(payload)
+        return payload, True
+    finally:
+        async with _detail_flights_lock:
+            if flights.get(content_id) is waiter:
+                del flights[content_id]
+
+
 @router.get('/movies/{content_id}', response_model=MovieDetail)
 async def get_movie(
     content_id: uuid.UUID,
@@ -600,17 +655,40 @@ async def get_movie(
     if cached is not None:
         response.headers['X-Cache'] = 'HIT'
         return MovieDetail.model_validate_json(cached)
+
+    async def _assemble() -> str:
+        # Double-check after acquiring the flight (another leader may have SETs).
+        again = await cache.get(key)
+        if again is not None:
+            return again
+        try:
+            detail = await metadata_service.get_movie_detail(
+                session,
+                content_id,
+                settings=settings,
+            )
+        except metadata_service.CatalogNotFoundError as exc:
+            raise _not_found('Movie not found') from exc
+        payload = detail.model_dump_json()
+        await cache.set(
+            key,
+            payload,
+            ttl_seconds=settings.metadata_cache_ttl_seconds,
+        )
+        return payload
+
     try:
-        detail = await metadata_service.get_movie_detail(session, content_id)
+        payload, is_leader = await _coalesce_detail_miss(
+            content_id=content_id,
+            flights=_movie_detail_flights,
+            leader_work=_assemble,
+        )
+    except HTTPException:
+        raise
     except metadata_service.CatalogNotFoundError as exc:
         raise _not_found('Movie not found') from exc
-    await cache.set(
-        key,
-        detail.model_dump_json(),
-        ttl_seconds=settings.metadata_cache_ttl_seconds,
-    )
-    response.headers['X-Cache'] = 'MISS'
-    return detail
+    response.headers['X-Cache'] = 'MISS' if is_leader else 'HIT'
+    return MovieDetail.model_validate_json(payload)
 
 
 @router.get('/tv/{content_id}', response_model=TvDetail)
@@ -628,17 +706,39 @@ async def get_tv(
     if cached is not None:
         response.headers['X-Cache'] = 'HIT'
         return TvDetail.model_validate_json(cached)
+
+    async def _assemble() -> str:
+        again = await cache.get(key)
+        if again is not None:
+            return again
+        try:
+            detail = await metadata_service.get_tv_detail(
+                session,
+                content_id,
+                settings=settings,
+            )
+        except metadata_service.CatalogNotFoundError as exc:
+            raise _not_found('TV show not found') from exc
+        payload = detail.model_dump_json()
+        await cache.set(
+            key,
+            payload,
+            ttl_seconds=settings.metadata_cache_ttl_seconds,
+        )
+        return payload
+
     try:
-        detail = await metadata_service.get_tv_detail(session, content_id)
+        payload, is_leader = await _coalesce_detail_miss(
+            content_id=content_id,
+            flights=_tv_detail_flights,
+            leader_work=_assemble,
+        )
+    except HTTPException:
+        raise
     except metadata_service.CatalogNotFoundError as exc:
         raise _not_found('TV show not found') from exc
-    await cache.set(
-        key,
-        detail.model_dump_json(),
-        ttl_seconds=settings.metadata_cache_ttl_seconds,
-    )
-    response.headers['X-Cache'] = 'MISS'
-    return detail
+    response.headers['X-Cache'] = 'MISS' if is_leader else 'HIT'
+    return TvDetail.model_validate_json(payload)
 
 
 @router.get(

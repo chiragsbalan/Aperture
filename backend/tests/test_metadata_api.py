@@ -94,8 +94,11 @@ def test_tv_detail_200(
     assert len(seasons_with_eps) == 1
     assert seasons_with_eps[0]['season_number'] >= 1
     extras = body['extras']
-    assert any(n['name'] == 'AMC' for n in extras['networks'])
-    assert extras['episode_runtime_minutes'] == 47
+    # Option B: fixture seed persists empty extras; chrome comes from Redis/TMDb
+    # enrichment when a key is configured (otherwise lists stay empty).
+    assert isinstance(extras.get('networks'), list)
+    if extras['networks']:
+        assert any(n['name'] == 'AMC' for n in extras['networks'])
     assert any(c['job'] == 'Creator' for c in body['crew'])
     assert extras.get('videos') == []
     assert extras.get('images') == {'backdrops': [], 'posters': []}

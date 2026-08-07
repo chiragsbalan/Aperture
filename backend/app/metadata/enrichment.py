@@ -1,4 +1,10 @@
-"""Normalize TMDB detail enrichment into a compact JSONB document."""
+"""Normalize TMDB detail enrichment into a compact JSONB document.
+
+Option B (lean catalog): Postgres persists **no** title-chrome extras
+(``lean_extras_for_persist`` → ``{}``). Identity/shelf fields live on
+``content_items`` / subtype columns. Tagline, genres, providers, similar,
+and other chrome are Redis ↔ TMDb enrichment at read time.
+"""
 
 from __future__ import annotations
 
@@ -21,6 +27,109 @@ _VIDEO_TYPE_RANK = {
     'Clip': 2,
     'Featurette': 3,
 }
+
+# Postgres ``content_items.extras`` stays empty under Option B.
+LEAN_EXTRAS_KEYS: frozenset[str] = frozenset()
+
+# Filled at detail-read time via Redis section cache ↔ TMDb.
+ENRICHMENT_EXTRAS_KEYS: frozenset[str] = frozenset(
+    {
+        'tagline',
+        'original_language',
+        'budget',
+        'revenue',
+        'collection',
+        'genres',
+        'keywords',
+        'studios',
+        'networks',
+        'episode_runtime_minutes',
+        'countries',
+        'spoken_languages',
+        'alternative_titles',
+        'releases',
+        'watch_providers',
+        'videos',
+        'images',
+        'similar',
+    }
+)
+
+
+def lean_extras_for_persist(_extras: dict[str, Any] | None) -> dict[str, Any]:
+    """Return the durable extras projection (always empty under Option B)."""
+    return {}
+
+
+def extras_need_live_enrichment(extras: dict[str, Any] | None) -> bool:
+    """True when extras lack enough chrome for a useful detail page."""
+    if not isinstance(extras, dict) or not extras:
+        return True
+    providers = extras.get('watch_providers')
+    similar = extras.get('similar')
+    genres = extras.get('genres')
+    tagline = extras.get('tagline')
+    has_providers = isinstance(providers, dict) and bool(providers)
+    has_similar = isinstance(similar, list) and bool(similar)
+    has_genres = isinstance(genres, list) and bool(genres)
+    has_tagline = isinstance(tagline, str) and bool(tagline.strip())
+    return not (has_providers or has_similar or has_genres or has_tagline)
+
+
+def merge_enrichment_extras(
+    base: dict[str, Any] | None,
+    overlay: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Overlay enrichment keys onto a base extras document."""
+    out: dict[str, Any] = dict(base) if isinstance(base, dict) else {}
+    if not isinstance(overlay, dict):
+        return out
+    for key in ENRICHMENT_EXTRAS_KEYS:
+        if key not in overlay:
+            continue
+        value = overlay[key]
+        if value is None:
+            continue
+        if key == 'watch_providers' and isinstance(value, dict):
+            if value:
+                out[key] = value
+            continue
+        if key == 'similar' and isinstance(value, list):
+            if value:
+                out[key] = value
+            continue
+        if key in (
+            'genres',
+            'keywords',
+            'studios',
+            'networks',
+            'countries',
+            'spoken_languages',
+            'alternative_titles',
+            'releases',
+            'videos',
+        ):
+            if isinstance(value, list) and value:
+                out[key] = value
+            continue
+        if key == 'images' and isinstance(value, dict):
+            out[key] = value
+            continue
+        if key == 'episode_runtime_minutes' and isinstance(value, (int, float)):
+            if int(value) > 0:
+                out[key] = int(value)
+            continue
+        if key in ('tagline', 'original_language') and isinstance(value, str):
+            if value.strip():
+                out[key] = value
+            continue
+        if key in ('budget', 'revenue') and isinstance(value, (int, float)):
+            if value:
+                out[key] = value
+            continue
+        if key == 'collection' and isinstance(value, dict) and value.get('name'):
+            out[key] = value
+    return out
 
 
 def _as_list(value: object) -> list[Any]:
@@ -80,7 +189,6 @@ def build_extras_from_tmdb_payload(
         if isinstance(value, (int, float)) and int(value) > 0
     ]
     if runtimes:
-        # TMDb often returns one typical length; prefer the first listed.
         episode_runtime_minutes = runtimes[0]
     countries = [
         {

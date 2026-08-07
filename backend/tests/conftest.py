@@ -32,8 +32,12 @@ def _clear_settings_cache() -> Iterator[None]:
         reset_library_contains_rate_limit_fallback,
     )
     from app.lists.rate_limit import reset_lists_rate_limit_fallback
+    from app.metadata import api as metadata_api
     from app.metadata import resolve as metadata_resolve
+    from app.metadata import service as metadata_service
     from app.metadata.rate_limit import reset_metadata_rate_limit_fallback
+    from app.metadata.stub_refresh import reset_stub_refresh_flights
+    from app.metadata.tmdb.client import reset_shared_tmdb_client
     from app.metadata.tv_season_hydrate import reset_tv_season_hydrate_flights
     from app.search.rate_limit import reset_search_rate_limit_fallback
     from app.users.rate_limit import reset_users_public_rate_limit_fallback
@@ -41,6 +45,10 @@ def _clear_settings_cache() -> Iterator[None]:
     get_settings.cache_clear()
     reset_cache()
     metadata_resolve._resolve_flights.clear()
+    metadata_service.reset_enrichment_flights()
+    reset_stub_refresh_flights()
+    metadata_api.reset_detail_flights()
+    reset_shared_tmdb_client()
     reset_tv_season_hydrate_flights()
     reset_refresh_grace_l1()
     reset_search_rate_limit_fallback()
@@ -52,6 +60,10 @@ def _clear_settings_cache() -> Iterator[None]:
     get_settings.cache_clear()
     reset_cache()
     metadata_resolve._resolve_flights.clear()
+    metadata_service.reset_enrichment_flights()
+    reset_stub_refresh_flights()
+    metadata_api.reset_detail_flights()
+    reset_shared_tmdb_client()
     reset_tv_season_hydrate_flights()
     reset_refresh_grace_l1()
     reset_search_rate_limit_fallback()

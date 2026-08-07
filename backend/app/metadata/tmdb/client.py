@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import date
 from typing import Any
 
 import httpx
@@ -18,12 +19,17 @@ _DEFAULT_MIN_INTERVAL_SECONDS = 0.25
 # Shared AsyncClient timeout — fixed so pooled connections stay consistent.
 _SHARED_TIMEOUT_SECONDS = 30.0
 
-# On-click resolve: credits for cast/director + recommendations for Similar.
-# Heavier appends (images/videos/providers/release_dates/…) stay off this path.
-# TV episode lists are fetched on demand via GET /tv/{id}/season/{n} when a
-# season tab opens — never fan-out during cold resolve.
-_MOVIE_INGEST_APPEND = 'credits,recommendations'
-_TV_INGEST_APPEND = 'credits,recommendations,content_ratings'
+# On-click resolve: credits + recommendations + watch providers.
+# Providers/similar are used to warm the detail Redis cache but are NOT
+# persisted to Postgres (Option B lean extras). Images/videos stay off.
+# TV episode lists are fetched on demand via GET /tv/{id}/season/{n}.
+_MOVIE_INGEST_APPEND = 'credits,recommendations,watch/providers'
+_TV_INGEST_APPEND = 'credits,recommendations,content_ratings,watch/providers'
+# Hybrid detail miss: refill enrichment without re-pulling the credit graph.
+_MOVIE_ENRICH_APPEND = (
+    'keywords,release_dates,alternative_titles,recommendations,watch/providers'
+)
+_TV_ENRICH_APPEND = 'recommendations,content_ratings,watch/providers'
 
 _shared_http_client: httpx.AsyncClient | None = None
 _shared_http_client_lock = asyncio.Lock()
@@ -31,6 +37,14 @@ _shared_http_client_lock = asyncio.Lock()
 # Process-wide throttle so concurrent TmdbClient instances share one budget.
 _throttle_lock = asyncio.Lock()
 _last_request_at = 0.0
+
+
+def reset_shared_tmdb_client() -> None:
+    """Drop the pooled AsyncClient (tests; avoids cross-loop reuse)."""
+    global _shared_http_client, _shared_http_client_lock
+    _shared_http_client = None
+    # Fresh lock so the next acquire is not bound to a closed event loop.
+    _shared_http_client_lock = asyncio.Lock()
 
 
 async def _shared_client() -> httpx.AsyncClient:
@@ -45,6 +59,7 @@ async def _shared_client() -> httpx.AsyncClient:
             _shared_http_client = httpx.AsyncClient(
                 base_url=TMDB_API_BASE,
                 timeout=_SHARED_TIMEOUT_SECONDS,
+                follow_redirects=False,
             )
             client = _shared_http_client
         return client
@@ -98,6 +113,11 @@ class TmdbClient:
         )
         return TmdbMovie.model_validate(data)
 
+    async def get_movie_for_stub_refresh(self, tmdb_id: int) -> TmdbMovie:
+        """Fetch lean movie fields for stub refresh (no append_to_response)."""
+        data = await self._get(f'/movie/{tmdb_id}')
+        return TmdbMovie.model_validate(data)
+
     async def get_movie_for_ingest(self, tmdb_id: int) -> TmdbMovie:
         """Fetch movie detail with enrichment fields for catalog upsert."""
         data = await self._get(
@@ -108,12 +128,25 @@ class TmdbClient:
         movie.extras = build_extras_from_tmdb_payload(data, kind='movie')
         return movie
 
+    async def get_movie_enrichment_extras(self, tmdb_id: int) -> dict[str, Any]:
+        """Fetch volatile extras (providers / similar) for hybrid detail reads."""
+        data = await self._get(
+            f'/movie/{tmdb_id}',
+            {'append_to_response': _MOVIE_ENRICH_APPEND},
+        )
+        return build_extras_from_tmdb_payload(data, kind='movie')
+
     async def get_tv(self, tmdb_id: int) -> TmdbTvShow:
         """Fetch TV detail + credits + seasons summary."""
         data = await self._get(
             f'/tv/{tmdb_id}',
             {'append_to_response': 'credits'},
         )
+        return TmdbTvShow.model_validate(data)
+
+    async def get_tv_for_stub_refresh(self, tmdb_id: int) -> TmdbTvShow:
+        """Fetch lean TV fields for stub refresh (no append_to_response)."""
+        data = await self._get(f'/tv/{tmdb_id}')
         return TmdbTvShow.model_validate(data)
 
     async def get_tv_season(
@@ -139,6 +172,14 @@ class TmdbClient:
         show.extras = build_extras_from_tmdb_payload(data, kind='tv')
         return show
 
+    async def get_tv_enrichment_extras(self, tmdb_id: int) -> dict[str, Any]:
+        """Fetch volatile extras (providers / similar) for hybrid detail reads."""
+        data = await self._get(
+            f'/tv/{tmdb_id}',
+            {'append_to_response': _TV_ENRICH_APPEND},
+        )
+        return build_extras_from_tmdb_payload(data, kind='tv')
+
     async def get_person(self, tmdb_id: int) -> TmdbPerson:
         """Fetch person detail."""
         data = await self._get(f'/person/{tmdb_id}')
@@ -161,6 +202,71 @@ class TmdbClient:
         if page < 1:
             raise ValueError('page must be >= 1')
         return await self._get('/tv/top_rated', {'page': str(page)})
+
+    async def get_changed_movie_ids(
+        self,
+        *,
+        start_date: date,
+        end_date: date,
+        max_pages: int = 5,
+    ) -> list[int]:
+        """Return TMDb movie ids from ``/movie/changes`` (capped pages)."""
+        return await self._collect_change_ids(
+            '/movie/changes',
+            start_date=start_date,
+            end_date=end_date,
+            max_pages=max_pages,
+        )
+
+    async def get_changed_tv_ids(
+        self,
+        *,
+        start_date: date,
+        end_date: date,
+        max_pages: int = 5,
+    ) -> list[int]:
+        """Return TMDb TV ids from ``/tv/changes`` (capped pages)."""
+        return await self._collect_change_ids(
+            '/tv/changes',
+            start_date=start_date,
+            end_date=end_date,
+            max_pages=max_pages,
+        )
+
+    async def _collect_change_ids(
+        self,
+        path: str,
+        *,
+        start_date: date,
+        end_date: date,
+        max_pages: int,
+    ) -> list[int]:
+        ids: list[int] = []
+        seen: set[int] = set()
+        for page in range(1, max(1, max_pages) + 1):
+            payload = await self._get(
+                path,
+                {
+                    'start_date': start_date.isoformat(),
+                    'end_date': end_date.isoformat(),
+                    'page': str(page),
+                },
+            )
+            for row in payload.get('results') or []:
+                if not isinstance(row, dict) or row.get('id') is None:
+                    continue
+                try:
+                    tmdb_id = int(row['id'])
+                except (TypeError, ValueError):
+                    continue
+                if tmdb_id in seen:
+                    continue
+                seen.add(tmdb_id)
+                ids.append(tmdb_id)
+            total_pages = int(payload.get('total_pages') or 1)
+            if page >= total_pages:
+                break
+        return ids
 
     async def _throttle(self) -> None:
         global _last_request_at

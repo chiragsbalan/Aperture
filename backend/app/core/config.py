@@ -101,8 +101,15 @@ class Settings(BaseSettings):
 
     # Redis (P2.4). Empty = in-memory CacheBackend (tests / local without Redis).
     redis_url: str = ''
-    # Metadata detail cache TTL (seconds).
+    # Metadata detail cache TTL (seconds) — assembled MovieDetail / TvDetail.
     metadata_cache_ttl_seconds: int = 600
+    # Enrichment section cache (providers / similar / meta tabs). Longer than
+    # the full DTO so TMDb is not re-hit on every detail miss.
+    metadata_enrichment_cache_ttl_seconds: int = 60 * 60 * 6
+    # Short TTL when TMDb enrichment fails so we do not stampede forever.
+    metadata_enrichment_negative_cache_ttl_seconds: int = 60
+    # Lazy stub refresh for TMDb ≤6‑month ToS (days since refreshed_at).
+    metadata_stub_max_age_days: int = Field(default=150, ge=1, le=180)
     # Landing poster mosaic (TMDb top-rated). Long TTL — list changes slowly.
     landing_posters_cache_ttl_seconds: int = 60 * 60 * 24
     landing_posters_count: int = Field(default=200, ge=1, le=300)

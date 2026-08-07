@@ -25,12 +25,13 @@ PostgreSQL remains the only authoritative store (Database Design). Redis and Ope
 
 **Usage rules:**
 
-- Redis is **non-authoritative**; all entries disposable and rebuildable from Postgres.
+- Redis is **non-authoritative**; all entries disposable and rebuildable from Postgres **and/or** TMDb for enrichment sections (Option B).
 - Prefer (P2.4): hot metadata reads; **search** IP rate-limit counters via atomic `CacheBackend.incr`; optional job coordination precursors.
 - **Auth** login/register/refresh rate limits stay on **Postgres** through P2–P10; migrate those counters to Redis in **P11** (with Redis harden). See ADR-0005 Future evolution.
 - Avoid: caching auth identity payloads; refresh-grace L1 (process memory only — never Redis); caching highly personalized results until profiling demands it.
 - Invalidation: update/expire affected keys after writes; no global flush as the default tool.
-- Degrade: metadata miss → Postgres; search RL `incr` failure → process-local counter (do not go open).
+- Degrade: metadata miss → Postgres lean stub (± live TMDb enrichment for providers/similar); enrichment failure → empty sections (not 503); search RL `incr` failure → process-local counter (do not go open).
+- **Never** treat Redis as catalog-of-record for identity, shelf fields, or user library data. Upstash TTL/eviction must remain a cache miss, not data loss.
 
 Local Compose adds Redis when P2.4 lands. Cloud Redis provider/tier is chosen at implementation time (cost still driven by ADR-0003 free-tier posture until upgrade).
 
@@ -63,8 +64,22 @@ Local Compose adds Redis when P2.4 lands. Cloud Redis provider/tier is chosen at
 - Roadmap Phase 11 Redis bullets are interpreted as hardening/ops **plus** finishing auth counter migration, not greenfield Redis adoption.
 - Search LLD “Phase 2 OpenSearch” language is staged by **this ADR + PLAN** (FTS in product P2, OpenSearch in product P6).
 
+### Title detail hybrid read (Option B)
+
+`GET /movies|{tv}/{uuid}`:
+
+1. Redis full-detail DTO HIT → return (TTL default 600s).
+2. MISS → assemble core from Postgres lean stub (`extras` is `{}`).
+3. Enrichment section key HIT (`meta:movie|tv:enrich:v1:{uuid}`, default 6h) → merge.
+4. Else single-flight TMDb enrichment → section SET → merge into response → full DTO SET.
+5. Optionally lazy-refresh lean stub columns when `refreshed_at` exceeds `metadata_stub_max_age_days` (default 150).
+6. TMDb/Redis failure → serve stub with empty enrichment sections (HTTP 200).
+
+Home rails remain TMDb-pool cached (rebuild from TMDb on miss), unchanged.
+
 ## Future evolution
 
 - ADR-0007: OpenSearch provider, sizing, and network placement (P5 exit).
 - **P11:** Redis HA, eviction policy review, cache hit SLOs; **migrate auth rate-limit counters** to shared Redis `CacheBackend` (ADR-0005); keep Postgres counters as durable audit/backup if useful.
 - Vector/semantic index (P8+) should reuse the same “derived index + API façade” pattern; supersede or extend this ADR if the fallback matrix changes.
+- Optional per-section Redis keys / TTLs for providers vs similar (today: full DTO cache after hybrid assemble).

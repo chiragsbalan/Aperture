@@ -2,7 +2,25 @@
 
 import ssl
 
-from app.core.db_ssl import asyncpg_connect_args
+from app.core.db_ssl import asyncpg_connect_args, is_local_database_url
+
+
+def test_is_local_database_url() -> None:
+    assert is_local_database_url(
+        'postgresql+asyncpg://aperture:aperture@localhost:5432/aperture'
+    )
+    assert is_local_database_url(
+        'postgresql+asyncpg://aperture:aperture@127.0.0.1:5432/aperture'
+    )
+    assert is_local_database_url(
+        'postgresql+asyncpg://aperture:aperture@[::1]:5432/aperture'
+    )
+    assert is_local_database_url(
+        'postgresql+asyncpg://aperture:aperture@db:5432/aperture'
+    )
+    assert not is_local_database_url(
+        'postgresql+asyncpg://u:p@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres'
+    )
 
 
 def test_local_hosts_skip_ssl() -> None:

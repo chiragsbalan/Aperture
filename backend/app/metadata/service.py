@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -11,6 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cache import get_cache
 from app.core.config import Settings
 from app.metadata import repository as metadata_repository
+from app.metadata.cache_keys import movie_enrichment_key, tv_enrichment_key
+from app.metadata.enrichment import (
+    extras_need_live_enrichment,
+    merge_enrichment_extras,
+)
 from app.metadata.images import InvalidImagePathError, tmdb_image_url
 from app.metadata.models import ContentCredit, ContentItem, Person
 from app.metadata.rate_limit import enforce_season_hydrate_rate_limit
@@ -41,6 +50,7 @@ from app.metadata.schemas import (
     WatchProvider,
     WatchProviderRegion,
 )
+from app.metadata.stub_refresh import maybe_refresh_stale_stub
 from app.metadata.tmdb.client import (
     TmdbClient,
     TmdbConfigError,
@@ -48,6 +58,20 @@ from app.metadata.tmdb.client import (
     TmdbUnavailableError,
 )
 from app.metadata.tv_season_hydrate import hydrate_tv_season_episodes
+
+logger = logging.getLogger(__name__)
+
+# Per-process coalescing for concurrent hybrid enrichment fetches.
+_enrich_flights: dict[tuple[str, uuid.UUID], asyncio.Future[dict[str, Any]]] = {}
+_enrich_flights_lock = asyncio.Lock()
+
+# Redis sentinel: TMDb enrich failed; skip live retry until short TTL expires.
+_ENRICHMENT_NEGATIVE_SENTINEL = {'_neg': True}
+
+
+def reset_enrichment_flights() -> None:
+    """Clear in-flight enrichment coalescing (tests)."""
+    _enrich_flights.clear()
 
 
 class CatalogNotFoundError(Exception):
@@ -549,9 +573,14 @@ def _credit_refs(
     return cast_refs, crew_refs
 
 
-def _movie_detail(item: ContentItem) -> MovieDetail:
+def _movie_detail(
+    item: ContentItem,
+    *,
+    extras_doc: dict[str, Any] | None = None,
+) -> MovieDetail:
     assert item.movie is not None
     cast_refs, crew_refs = _credit_refs(list(item.credits))
+    raw_extras = extras_doc if extras_doc is not None else item.extras
     return MovieDetail(
         type='movie',
         id=item.id,
@@ -566,7 +595,7 @@ def _movie_detail(item: ContentItem) -> MovieDetail:
         status=item.movie.status,
         cast=cast_refs,
         crew=crew_refs,
-        extras=_title_extras(item.extras),
+        extras=_title_extras(raw_extras),
     )
 
 
@@ -626,6 +655,7 @@ def _tv_detail(
     *,
     embed_season_number: int | None,
     embed_episodes: list[Any],
+    extras_doc: dict[str, Any] | None = None,
 ) -> TvDetail:
     assert item.tv_show is not None
     cast_refs, crew_refs = _credit_refs(list(item.credits))
@@ -648,6 +678,7 @@ def _tv_detail(
         )
         for season in seasons
     ]
+    raw_extras = extras_doc if extras_doc is not None else item.extras
     return TvDetail(
         type='tv_show',
         id=item.id,
@@ -665,8 +696,217 @@ def _tv_detail(
         seasons=season_details,
         cast=cast_refs,
         crew=crew_refs,
-        extras=_title_extras(item.extras),
+        extras=_title_extras(raw_extras),
     )
+
+
+async def _coalesce_enrichment(
+    key: tuple[str, uuid.UUID],
+    leader_work: Callable[[], Awaitable[dict[str, Any]]],
+) -> dict[str, Any]:
+    """Run one enrichment fetch per content id; waiters share the result."""
+    loop = asyncio.get_running_loop()
+    async with _enrich_flights_lock:
+        existing = _enrich_flights.get(key)
+        if existing is not None:
+            waiter: asyncio.Future[dict[str, Any]] = existing
+            is_leader = False
+        else:
+            waiter = loop.create_future()
+            _enrich_flights[key] = waiter
+            is_leader = True
+
+    if not is_leader:
+        return await asyncio.shield(waiter)
+
+    try:
+        extras = await leader_work()
+    except BaseException as exc:
+        if not waiter.done():
+            waiter.set_exception(exc)
+        raise
+    else:
+        if not waiter.done():
+            waiter.set_result(extras)
+        return extras
+    finally:
+        async with _enrich_flights_lock:
+            if _enrich_flights.get(key) is waiter:
+                del _enrich_flights[key]
+
+
+async def _live_enrichment_extras(
+    session: AsyncSession,
+    *,
+    content_item_id: uuid.UUID,
+    source_namespace: str,
+    settings: Settings,
+) -> dict[str, Any] | None:
+    """Fetch enrichment extras from TMDb; degrade to None on failure."""
+    mapping = await metadata_repository.get_external_id_for_content(
+        session,
+        source='tmdb',
+        source_namespace=source_namespace,
+        content_item_id=content_item_id,
+    )
+    if mapping is None or not mapping.external_id:
+        return None
+    try:
+        tmdb_id = int(mapping.external_id)
+    except ValueError:
+        return None
+
+    try:
+        client = TmdbClient.from_settings(settings)
+    except TmdbConfigError:
+        return None
+
+    async def _fetch() -> dict[str, Any]:
+        try:
+            if source_namespace == 'movie':
+                return await client.get_movie_enrichment_extras(tmdb_id)
+            return await client.get_tv_enrichment_extras(tmdb_id)
+        except Exception as exc:
+            # Degrade inside the flight so waiters get {} (not a shared
+            # Future exception). Broad catch: TMDb outages and transport
+            # oddities must not 500 detail.
+            logger.info(
+                'hybrid enrichment skipped for %s %s: %s',
+                source_namespace,
+                content_item_id,
+                exc,
+            )
+            return {}
+
+    live = await _coalesce_enrichment(
+        (source_namespace, content_item_id),
+        _fetch,
+    )
+    return live or None
+
+
+def _enrichment_cache_key(
+    content_item_id: uuid.UUID,
+    *,
+    source_namespace: str,
+) -> str:
+    if source_namespace == 'movie':
+        return movie_enrichment_key(content_item_id)
+    return tv_enrichment_key(content_item_id)
+
+
+async def _cache_enrichment_doc(
+    *,
+    content_item_id: uuid.UUID,
+    source_namespace: str,
+    extras: dict[str, Any],
+    settings: Settings,
+) -> None:
+    """Store enrichment JSON under a section key (longer TTL than full DTO)."""
+    if not extras or extras.get('_neg'):
+        return
+    await get_cache().set(
+        _enrichment_cache_key(content_item_id, source_namespace=source_namespace),
+        json.dumps(extras, separators=(',', ':'), default=str),
+        ttl_seconds=settings.metadata_enrichment_cache_ttl_seconds,
+    )
+
+
+async def _cache_enrichment_negative(
+    *,
+    content_item_id: uuid.UUID,
+    source_namespace: str,
+    settings: Settings,
+) -> None:
+    """Short-TTL sentinel so failed enrich does not stampede TMDb."""
+    await get_cache().set(
+        _enrichment_cache_key(content_item_id, source_namespace=source_namespace),
+        json.dumps(_ENRICHMENT_NEGATIVE_SENTINEL, separators=(',', ':')),
+        ttl_seconds=settings.metadata_enrichment_negative_cache_ttl_seconds,
+    )
+
+
+async def _load_cached_enrichment(
+    *,
+    content_item_id: uuid.UUID,
+    source_namespace: str,
+) -> dict[str, Any] | None:
+    raw = await get_cache().get(
+        _enrichment_cache_key(content_item_id, source_namespace=source_namespace),
+    )
+    if raw is None:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _is_enrichment_negative(cached: dict[str, Any] | None) -> bool:
+    return cached is not None and cached.get('_neg') is True
+
+
+async def _resolve_extras_doc(
+    session: AsyncSession,
+    *,
+    content_item_id: uuid.UUID,
+    source_namespace: str,
+    stored_extras: dict[str, Any] | None,
+    settings: Settings | None,
+    enrichment_extras: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Merge lean Postgres extras with section-cache / live enrichment."""
+    base = stored_extras if isinstance(stored_extras, dict) else {}
+    if enrichment_extras is not None:
+        merged = merge_enrichment_extras(base, enrichment_extras)
+        if settings is not None:
+            await _cache_enrichment_doc(
+                content_item_id=content_item_id,
+                source_namespace=source_namespace,
+                extras=merged,
+                settings=settings,
+            )
+        return merged
+
+    if settings is None:
+        return base
+
+    cached = await _load_cached_enrichment(
+        content_item_id=content_item_id,
+        source_namespace=source_namespace,
+    )
+    if _is_enrichment_negative(cached):
+        # Negative hit: serve stub chrome only; skip live retry this request.
+        return base
+    if cached is not None and not extras_need_live_enrichment(cached):
+        return merge_enrichment_extras(base, cached)
+
+    if not extras_need_live_enrichment(base) and cached is None:
+        # Legacy fat rows (pre-trim) can still serve without TMDb.
+        return base
+
+    live = await _live_enrichment_extras(
+        session,
+        content_item_id=content_item_id,
+        source_namespace=source_namespace,
+        settings=settings,
+    )
+    if live is None:
+        await _cache_enrichment_negative(
+            content_item_id=content_item_id,
+            source_namespace=source_namespace,
+            settings=settings,
+        )
+        return merge_enrichment_extras(base, cached) if cached else base
+    merged = merge_enrichment_extras(base, live)
+    await _cache_enrichment_doc(
+        content_item_id=content_item_id,
+        source_namespace=source_namespace,
+        extras=merged,
+        settings=settings,
+    )
+    return merged
 
 
 def _person_detail(person: Person) -> PersonDetail:
@@ -747,17 +987,39 @@ async def get_movie_detail(
     content_item_id: uuid.UUID,
     *,
     resolve_similar: bool = True,
+    settings: Settings | None = None,
+    enrichment_extras: dict[str, Any] | None = None,
 ) -> MovieDetail:
     """Load a movie detail DTO or raise :class:`CatalogNotFoundError`.
 
+    Lean Postgres extras are merged with Redis/TMDb enrichment (providers /
+    similar) when ``settings`` is provided and stored extras lack those
+    sections. Pass ``enrichment_extras`` to skip a live TMDb round-trip (e.g.
+    immediately after ingest).
+
     The write-through warm path after ingest uses ``resolve_similar=True`` so
     Similar titles are catalog-linked before the post-redirect detail GET.
-    Pass ``resolve_similar=False`` only when the caller will resolve them later.
     """
     item = await metadata_repository.get_movie_by_id(session, content_item_id)
     if item is None or item.movie is None:
         raise CatalogNotFoundError('movie not found')
-    detail = _movie_detail(item)
+    item = await maybe_refresh_stale_stub(
+        session,
+        item,
+        source_namespace='movie',
+        settings=settings,
+    )
+    if item.movie is None:
+        raise CatalogNotFoundError('movie not found')
+    extras_doc = await _resolve_extras_doc(
+        session,
+        content_item_id=content_item_id,
+        source_namespace='movie',
+        stored_extras=item.extras if isinstance(item.extras, dict) else {},
+        settings=settings,
+        enrichment_extras=enrichment_extras,
+    )
+    detail = _movie_detail(item, extras_doc=extras_doc)
     if resolve_similar:
         await _resolve_similar_catalog_ids(
             session,
@@ -772,17 +1034,25 @@ async def get_tv_detail(
     content_item_id: uuid.UUID,
     *,
     resolve_similar: bool = True,
+    settings: Settings | None = None,
+    enrichment_extras: dict[str, Any] | None = None,
 ) -> TvDetail:
     """Load a TV detail DTO or raise :class:`CatalogNotFoundError`.
 
     Season stubs load without episodes; the preferred season (Season 1 when
     present) is loaded separately and embedded when rows already exist.
-    The write-through warm path after ingest uses ``resolve_similar=True`` so
-    Similar titles are catalog-linked before the post-redirect detail GET.
-    Pass ``resolve_similar=False`` only when the caller will resolve them later.
+    Lean extras are hybrid-enriched like movies when ``settings`` is set.
     """
     item = await metadata_repository.get_tv_by_id(session, content_item_id)
     if item is None or item.tv_show is None:
+        raise CatalogNotFoundError('tv show not found')
+    item = await maybe_refresh_stale_stub(
+        session,
+        item,
+        source_namespace='tv',
+        settings=settings,
+    )
+    if item.tv_show is None:
         raise CatalogNotFoundError('tv show not found')
     seasons = list(item.tv_show.seasons)
     embed_number = _preferred_embed_season_number(seasons)
@@ -795,10 +1065,19 @@ async def get_tv_detail(
         )
         if season_row is not None:
             embed_episodes = list(season_row.episodes)
+    extras_doc = await _resolve_extras_doc(
+        session,
+        content_item_id=content_item_id,
+        source_namespace='tv',
+        stored_extras=item.extras if isinstance(item.extras, dict) else {},
+        settings=settings,
+        enrichment_extras=enrichment_extras,
+    )
     detail = _tv_detail(
         item,
         embed_season_number=embed_number,
         embed_episodes=embed_episodes,
+        extras_doc=extras_doc,
     )
     if resolve_similar:
         await _resolve_similar_catalog_ids(
