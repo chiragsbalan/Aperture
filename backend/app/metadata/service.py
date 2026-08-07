@@ -308,7 +308,7 @@ async def fetch_now_in_theatres_pool(
     client: TmdbClient | None = None,
 ) -> NowInTheatresResponse:
     """Return TMDb now-playing movies, most popular first, for the home rail."""
-    limit = count if count is not None else settings.top_movies_pool_count
+    limit = count if count is not None else settings.now_in_theatres_pool_count
     if limit < 1:
         return NowInTheatresResponse(movies=[])
 

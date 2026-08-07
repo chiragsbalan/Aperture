@@ -1,3 +1,5 @@
+import { Suspense } from 'react';
+
 import { CustomListsPage } from '@/components/custom-lists-page';
 import { SiteHeader } from '@/components/site-header';
 import type { Metadata } from 'next';
@@ -15,7 +17,15 @@ export default function LibraryListsPage() {
       </a>
       <SiteHeader />
       <main id="main-content" className="relative z-[1] w-full">
-        <CustomListsPage />
+        <Suspense
+          fallback={
+            <p className="layout-content mt-10 text-muted" role="status">
+              Loading…
+            </p>
+          }
+        >
+          <CustomListsPage />
+        </Suspense>
       </main>
     </div>
   );

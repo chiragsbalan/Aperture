@@ -7,8 +7,9 @@
  *
  * Display cap coupling: `HOME_RAIL_MAX_PUBLIC_LIMIT` in `catalog.ts` (24)
  * must stay aligned with backend `TOP_MOVIES_MAX_PUBLIC_LIMIT` /
- * `settings.top_movies_max_public_limit`. Default FE fetch limit 12 aligns
- * with `top_movies_default_limit`.
+ * `settings.top_movies_max_public_limit`. Authenticated browse shelves use
+ * `HOME_RAIL_MAX_AUTH_LIMIT` (500) ↔ `TOP_MOVIES_MAX_AUTH_LIMIT`. Default FE
+ * fetch limit 12 aligns with `top_movies_default_limit`.
  *
  * RSC cookie/`/me` probe lives in `home-shell.server.ts` so client modules
  * can import headings and pure helpers without `next/headers`.

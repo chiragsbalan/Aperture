@@ -10,8 +10,8 @@
  * `title-meta-tabs.tsx` / `profile-nav.tsx` + `profile-tab-stage.tsx`).
  *
  * Size easing (height/width when those are explicitly set): use `.motion-size`
- * from `globals.css`. Overflow hints (no scrollbar): `.scroll-fade-x` /
- * `.scroll-fade-y` + `useScrollFadeX` / `useScrollFadeY` from `scroll-fade.ts`.
+ * from `globals.css`. Overflow hints (no scrollbar): `.scroll-fade-*-host`
+ * overlays + `useScrollFadeX` / `useScrollFadeY` from `scroll-fade.ts`.
  *
  * Title poster open morph (product-wide): every openable movie/TV poster must
  * use `TitleNavPoster` (or `TitlePosterLink` / `TmdbResolveLink`). See

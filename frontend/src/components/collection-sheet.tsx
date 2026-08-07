@@ -29,24 +29,35 @@ import { useScrollFadeY } from '@/lib/scroll-fade';
 
 const COLLECTION_SHEET_OPEN_ATTR = 'data-collection-sheet-open';
 
-type OverlayPhase = 'closed' | 'open' | 'closing';
-
 interface CollectionSheetProps {
   open: boolean;
   title: string;
-  /** Called after the leave animation finishes (parent clears open state). */
+  /**
+   * After the leave animation finishes. Lazy-mounted parents unmount here.
+   * Simple parents that only flip ``open`` may use the same fn as dismiss.
+   */
   onClose: () => void;
+  /**
+   * User asked to dismiss (backdrop / Escape / Done). Must set ``open`` to
+   * false. Defaults to ``onClose`` when omitted (for sheets that only toggle
+   * open state).
+   */
+  onDismiss?: () => void;
   children: ReactNode;
 }
 
 /**
  * Shared centered overlay sheet (search / followers aesthetic).
  * Use for modal forms and collection lists — not native `<dialog>`.
+ *
+ * Fully controlled by ``open``: dismiss only asks the parent to set
+ * ``open={false}``; leave animation + ``onClose`` follow from that.
  */
 export function CollectionSheet({
   open,
   title,
   onClose,
+  onDismiss,
   children,
 }: CollectionSheetProps) {
   const dialogId = useId();
@@ -55,25 +66,23 @@ export function CollectionSheet({
   const bodyHostRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<number | null>(null);
+  /** Guards timer + animationend so ``onClose`` runs once per leave. */
+  const finishCloseOnceRef = useRef(false);
   const previousOverflowRef = useRef('');
   const inertedRef = useRef<HTMLElement[]>([]);
   const chromeActiveRef = useRef(false);
-  const phaseRef = useRef<OverlayPhase>('closed');
   const onCloseRef = useRef(onClose);
-  const [phase, setPhase] = useState<OverlayPhase>('closed');
+  const onDismissRef = useRef(onDismiss);
   const [mounted, setMounted] = useState(false);
   const [portalRoot, setPortalRoot] = useState<HTMLDivElement | null>(null);
-  const isVisible = phase !== 'closed';
-  const isLeaving = phase === 'closing';
+  /** Keep portal painted through the leave animation after ``open`` flips. */
+  const [present, setPresent] = useState(open);
+  const [leaving, setLeaving] = useState(false);
 
-  // Do not let a stale 'closing' render overwrite finishClose's synchronous
-  // 'closed' claim (timer + animationend race before setPhase flushes).
-  if (phaseRef.current !== 'closed' || phase === 'closed') {
-    phaseRef.current = phase;
-  }
   onCloseRef.current = onClose;
+  onDismissRef.current = onDismiss;
 
-  useScrollFadeY(bodyRef, isVisible, bodyHostRef);
+  useScrollFadeY(bodyRef, present, bodyHostRef);
 
   useEffect(() => {
     setMounted(true);
@@ -97,43 +106,61 @@ export function CollectionSheet({
   }, []);
 
   const finishClose = useCallback(() => {
-    if (phaseRef.current === 'closed') {
+    if (finishCloseOnceRef.current) {
       return;
     }
-    // Claim closed synchronously so timer + animationend cannot double-fire
-    // onClose before React flushes setPhase.
-    phaseRef.current = 'closed';
+    finishCloseOnceRef.current = true;
     clearCloseTimer();
     teardownOverlayChrome();
-    setPhase('closed');
+    setLeaving(false);
+    setPresent(false);
     onCloseRef.current();
   }, [clearCloseTimer, teardownOverlayChrome]);
 
-  const beginClose = useCallback(() => {
-    if (phaseRef.current !== 'open') {
-      return;
-    }
-    setPhase('closing');
-    clearCloseTimer();
-    closeTimerRef.current = window.setTimeout(() => {
-      finishClose();
-    }, MOTION_DURATION_MED_MS);
-  }, [clearCloseTimer, finishClose]);
+  const finishCloseRef = useRef(finishClose);
+  finishCloseRef.current = finishClose;
 
+  // Drive presence / leave solely from the controlled ``open`` prop.
   useEffect(() => {
     if (open) {
       dispatchOverlayClose(CLOSE_SEARCH_EVENT);
       dispatchOverlayClose(CLOSE_ACCOUNT_EVENT);
-      setPhase('open');
+      clearCloseTimer();
+      finishCloseOnceRef.current = false;
+      setPresent(true);
+      setLeaving(false);
       return;
     }
-    if (phaseRef.current === 'open') {
-      beginClose();
+    if (!present) {
+      return;
     }
-  }, [open, beginClose]);
+    setLeaving(true);
+    clearCloseTimer();
+    closeTimerRef.current = window.setTimeout(() => {
+      finishCloseRef.current();
+    }, MOTION_DURATION_MED_MS);
+    return () => {
+      clearCloseTimer();
+    };
+  }, [open, present, clearCloseTimer]);
+
+  const requestClose = useCallback(() => {
+    if (leaving) {
+      finishCloseRef.current();
+      return;
+    }
+    if (!open && !present) {
+      return;
+    }
+    const dismiss = onDismissRef.current ?? onCloseRef.current;
+    dismiss();
+  }, [leaving, open, present]);
+
+  const requestCloseRef = useRef(requestClose);
+  requestCloseRef.current = requestClose;
 
   useLayoutEffect(() => {
-    if (!isVisible || !portalRoot) {
+    if (!present || !portalRoot) {
       return;
     }
 
@@ -146,31 +173,19 @@ export function CollectionSheet({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        if (phaseRef.current === 'open') {
-          beginClose();
-        } else if (phaseRef.current === 'closing') {
-          finishClose();
-        }
+        requestCloseRef.current();
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
-      clearCloseTimer();
       teardownOverlayChrome();
     };
-  }, [
-    isVisible,
-    portalRoot,
-    beginClose,
-    finishClose,
-    clearCloseTimer,
-    teardownOverlayChrome,
-  ]);
+  }, [present, portalRoot, teardownOverlayChrome]);
 
   useEffect(() => {
-    if (phase !== 'open' || !portalRoot) {
+    if (!present || leaving || !portalRoot) {
       return;
     }
     const frame = window.requestAnimationFrame(() => {
@@ -179,19 +194,19 @@ export function CollectionSheet({
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [phase, portalRoot]);
+  }, [present, leaving, portalRoot]);
 
   function onPanelAnimationEnd(event: AnimationEvent<HTMLDivElement>) {
     if (event.target !== event.currentTarget) {
       return;
     }
-    if (phase !== 'closing') {
+    if (!leaving) {
       return;
     }
-    finishClose();
+    finishCloseRef.current();
   }
 
-  if (!isVisible || !mounted) {
+  if (!mounted || !present) {
     return null;
   }
 
@@ -204,12 +219,14 @@ export function CollectionSheet({
       <div
         className={[
           'search-overlay-backdrop absolute inset-0 bg-[rgba(12,11,9,0.62)] backdrop-blur-[6px]',
-          isLeaving ? 'is-leaving' : '',
+          leaving ? 'is-leaving' : '',
         ]
           .filter(Boolean)
           .join(' ')}
         role="presentation"
-        onClick={beginClose}
+        onClick={() => {
+          requestClose();
+        }}
       />
       <div
         ref={panelRef}
@@ -220,7 +237,7 @@ export function CollectionSheet({
         tabIndex={-1}
         className={[
           'collection-sheet-panel overlay-surface overlay-panel-motion relative z-[1] w-full max-w-md overflow-hidden outline-none',
-          isLeaving ? 'is-leaving' : '',
+          leaving ? 'is-leaving' : '',
         ]
           .filter(Boolean)
           .join(' ')}

@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.catalog import router as catalog_router
 from app.api.health import router as health_router
 from app.api.library import router as library_router
 from app.api.lists import router as lists_router
@@ -61,6 +62,9 @@ def create_app() -> FastAPI:
     api_v1.include_router(users_router)
     api_v1.include_router(lists_router)
     api_v1.include_router(library_router)
+    # Auth-aware catalog rails (top movies/TV) before metadata so path matches
+    # stay on the API-layer handlers that may import Auth.
+    api_v1.include_router(catalog_router)
     api_v1.include_router(metadata_router)
     api_v1.include_router(search_router)
     app.include_router(api_v1)

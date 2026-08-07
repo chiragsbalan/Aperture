@@ -1,10 +1,8 @@
 import Link from 'next/link';
 
 import { ProfileAvatar } from '@/components/profile-avatar';
-import { TitlePosterLink } from '@/components/title-poster-link';
+import { TitleShelfView } from '@/components/title-shelf-view';
 import type { LibraryContentType } from '@/lib/library';
-import { hrefForLibraryContent } from '@/lib/library';
-import { POSTER_GRID_SIZES } from '@/lib/poster';
 
 export interface ProfileCollectionTitleItem {
   kind: 'title';
@@ -35,7 +33,7 @@ interface ProfileCollectionViewProps {
   items: ProfileCollectionItem[];
 }
 
-/** Generic named collection: title and a list of titles or people. */
+/** Named collection page: titles via TitleShelfView, or people rows. */
 export function ProfileCollectionView({
   title,
   emptyMessage,
@@ -50,61 +48,23 @@ export function ProfileCollectionView({
     (item): item is ProfileCollectionPersonItem => item.kind === 'person',
   );
 
-  return (
-    <div className="layout-content motion-fade-rise text-left">
-      <h1 className="type-page-lg text-foreground">{title}</h1>
+  if (personItems.length > 0) {
+    return (
+      <div className="layout-content motion-fade-rise text-left">
+        <h1 className="type-page-lg text-foreground">{title}</h1>
 
-      {status === 'loading' ? (
-        <p className="mt-10 text-muted" role="status">
-          Loading…
-        </p>
-      ) : null}
+        {status === 'loading' ? (
+          <p className="mt-10 text-muted" role="status">
+            Loading…
+          </p>
+        ) : null}
 
-      {status === 'error' ? (
-        <p className="mt-10 text-[var(--color-danger)]" role="alert">
-          {errorMessage ?? 'Could not load this list.'}
-        </p>
-      ) : null}
+        {status === 'error' ? (
+          <p className="mt-10 text-[var(--color-danger)]" role="alert">
+            {errorMessage ?? 'Could not load this list.'}
+          </p>
+        ) : null}
 
-      {status === 'ready' && items.length === 0 ? (
-        <p className="mt-10 text-muted">{emptyMessage}</p>
-      ) : null}
-
-      {status === 'ready' && titleItems.length > 0 ? (
-        <ul className="poster-grid mt-10">
-          {titleItems.map((item) => (
-            <li key={`${item.type}:${item.id}`} className="min-w-0">
-              <TitlePosterLink
-                href={hrefForLibraryContent({
-                  type: item.type,
-                  id: item.id,
-                })}
-                contentId={item.id}
-                posterUrl={item.posterUrl}
-                posterAlt={`${item.title} poster`}
-                ariaLabel={
-                  item.year != null
-                    ? `${item.title} (${item.year})`
-                    : item.title
-                }
-                sizes={POSTER_GRID_SIZES}
-                className="block min-w-0 overflow-hidden transition hover:opacity-90"
-              >
-                <div className="poster-meta">
-                  <p className="mt-2 truncate font-display text-sm font-medium text-foreground">
-                    {item.title}
-                  </p>
-                  {item.year != null ? (
-                    <p className="truncate text-xs text-muted">{item.year}</p>
-                  ) : null}
-                </div>
-              </TitlePosterLink>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {status === 'ready' && personItems.length > 0 ? (
         <ul className="mt-10 divide-y divide-[var(--color-border)]">
           {personItems.map((item) => {
             const label = item.displayName?.trim() || item.username;
@@ -134,7 +94,24 @@ export function ProfileCollectionView({
             );
           })}
         </ul>
-      ) : null}
-    </div>
+      </div>
+    );
+  }
+
+  return (
+    <TitleShelfView
+      title={title}
+      emptyMessage={emptyMessage}
+      status={status}
+      errorMessage={errorMessage}
+      items={titleItems.map((item) => ({
+        key: `${item.type}:${item.id}`,
+        contentId: item.id,
+        kind: item.type === 'tv' ? 'tv' : 'movie',
+        title: item.title,
+        year: item.year,
+        posterUrl: item.posterUrl,
+      }))}
+    />
   );
 }

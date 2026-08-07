@@ -98,7 +98,7 @@ function ListIcon({ filled }: { filled: boolean }) {
       width="28"
       height="28"
       viewBox="0 0 24 24"
-      fill="none"
+      fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"
       strokeWidth="1.75"
       strokeLinecap="round"
@@ -106,31 +106,8 @@ function ListIcon({ filled }: { filled: boolean }) {
       aria-hidden
       className="h-7 w-7 sm:h-8 sm:w-8"
     >
-      <path d="M9 7h11M9 12h11M9 17h11" />
-      <rect
-        x="3.5"
-        y="5.5"
-        width="3"
-        height="3"
-        rx="0.6"
-        fill={filled ? 'currentColor' : 'none'}
-      />
-      <rect
-        x="3.5"
-        y="10.5"
-        width="3"
-        height="3"
-        rx="0.6"
-        fill={filled ? 'currentColor' : 'none'}
-      />
-      <rect
-        x="3.5"
-        y="15.5"
-        width="3"
-        height="3"
-        rx="0.6"
-        fill={filled ? 'currentColor' : 'none'}
-      />
+      {/* Hollow plus — outline of a thick cross, not two thin strokes. */}
+      <path d="M9.25 4.75h5.5v4.5h4.5v5.5h-4.5v4.5h-5.5v-4.5h-4.5v-5.5h4.5z" />
     </svg>
   );
 }
@@ -153,7 +130,7 @@ function LoggedIcon({ filled }: { filled: boolean }) {
       <path
         d="M8.5 12.25l2.4 2.4 4.6-4.9"
         fill="none"
-        stroke={filled ? 'var(--color-accent-contrast)' : 'currentColor'}
+        stroke={filled ? 'var(--color-bg)' : 'currentColor'}
       />
     </svg>
   );
@@ -459,6 +436,37 @@ export function LibraryActions({
       setListItemIds(refreshed.itemIds);
     } else {
       setListMembership((current) => ({ ...current, [list.id]: true }));
+      setListItemIds((current) => ({
+        ...current,
+        [list.id]: result.item.item_id,
+      }));
+    }
+  }
+
+  /** After creating a list from this title page, put the title on it immediately. */
+  async function handleListCreated(list: CustomListSummary) {
+    setLists((current) => [list, ...current]);
+    setListMembership((current) => ({ ...current, [list.id]: true }));
+    if (libraryType == null) {
+      return;
+    }
+    setPending('lists');
+    setError(null);
+    const result = await addCustomListItem(list.id, libraryType, contentId);
+    setPending(null);
+    if (!result.ok) {
+      setListMembership((current) => ({ ...current, [list.id]: false }));
+      setError(result.error);
+      return;
+    }
+    setListItemIds((current) => ({
+      ...current,
+      [list.id]: result.item.item_id,
+    }));
+    const refreshed = await fetchCustomListsMembership(libraryType, contentId);
+    if (refreshed.ok) {
+      setListMembership(refreshed.membership);
+      setListItemIds(refreshed.itemIds);
     }
   }
 
@@ -587,8 +595,12 @@ export function LibraryActions({
           lists={lists}
           listMembership={listMembership}
           pending={pending === 'lists'}
+          error={error}
           onToggleList={(list) => {
             void toggleListMembership(list);
+          }}
+          onListCreated={(list) => {
+            void handleListCreated(list);
           }}
         />
       ) : null}

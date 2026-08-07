@@ -41,7 +41,12 @@ export function LibraryLogWatchSheet({
   onSubmit,
 }: LibraryLogWatchSheetProps) {
   return (
-    <CollectionSheet open={open} title="Log watch" onClose={onClose}>
+    <CollectionSheet
+      open={open}
+      title="Log watch"
+      onClose={onClose}
+      onDismiss={onDismiss}
+    >
       <form
         onSubmit={(event) => {
           onSubmit(event);

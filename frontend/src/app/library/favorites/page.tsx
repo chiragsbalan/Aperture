@@ -18,7 +18,7 @@ export default function FavoritesPage() {
         <LibraryListPage
           kind="favorites"
           title="Favorites"
-          emptyMessage="No favorites yet. Add a title to favorites from any movie or TV page."
+          emptyMessage="No favorites yet. Add titles from any movie or TV page."
         />
       </main>
     </div>

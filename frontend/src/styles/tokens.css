@@ -41,7 +41,7 @@
   --color-action-watchlist: #c9b07a;
   --color-action-favorites: #e07a8a;
   --color-action-lists: #6a9ec9;
-  --color-action-log: var(--color-accent);
+  --color-action-log: #6fbf73;
 
   /*
    * Atmosphere — distinct purple + blue lobes via `.shell-atmosphere`
@@ -218,14 +218,16 @@
    * Overflow edge fades — pair with `.scroll-fade-x` / `.scroll-fade-y` +
    * useScrollFadeX / useScrollFadeY in `lib/scroll-fade.ts`.
    *
-   * Strength = mask length on each scrollable edge. Locked defaults — change
-   * here only, not as one-off lengths in components.
+   * Horizontal tab strips (seasons, profile): JS marks the edge-most visible
+   * tab (`data-scroll-fade-edge`); CSS fades that full name via
+   * background-clip (opaque inner → transparent outer). `--scroll-fade-size`
+   * is unused for tablists (kept as a general horizontal fallback).
    *
    * Vertical people rows (Followers / Following sheet): avatar md (3rem) +
    * py-4 (2rem) ≈ 5rem. Fade reaches halfway through that bottommost row so
    * overflow is obvious without swallowing the whole item.
    */
-  --scroll-fade-size: 1.75rem; /* horizontal (seasons, profile tabs) */
+  --scroll-fade-size: 3rem; /* horizontal fallback / non-tablist */
   --scroll-fade-people-row: 5rem; /* avatar md + py-4 people link row */
   --scroll-fade-size-y: calc(var(--scroll-fade-people-row) / 2); /* 2.5rem */
 }
@@ -255,7 +257,7 @@
   --color-action-watchlist: #9a7a3a;
   --color-action-favorites: #c45c6a;
   --color-action-lists: #3d6f94;
-  --color-action-log: var(--color-accent);
+  --color-action-log: #2f8f45;
 
   --bg-glow-purple: rgba(130, 100, 190, 0.16);
   --bg-glow-blue: rgba(60, 120, 190, 0.14);

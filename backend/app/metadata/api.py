@@ -198,8 +198,23 @@ def _filter_rail_titles(titles: list[TopMovie]) -> list[TopMovie]:
 
 def _public_rail_display_limit(limit: int | None, settings: Settings) -> int:
     """Clamp requested (or default) rail size to the public max."""
+    return _rail_display_limit(limit, settings, authenticated=False)
+
+
+def _rail_display_limit(
+    limit: int | None,
+    settings: Settings,
+    *,
+    authenticated: bool,
+) -> int:
+    """Clamp rail size: public max for anonymous, auth max when signed in."""
     requested = limit if limit is not None else settings.top_movies_default_limit
-    return min(requested, settings.top_movies_max_public_limit)
+    ceiling = (
+        settings.top_movies_max_auth_limit
+        if authenticated
+        else settings.top_movies_max_public_limit
+    )
+    return min(requested, ceiling)
 
 
 def _filter_top_movies(detail: TopMoviesResponse) -> TopMoviesResponse:
@@ -414,7 +429,7 @@ async def _load_now_in_theatres_pool(
     response: Response,
 ) -> NowInTheatresResponse:
     cache = get_cache()
-    key = now_in_theatres_key(count=settings.top_movies_pool_count)
+    key = now_in_theatres_key(count=settings.now_in_theatres_pool_count)
 
     hit = await _read_cached_now_in_theatres(cache, key)
     if hit is not None:
@@ -459,52 +474,8 @@ async def _load_now_in_theatres_pool(
         return filtered
 
 
-@router.get('/catalog/top-movies', response_model=TopMoviesResponse)
-async def get_top_movies(
-    request: Request,
-    settings: SettingsDep,
-    response: Response,
-    limit: int | None = Query(default=None, ge=1, le=100),
-) -> TopMoviesResponse:
-    """Return a shuffled sample from TMDb's all-time top-rated movies.
-
-    Public (unauthenticated), like ``/landing/posters``. Served to signed-in
-    ``/`` and guest ``/`` (public home) via RSC (not the browser BFF proxy). Every
-    request is subject to a per-IP rate limit (HIT / BYPASS / MISS). The full
-    pool (default 100) is Redis-cached; each response reshuffles and truncates
-    to ``limit``. Degrades to an empty list when TMDb is unavailable so the
-    home rail can show an empty state.
-    """
-    client_ip = resolve_client_ip(request, settings)
-    await enforce_top_movies_rate_limit(
-        get_cache(),
-        settings=settings,
-        client_ip=client_ip,
-    )
-    display_limit = _public_rail_display_limit(limit, settings)
-    pool = await _load_top_movies_pool(settings, response)
-    response.headers['Cache-Control'] = _HOME_RAIL_CACHE_CONTROL
-    return _shuffle_top_movies(pool, limit=display_limit)
-
-
-@router.get('/catalog/top-tv-shows', response_model=TopTvShowsResponse)
-async def get_top_tv_shows(
-    request: Request,
-    settings: SettingsDep,
-    response: Response,
-    limit: int | None = Query(default=None, ge=1, le=100),
-) -> TopTvShowsResponse:
-    """Return a shuffled sample from TMDb's all-time top-rated TV shows."""
-    client_ip = resolve_client_ip(request, settings)
-    await enforce_top_movies_rate_limit(
-        get_cache(),
-        settings=settings,
-        client_ip=client_ip,
-    )
-    display_limit = _public_rail_display_limit(limit, settings)
-    pool = await _load_top_tv_shows_pool(settings, response)
-    response.headers['Cache-Control'] = _HOME_RAIL_CACHE_CONTROL
-    return _shuffle_top_tv_shows(pool, limit=display_limit)
+# Auth-gated top-movies / top-tv-shows live in ``app.api.catalog`` so Metadata
+# does not import Auth (import-linter). Helpers above stay here for both.
 
 
 @router.get('/catalog/now-in-theatres', response_model=NowInTheatresResponse)

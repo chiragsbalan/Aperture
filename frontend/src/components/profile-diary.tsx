@@ -288,8 +288,12 @@ export function ProfileDiary({ username }: ProfileDiaryProps) {
         <DiaryEntrySheet
           entry={selected}
           open={sheetOpen}
+          onDismiss={() => {
+            setSheetOpen(false);
+          }}
           onClose={() => {
             setSheetOpen(false);
+            setSelected(null);
           }}
           onUpdated={handleUpdated}
           onDeleted={handleDeleted}

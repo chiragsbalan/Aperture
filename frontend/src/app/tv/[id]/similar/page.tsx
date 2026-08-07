@@ -1,15 +1,27 @@
-import { SiteHeader } from '@/components/site-header';
+import { SimilarTitlesPage } from '@/components/similar-titles-page';
 import { fetchTv } from '@/lib/catalog';
 import { parseTmdbIdParam } from '@/lib/content_ids';
+import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 
 interface TvSimilarPageProps {
   params: Promise<{ id: string }>;
 }
 
-/**
- * Placeholder for the full similar-titles page.
- */
+export async function generateMetadata({
+  params,
+}: TvSimilarPageProps): Promise<Metadata> {
+  const { id } = await params;
+  const result = await fetchTv(id);
+  if (!result.ok) {
+    return { title: 'Similar · Aperture' };
+  }
+  return {
+    title: `Similar to ${result.data.title} · Aperture`,
+    description: `Titles similar to ${result.data.title} on Aperture.`,
+  };
+}
+
 export default async function TvSimilarPage({ params }: TvSimilarPageProps) {
   const { id } = await params;
   const tmdbId = parseTmdbIdParam(id);
@@ -17,25 +29,18 @@ export default async function TvSimilarPage({ params }: TvSimilarPageProps) {
     redirect(`/tv/tmdb/${tmdbId}`);
   }
   const result = await fetchTv(id);
-  if (!result.ok && result.status === 404) {
-    notFound();
+  if (!result.ok) {
+    if (result.status === 404) {
+      notFound();
+    }
+    return <SimilarTitlesPage sourceTitle="this show" kind="tv" similar={[]} />;
   }
 
   return (
-    <div className="shell-atmosphere relative min-h-dvh overflow-x-hidden">
-      <a href="#main-content" className="skip-link">
-        Skip to main content
-      </a>
-      <SiteHeader />
-      <main
-        id="main-content"
-        className="layout-content layout-shell-pad-top relative z-[1] pb-24 text-left"
-      >
-        <h1 className="type-page-lg text-foreground">Similar</h1>
-        <p className="mt-3 text-sm text-muted">
-          Full similar titles for this show will land here.
-        </p>
-      </main>
-    </div>
+    <SimilarTitlesPage
+      sourceTitle={result.data.title}
+      kind="tv"
+      similar={result.data.extras.similar}
+    />
   );
 }

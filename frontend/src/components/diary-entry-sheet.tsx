@@ -21,6 +21,9 @@ type SheetMode = 'detail' | 'edit' | 'delete';
 interface DiaryEntrySheetProps {
   entry: WatchEntry | null;
   open: boolean;
+  /** Begin close (set open=false); keeps mount for leave animation. */
+  onDismiss: () => void;
+  /** After leave animation — parent may clear selected entry. */
   onClose: () => void;
   onUpdated: (entry: WatchEntry) => void;
   onDeleted: (entryId: string) => void;
@@ -32,6 +35,7 @@ interface DiaryEntrySheetProps {
 export function DiaryEntrySheet({
   entry,
   open,
+  onDismiss,
   onClose,
   onUpdated,
   onDeleted,
@@ -79,7 +83,7 @@ export function DiaryEntrySheet({
       }
       setActiveEntry(result.entry);
       onUpdated(result.entry);
-      onClose();
+      onDismiss();
     } catch {
       setError('Could not update diary entry.');
     } finally {
@@ -100,7 +104,7 @@ export function DiaryEntrySheet({
         return;
       }
       const deletedId = activeEntry.id;
-      onClose();
+      onDismiss();
       onDeleted(deletedId);
     } catch {
       setError('Could not delete diary entry.');
@@ -110,7 +114,12 @@ export function DiaryEntrySheet({
   }
 
   return (
-    <CollectionSheet open={open} title={title} onClose={onClose}>
+    <CollectionSheet
+      open={open}
+      title={title}
+      onDismiss={onDismiss}
+      onClose={onClose}
+    >
       {activeEntry == null ? null : mode === 'detail' ? (
         <div className="space-y-6">
           <DiaryEntryLayout entry={activeEntry} />

@@ -36,6 +36,9 @@ export default function RootLayout({
       lang="en"
       data-theme="dark"
       className={`${fraunces.variable} ${sourceSans.variable}`}
+      // beforeInteractive shell-atmosphere script sets ``--shell-glow-*`` on
+      // ``<html>`` before hydrate; without this React warns on the mismatch.
+      suppressHydrationWarning
     >
       <body className="antialiased">
         <Script
