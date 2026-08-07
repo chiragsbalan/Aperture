@@ -26,6 +26,8 @@ interface ActiveFlight {
   outgoingMain: HTMLElement | null;
   outgoingMainOpacity: string;
   outgoingMainTransition: string;
+  outgoingBackdrop: HTMLElement | null;
+  outgoingBackdropOpacity: string;
   animation: Animation;
   contentId: string | null;
   targetEl: HTMLElement | null;
@@ -34,6 +36,28 @@ interface ActiveFlight {
   targetClaimed: boolean;
   settling: boolean;
   settlePromise: Promise<void> | null;
+}
+
+/** Fixed title atmosphere layer (outside ``main``) — see TitleAtmosphere. */
+const TITLE_BACKDROP_SELECTOR = '[data-title-backdrop]';
+
+/**
+ * Hide the current title backdrop immediately.
+ *
+ * The backdrop is a fixed sibling of ``main``, so fading ``main`` alone leaves
+ * the previous title’s art under the FLIP clone (Similar → another title).
+ */
+function hideOutgoingTitleBackdrop(): {
+  el: HTMLElement | null;
+  opacity: string;
+} {
+  const el = document.querySelector<HTMLElement>(TITLE_BACKDROP_SELECTOR);
+  if (el == null) {
+    return { el: null, opacity: '' };
+  }
+  const opacity = el.style.opacity;
+  el.style.opacity = '0';
+  return { el, opacity };
 }
 
 let activeFlight: ActiveFlight | null = null;
@@ -155,6 +179,11 @@ export function startTitlePosterFlight(options: {
   endTitlePosterFlight();
   removeOrphanFlightClones();
 
+  // Clear old title art on click — including reduced-motion (no FLIP clone).
+  // Navigation proceeds via router.push; the outgoing page unmounts shortly.
+  const { el: outgoingBackdrop, opacity: outgoingBackdropOpacity } =
+    hideOutgoingTitleBackdrop();
+
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     return;
   }
@@ -269,6 +298,8 @@ export function startTitlePosterFlight(options: {
     outgoingMain,
     outgoingMainOpacity,
     outgoingMainTransition,
+    outgoingBackdrop,
+    outgoingBackdropOpacity,
     animation,
     contentId: options.contentId ?? null,
     targetEl: null,
@@ -486,6 +517,8 @@ export function endTitlePosterFlight(): void {
     outgoingMain,
     outgoingMainOpacity,
     outgoingMainTransition,
+    outgoingBackdrop,
+    outgoingBackdropOpacity,
     animation,
     targetEl,
     targetOpacity,
@@ -508,6 +541,9 @@ export function endTitlePosterFlight(): void {
     outgoingMain.style.opacity = outgoingMainOpacity;
     outgoingMain.style.transition = outgoingMainTransition;
     outgoingMain.style.pointerEvents = '';
+  }
+  if (outgoingBackdrop != null && outgoingBackdrop.isConnected) {
+    outgoingBackdrop.style.opacity = outgoingBackdropOpacity;
   }
   if (targetEl != null && targetEl.isConnected) {
     targetEl.style.opacity = targetOpacity;
