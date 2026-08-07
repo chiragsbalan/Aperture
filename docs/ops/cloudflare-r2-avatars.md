@@ -98,7 +98,11 @@ NEXT_PUBLIC_MEDIA_HOST=media.yourdomain.com
 NEXT_PUBLIC_R2_ACCOUNT_ID=
 ```
 
-Restart the API and rebuild/redeploy the frontend after changing `NEXT_PUBLIC_*` (baked into CSP at build time).
+Restart the API and **redeploy** the frontend after changing `NEXT_PUBLIC_*` (baked into CSP at build time).
+
+**Prod check:** open `/settings` → response headers → `Content-Security-Policy`.  
+`connect-src` **must** include `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com`.  
+If it is only `'self'`, phone/desktop uploads fail even when CORS is correct — set `NEXT_PUBLIC_R2_ACCOUNT_ID` on Vercel (same value as `R2_ACCOUNT_ID`) and redeploy.
 
 ## 7. Verify
 
