@@ -6,12 +6,26 @@ import {
   type Preferences,
   type ProfileLink,
 } from '@/lib/profile';
+import {
+  AvatarUploadError,
+  avatarFileAccept,
+  deleteAvatar,
+  uploadAvatarFile,
+} from '@/lib/avatar-upload';
 import { useAuth } from '@/components/auth-provider';
+import { ProfileAvatar } from '@/components/profile-avatar';
 import { invalidatePublicWatchEntries } from '@/lib/library';
 import { applyThemePreference } from '@/lib/theme';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from 'react';
 
 type LoadState =
   | { status: 'loading' }
@@ -35,12 +49,13 @@ export function SettingsForm() {
   const languageHintId = useId();
   const errorId = useId();
   const submitRef = useRef<HTMLButtonElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [links, setLinks] = useState<ProfileLink[]>([]);
   const [preferences, setPreferences] = useState<Preferences>({
@@ -51,6 +66,8 @@ export function SettingsForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [avatarPending, setAvatarPending] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [renameAvailableAt, setRenameAvailableAt] = useState<string | null>(
@@ -107,7 +124,7 @@ export function SettingsForm() {
         setUsername(profile.username);
         setDisplayName(profile.display_name ?? '');
         setBio(profile.bio ?? '');
-        setAvatarUrl(profile.avatar_url ?? '');
+        setAvatarUrl(profile.avatar_url);
         setWebsiteUrl(profile.website_url ?? '');
         setLinks(profile.links ?? []);
         setPreferences(profile.preferences);
@@ -129,6 +146,65 @@ export function SettingsForm() {
     };
   }, []);
 
+  function applyProfile(updated: OwnedProfile) {
+    setState({ status: 'ok', profile: updated });
+    setUsername(updated.username);
+    setDisplayName(updated.display_name ?? '');
+    setBio(updated.bio ?? '');
+    setAvatarUrl(updated.avatar_url);
+    setWebsiteUrl(updated.website_url ?? '');
+    setLinks(updated.links ?? []);
+    setPreferences(updated.preferences);
+    setRenameAvailableAt(updated.username_rename_available_at);
+    applyThemePreference(updated.preferences.theme);
+  }
+
+  async function onAvatarChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || state.status !== 'ok') {
+      return;
+    }
+    setAvatarError(null);
+    setSuccess(null);
+    setAvatarPending(true);
+    try {
+      const updated = await uploadAvatarFile(file);
+      applyProfile(updated);
+      setSuccess('Profile photo updated.');
+    } catch (err) {
+      const message =
+        err instanceof AvatarUploadError
+          ? err.message
+          : 'Could not upload photo.';
+      setAvatarError(message);
+    } finally {
+      setAvatarPending(false);
+    }
+  }
+
+  async function onAvatarRemove() {
+    if (state.status !== 'ok' || !avatarUrl) {
+      return;
+    }
+    setAvatarError(null);
+    setSuccess(null);
+    setAvatarPending(true);
+    try {
+      const updated = await deleteAvatar();
+      applyProfile(updated);
+      setSuccess('Profile photo removed.');
+    } catch (err) {
+      const message =
+        err instanceof AvatarUploadError
+          ? err.message
+          : 'Could not remove photo.';
+      setAvatarError(message);
+    } finally {
+      setAvatarPending(false);
+    }
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (state.status !== 'ok') {
@@ -149,7 +225,6 @@ export function SettingsForm() {
     const profileBody: Record<string, unknown> = {
       display_name: displayName.trim() ? displayName.trim() : null,
       bio: bio.trim() ? bio.trim() : null,
-      avatar_url: avatarUrl.trim() ? avatarUrl.trim() : null,
       website_url: websiteUrl.trim() ? websiteUrl.trim() : null,
       links: cleanedLinks,
       preferences,
@@ -170,17 +245,7 @@ export function SettingsForm() {
         return;
       }
 
-      const updated = profileData as OwnedProfile;
-      setState({ status: 'ok', profile: updated });
-      setUsername(updated.username);
-      setDisplayName(updated.display_name ?? '');
-      setBio(updated.bio ?? '');
-      setAvatarUrl(updated.avatar_url ?? '');
-      setWebsiteUrl(updated.website_url ?? '');
-      setLinks(updated.links ?? []);
-      setPreferences(updated.preferences);
-      setRenameAvailableAt(updated.username_rename_available_at);
-      applyThemePreference(updated.preferences.theme);
+      applyProfile(profileData as OwnedProfile);
       setSuccess('Settings saved.');
     } catch {
       setError('Network error — try again');
@@ -310,25 +375,62 @@ export function SettingsForm() {
           </div>
 
           <div>
-            <label htmlFor={avatarId} className="text-sm text-muted">
-              Avatar URL
-            </label>
-            <input
-              id={avatarId}
-              name="avatar_url"
-              type="url"
-              inputMode="url"
-              placeholder="https://"
-              value={avatarUrl}
-              onChange={(event) => {
-                setAvatarUrl(event.target.value);
-              }}
-              maxLength={512}
-              className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground"
-            />
-            <p className="mt-1 text-xs text-muted">
-              HTTPS image URL only. Leave blank for initials.
+            <p className="text-sm text-muted" id={`${avatarId}-label`}>
+              Profile photo
             </p>
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              <ProfileAvatar
+                username={username || state.profile.username}
+                displayName={displayName}
+                avatarUrl={avatarUrl}
+                size="lg"
+              />
+              <div className="space-y-2">
+                <input
+                  ref={avatarInputRef}
+                  id={avatarId}
+                  name="avatar"
+                  type="file"
+                  accept={avatarFileAccept()}
+                  className="sr-only"
+                  aria-labelledby={`${avatarId}-label`}
+                  disabled={avatarPending || pending}
+                  onChange={onAvatarChange}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-1.5 text-sm text-foreground disabled:opacity-60"
+                    disabled={avatarPending || pending}
+                    onClick={() => {
+                      avatarInputRef.current?.click();
+                    }}
+                  >
+                    {avatarPending ? 'Uploading…' : 'Upload photo'}
+                  </button>
+                  {avatarUrl ? (
+                    <button
+                      type="button"
+                      className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-1.5 text-sm text-muted disabled:opacity-60"
+                      disabled={avatarPending || pending}
+                      onClick={() => {
+                        void onAvatarRemove();
+                      }}
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                <p className="text-xs text-muted">
+                  JPEG, PNG, or WebP up to 2MB. Stored on Cloudflare R2.
+                </p>
+                {avatarError ? (
+                  <p role="alert" className="text-xs text-[var(--color-danger)]">
+                    {avatarError}
+                  </p>
+                ) : null}
+              </div>
+            </div>
           </div>
 
           <div>

@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from app.auth.deps import CurrentIdentityDep, OptionalIdentityDep
+from app.core import r2 as r2_store
 from app.core.cache import get_cache
 from app.core.deps import DbSessionDep, SettingsDep
 from app.core.trusted_client import resolve_client_ip
@@ -17,9 +18,13 @@ from app.lists.schemas import (
     ProfileListsPageResponse,
     SystemListResponse,
 )
+from app.users import avatars as avatars_service
 from app.users import service as users_service
 from app.users.rate_limit import enforce_users_public_rate_limit
 from app.users.schemas import (
+    AvatarConfirmRequest,
+    AvatarUploadUrlRequest,
+    AvatarUploadUrlResponse,
     PreferencesPatchRequest,
     PreferencesResponse,
     ProfileCounts,
@@ -108,11 +113,115 @@ async def get_me_profile(
     return _profile_response(profile)
 
 
+@router.post('/me/avatar/upload-url', response_model=AvatarUploadUrlResponse)
+async def create_avatar_upload_url(
+    body: AvatarUploadUrlRequest,
+    identity: CurrentIdentityDep,
+    session: DbSessionDep,
+    settings: SettingsDep,
+) -> AvatarUploadUrlResponse:
+    """Mint a short-lived R2 presigned PUT URL for the caller's avatar."""
+    try:
+        owned = await users_service.get_owned_profile(
+            session,
+            identity_id=identity.id,
+        )
+        slot = avatars_service.create_upload_slot(
+            settings,
+            user_id=owned.id,
+            content_type=body.content_type,
+            byte_size=body.byte_size,
+        )
+    except users_service.ProfileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='Profile not found',
+        ) from exc
+    except avatars_service.AvatarStorageUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail='Avatar storage is not configured',
+        ) from exc
+    except avatars_service.AvatarValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    return AvatarUploadUrlResponse(
+        upload_url=slot.upload_url,
+        public_url=slot.public_url,
+        key=slot.key,
+        expires_in=slot.expires_in,
+        max_bytes=slot.max_bytes,
+        content_type=slot.content_type,
+    )
+
+
+@router.post('/me/avatar/confirm', response_model=ProfileResponse)
+async def confirm_avatar_upload(
+    body: AvatarConfirmRequest,
+    identity: CurrentIdentityDep,
+    session: DbSessionDep,
+    settings: SettingsDep,
+) -> ProfileResponse:
+    """After a successful R2 PUT, attach the object as the profile avatar."""
+    try:
+        profile = await avatars_service.confirm_avatar_upload(
+            session,
+            settings,
+            identity_id=identity.id,
+            key=body.key.strip(),
+        )
+    except users_service.ProfileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='Profile not found',
+        ) from exc
+    except avatars_service.AvatarStorageUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail='Avatar storage is not configured',
+        ) from exc
+    except avatars_service.AvatarObjectMissingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='Uploaded object not found — retry upload',
+        ) from exc
+    except avatars_service.AvatarValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    return _profile_response(profile)
+
+
+@router.delete('/me/avatar', response_model=ProfileResponse)
+async def delete_avatar(
+    identity: CurrentIdentityDep,
+    session: DbSessionDep,
+    settings: SettingsDep,
+) -> ProfileResponse:
+    """Remove the profile avatar (DB + R2 object when first-party)."""
+    try:
+        profile = await avatars_service.delete_avatar(
+            session,
+            settings,
+            identity_id=identity.id,
+        )
+    except users_service.ProfileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='Profile not found',
+        ) from exc
+    return _profile_response(profile)
+
+
 @router.patch('/me', response_model=ProfileResponse)
 async def patch_me_profile(
     body: ProfilePatchRequest,
     identity: CurrentIdentityDep,
     session: DbSessionDep,
+    settings: SettingsDep,
 ) -> ProfileResponse:
     """Update username, display name, and/or bio for the current user."""
     data = body.model_dump(exclude_unset=True)
@@ -123,6 +232,17 @@ async def patch_me_profile(
     display_name = data['display_name'] if 'display_name' in data else ...
     bio = data['bio'] if 'bio' in data else ...
     avatar_url = data['avatar_url'] if 'avatar_url' in data else ...
+    # When R2 is configured, only allow clearing avatar via PATCH (or our CDN URL).
+    # New uploads must go through /me/avatar/* so we can HeadObject-confirm.
+    if 'avatar_url' in data and r2_store.r2_configured(settings):
+        if avatar_url is not None and not r2_store.is_our_public_avatar_url(
+            settings,
+            str(avatar_url),
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail='avatar_url must be a first-party media URL; use avatar upload',
+            )
     website_url = data['website_url'] if 'website_url' in data else ...
     links_raw = data.get('links', ...)
     links: list[dict[str, str]] | object = ...

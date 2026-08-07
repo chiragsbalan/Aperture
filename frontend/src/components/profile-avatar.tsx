@@ -3,7 +3,6 @@ import { initialsFromProfile } from '@/lib/profile';
 interface ProfileAvatarProps {
   username: string;
   displayName?: string | null;
-  /** Ignored for now — remote avatars are blocked by CSP; initials only. */
   avatarUrl?: string | null;
   size?: 'sm' | 'md' | 'lg';
 }
@@ -11,6 +10,7 @@ interface ProfileAvatarProps {
 export function ProfileAvatar({
   username,
   displayName,
+  avatarUrl,
   size = 'md',
 }: ProfileAvatarProps) {
   const initials = initialsFromProfile(displayName, username);
@@ -20,6 +20,22 @@ export function ProfileAvatar({
       : size === 'sm'
         ? 'h-10 w-10 text-sm sm:h-11 sm:w-11 sm:text-base'
         : 'h-12 w-12 text-base';
+
+  if (avatarUrl) {
+    return (
+      // next/image needs a configured remote host; plain img works for any
+      // allowlisted CSP media host (R2 custom domain).
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={avatarUrl}
+        alt=""
+        width={80}
+        height={80}
+        className={`inline-block rounded-[var(--radius-pill)] border border-[var(--color-border)] object-cover ${sizeClass}`}
+        decoding="async"
+      />
+    );
+  }
 
   return (
     <div

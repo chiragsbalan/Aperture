@@ -42,6 +42,7 @@ ADR-0009-public-profiles.md
 ADR-0010-guest-landing-home-shell.md
 ADR-0011-title-poster-morph.md
 ADR-0012-brand-shell-atmosphere.md
+ADR-0014-avatar-r2-cdn.md
 ```
 
 Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
@@ -59,8 +60,9 @@ Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
 | [ADR-0010](ADR-0010-guest-landing-home-shell.md) | Guest landing on `/` + signed-in home shell (in-place auth, session matrix) |
 | [ADR-0011](ADR-0011-title-poster-morph.md) | Title poster shared-element morph (`TitleNavPoster` / FLIP) |
 | [ADR-0012](ADR-0012-brand-shell-atmosphere.md) | Purple brand + shell atmosphere (guest mosaic excluded) |
+| [ADR-0014](ADR-0014-avatar-r2-cdn.md) | Profile avatars via Cloudflare R2 + custom-domain CDN |
 
-Reserved / not yet written: **ADR-0007** — OpenSearch hosting (due at P5 exit per PLAN).
+Reserved / not yet written: **ADR-0007** — OpenSearch hosting (due at P5 exit per PLAN). **ADR-0013** may be claimed by lean-catalog work on another branch — do not reuse without checking.
 ## Template
 
 Every ADR should contain:

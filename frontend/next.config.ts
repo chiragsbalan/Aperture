@@ -3,18 +3,43 @@ import type { NextConfig } from 'next';
 
 const isProd = process.env.NODE_ENV === 'production';
 
+// First-party avatar CDN host (Cloudflare R2 custom domain), hostname only.
+// Example: media.example.com — set NEXT_PUBLIC_MEDIA_HOST in Vercel / .env.
+const mediaHost = (process.env.NEXT_PUBLIC_MEDIA_HOST ?? '').trim();
+
+const imgSrc = [
+  "'self'",
+  'data:',
+  'blob:',
+  'https://image.tmdb.org',
+  'https://i.ytimg.com',
+  'https://flagcdn.com',
+  ...(mediaHost ? [`https://${mediaHost}`] : []),
+].join(' ');
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   // next/font and Next.js runtime need these in practice for the shell.
   `script-src 'self' 'unsafe-inline'${isProd ? '' : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://image.tmdb.org https://i.ytimg.com https://flagcdn.com",
+  `img-src ${imgSrc}`,
   "font-src 'self' data:",
-  "connect-src 'self'",
+  // Browser PUTs go to the R2 S3 API host (presigned); not the custom domain.
+  "connect-src 'self' https://*.r2.cloudflarestorage.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
 ].join('; ');
+
+const mediaRemotePattern = mediaHost
+  ? [
+      {
+        protocol: 'https' as const,
+        hostname: mediaHost,
+        pathname: '/avatars/**',
+      },
+    ]
+  : [];
 
 const nextConfig: NextConfig = {
   output: 'standalone',
@@ -36,6 +61,7 @@ const nextConfig: NextConfig = {
         hostname: 'i.ytimg.com',
         pathname: '/vi/**',
       },
+      ...mediaRemotePattern,
     ],
   },
   async headers() {
