@@ -5,7 +5,8 @@ const isProd = process.env.NODE_ENV === 'production';
 
 // First-party avatar CDN host (Cloudflare R2 custom domain), hostname only.
 // Example: media.example.com — set NEXT_PUBLIC_MEDIA_HOST in Vercel / .env.
-const mediaHost = (process.env.NEXT_PUBLIC_MEDIA_HOST ?? '').trim();
+const rawMediaHost = (process.env.NEXT_PUBLIC_MEDIA_HOST ?? '').trim();
+const mediaHost = /^[a-z0-9.-]+$/i.test(rawMediaHost) ? rawMediaHost : '';
 
 const imgSrc = [
   "'self'",

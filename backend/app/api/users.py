@@ -154,6 +154,7 @@ async def create_avatar_upload_url(
         expires_in=slot.expires_in,
         max_bytes=slot.max_bytes,
         content_type=slot.content_type,
+        cache_control=slot.cache_control,
     )
 
 
@@ -181,6 +182,11 @@ async def confirm_avatar_upload(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail='Avatar storage is not configured',
+        ) from exc
+    except avatars_service.AvatarStorageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail='Avatar storage temporarily unavailable',
         ) from exc
     except avatars_service.AvatarObjectMissingError as exc:
         raise HTTPException(
@@ -232,17 +238,17 @@ async def patch_me_profile(
     display_name = data['display_name'] if 'display_name' in data else ...
     bio = data['bio'] if 'bio' in data else ...
     avatar_url = data['avatar_url'] if 'avatar_url' in data else ...
-    # When R2 is configured, only allow clearing avatar via PATCH (or our CDN URL).
-    # New uploads must go through /me/avatar/* so we can HeadObject-confirm.
-    if 'avatar_url' in data and r2_store.r2_configured(settings):
-        if avatar_url is not None and not r2_store.is_our_public_avatar_url(
-            settings,
-            str(avatar_url),
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail='avatar_url must be a first-party media URL; use avatar upload',
-            )
+    # When R2 is configured, PATCH may only clear avatar_url. Setting a URL must
+    # go through /me/avatar/* (HeadObject + ownership checks) to avoid IDOR.
+    if (
+        'avatar_url' in data
+        and r2_store.r2_configured(settings)
+        and avatar_url is not None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail='Use avatar upload endpoints to set a profile photo',
+        )
     website_url = data['website_url'] if 'website_url' in data else ...
     links_raw = data.get('links', ...)
     links: list[dict[str, str]] | object = ...

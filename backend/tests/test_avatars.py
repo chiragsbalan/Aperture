@@ -8,7 +8,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from app.core.config import Settings
-from app.core.r2 import R2ObjectHead, key_from_public_url, public_object_url
+from app.core.r2 import (
+    R2ObjectHead,
+    is_our_public_avatar_url,
+    key_from_public_url,
+    public_object_url,
+)
 from app.users import avatars as avatars_service
 
 
@@ -30,11 +35,16 @@ def _settings(**overrides: Any) -> Settings:
 
 def test_public_url_and_key_roundtrip() -> None:
     settings = _settings()
-    key = f'avatars/{uuid.uuid4()}/abc.webp'
+    key = f'avatars/{uuid.uuid4()}/{uuid.uuid4()}.webp'
     url = public_object_url(settings, key)
     assert url == f'https://media.example.com/{key}'
     assert key_from_public_url(settings, url) == key
     assert key_from_public_url(settings, 'https://evil.example/x') is None
+    assert is_our_public_avatar_url(settings, url)
+    assert not is_our_public_avatar_url(
+        settings,
+        'https://media.example.com/other/path.webp',
+    )
 
 
 def test_create_upload_slot_validates_type_and_size() -> None:
@@ -54,7 +64,9 @@ def test_create_upload_slot_validates_type_and_size() -> None:
     assert slot.key.startswith(f'avatars/{user_id}/')
     assert slot.key.endswith('.webp')
     assert slot.public_url.startswith('https://media.example.com/')
+    assert slot.cache_control == 'public, max-age=31536000, immutable'
     mock_presign.assert_called_once()
+    assert mock_presign.call_args.kwargs['content_length'] == 1024
 
     with pytest.raises(avatars_service.AvatarValidationError):
         avatars_service.create_upload_slot(
@@ -86,14 +98,20 @@ def test_create_upload_slot_requires_r2() -> None:
 
 def test_assert_key_owned_by_user() -> None:
     user_id = uuid.uuid4()
-    avatars_service._assert_key_owned_by_user(f'avatars/{user_id}/x.webp', user_id)
+    key = f'avatars/{user_id}/{uuid.uuid4()}.webp'
+    avatars_service._assert_key_owned_by_user(key, user_id)
     with pytest.raises(avatars_service.AvatarValidationError):
         avatars_service._assert_key_owned_by_user(
-            f'avatars/{uuid.uuid4()}/x.webp',
+            f'avatars/{uuid.uuid4()}/{uuid.uuid4()}.webp',
             user_id,
         )
     with pytest.raises(avatars_service.AvatarValidationError):
         avatars_service._assert_key_owned_by_user('avatars/../escape', user_id)
+    with pytest.raises(avatars_service.AvatarValidationError):
+        avatars_service._assert_key_owned_by_user(
+            f'avatars/{user_id}/not-a-uuid.webp',
+            user_id,
+        )
 
 
 @pytest.mark.asyncio
@@ -115,7 +133,6 @@ async def test_confirm_avatar_happy_path() -> None:
     user.username_changed_at = None
 
     session = MagicMock()
-    session.commit = MagicMock(return_value=None)
 
     async def _get_user(*_a: Any, **_k: Any) -> MagicMock:
         return user
@@ -123,6 +140,11 @@ async def test_confirm_avatar_happy_path() -> None:
     async def _update(*_a: Any, **_k: Any) -> MagicMock:
         user.avatar_url = public_object_url(settings, key)
         return user
+
+    async def _commit() -> None:
+        return None
+
+    session.commit = _commit  # type: ignore[method-assign]
 
     with (
         patch(
@@ -158,13 +180,6 @@ async def test_confirm_avatar_happy_path() -> None:
             username_changed_at=None,
             username_rename_available_at=None,
         )
-        # session.commit is awaited in production — make it awaitable
-        session.commit = MagicMock()
-
-        async def _commit() -> None:
-            return None
-
-        session.commit = _commit  # type: ignore[method-assign]
 
         profile = await avatars_service.confirm_avatar_upload(
             session,
@@ -174,3 +189,31 @@ async def test_confirm_avatar_happy_path() -> None:
         )
 
     assert profile.avatar_url == public_object_url(settings, key)
+
+
+@pytest.mark.asyncio
+async def test_confirm_rejects_foreign_key() -> None:
+    settings = _settings()
+    identity_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    foreign_key = f'avatars/{uuid.uuid4()}/{uuid.uuid4()}.webp'
+
+    user = MagicMock()
+    user.id = user_id
+    user.username = 'ada'
+
+    async def _get_user(*_a: Any, **_k: Any) -> MagicMock:
+        return user
+
+    session = MagicMock()
+    with patch(
+        'app.users.avatars.users_repository.get_user_by_identity_id',
+        side_effect=_get_user,
+    ):
+        with pytest.raises(avatars_service.AvatarValidationError):
+            await avatars_service.confirm_avatar_upload(
+                session,
+                settings,
+                identity_id=identity_id,
+                key=foreign_key,
+            )

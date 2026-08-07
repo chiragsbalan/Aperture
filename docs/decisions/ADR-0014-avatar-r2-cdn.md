@@ -21,7 +21,8 @@ Profiles already store optional `users.avatar_url`, but upload/CDN was deferred.
 | API | `POST /users/me/avatar/upload-url`, `POST /users/me/avatar/confirm`, `DELETE /users/me/avatar` |
 | DB | Continue storing the final CDN URL in `users.avatar_url` |
 | Types / size | `image/jpeg` \| `image/png` \| `image/webp`, default max **2MB** (client resize + server HeadObject check) |
-| PATCH `/users/me` | When R2 is configured, `avatar_url` may only be cleared or set to our media base — not arbitrary third-party URLs |
+| PATCH `/users/me` | When R2 is configured, `avatar_url` may only be **cleared** (`null`). Setting a photo must use upload/confirm (prevents IDOR on public CDN keys). |
+| Object cache | Presigned PUT signs `Cache-Control: public, max-age=31536000, immutable` + exact `ContentLength` |
 
 Upload flow:
 
@@ -41,9 +42,10 @@ When R2 env vars are unset, upload endpoints return **503** (local/dev without C
 
 ## Consequences
 
-- Requires a Cloudflare account, R2 bucket, API token, bucket CORS, and (for production) a custom domain on the zone.
-- Frontend CSP must allow `img-src` for `NEXT_PUBLIC_MEDIA_HOST` and `connect-src` for `https://*.r2.cloudflarestorage.com`.
-- Orphan objects (uploaded but never confirmed) need a bucket lifecycle rule (e.g. abort incomplete / prefix TTL) — ops follow-up.
+- Requires a Cloudflare account, R2 bucket, API token, bucket CORS. Early prod may use `*.r2.dev`; later prefer a custom media hostname on the zone.
+- Frontend CSP must allow `img-src` for `NEXT_PUBLIC_MEDIA_HOST` (hostname regex-validated at build) and `connect-src` for `https://*.r2.cloudflarestorage.com`.
+- Render Blueprint (`render.yaml`) lists `R2_*` as `sync: false` dashboard secrets; Vercel needs `NEXT_PUBLIC_MEDIA_HOST` and a redeploy after changes.
+- **Prod should** set a bucket lifecycle / prefix TTL on `avatars/` for unconfirmed orphans (see ops doc §8).
 - Optional later: edge Image Resizing on the media hostname for `sm`/`lg` variants without storing multiple keys.
 
 ## Ops

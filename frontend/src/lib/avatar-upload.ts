@@ -13,6 +13,7 @@ export interface AvatarUploadSlot {
   expires_in: number;
   max_bytes: number;
   content_type: string;
+  cache_control: string;
 }
 
 export class AvatarUploadError extends Error {
@@ -100,10 +101,16 @@ export async function putAvatarToR2(
   uploadUrl: string,
   blob: Blob,
   contentType: string,
+  cacheControl: string,
 ): Promise<void> {
+  // Content-Length is a forbidden fetch header — the browser sets it from `blob`.
+  // It must still match the size signed into the presigned URL (upload-url byte_size).
   const res = await fetch(uploadUrl, {
     method: 'PUT',
-    headers: { 'Content-Type': contentType },
+    headers: {
+      'Content-Type': contentType,
+      'Cache-Control': cacheControl,
+    },
     body: blob,
   });
   if (!res.ok) {
@@ -138,7 +145,17 @@ export async function deleteAvatar(): Promise<OwnedProfile> {
 export async function uploadAvatarFile(file: File): Promise<OwnedProfile> {
   const { blob, contentType } = await prepareAvatarBlob(file);
   const slot = await requestAvatarUploadUrl(contentType, blob.size);
-  await putAvatarToR2(slot.upload_url, blob, contentType);
+  if (blob.size > slot.max_bytes) {
+    throw new AvatarUploadError(
+      `Image is too large after resize (max ${Math.floor(slot.max_bytes / (1024 * 1024))}MB).`,
+    );
+  }
+  await putAvatarToR2(
+    slot.upload_url,
+    blob,
+    contentType,
+    slot.cache_control,
+  );
   return confirmAvatarUpload(slot.key);
 }
 

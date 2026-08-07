@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import re
 import uuid
 from contextlib import suppress
 from dataclasses import dataclass
@@ -12,6 +14,8 @@ from app.core import r2 as r2_store
 from app.core.config import Settings
 from app.users import repository as users_repository
 from app.users.service import OwnedProfile, ProfileNotFoundError, get_owned_profile
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_AVATAR_CONTENT_TYPES: frozenset[str] = frozenset(
     {
@@ -27,6 +31,15 @@ _EXT_BY_TYPE: dict[str, str] = {
     'image/webp': 'webp',
 }
 
+# avatars/{uuid}/{uuid}.jpg|png|webp
+_AVATAR_KEY_RE = re.compile(
+    r'^avatars/'
+    r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/'
+    r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+    r'\.(jpg|png|webp)$',
+    re.IGNORECASE,
+)
+
 
 class AvatarStorageUnavailableError(Exception):
     """R2 is not configured in this environment."""
@@ -40,6 +53,10 @@ class AvatarObjectMissingError(Exception):
     """Expected R2 object is missing at confirm time."""
 
 
+class AvatarStorageError(Exception):
+    """R2 operation failed for a non-missing reason."""
+
+
 @dataclass(frozen=True, slots=True)
 class AvatarUploadSlot:
     """Presigned upload grant for the browser."""
@@ -50,6 +67,7 @@ class AvatarUploadSlot:
     expires_in: int
     max_bytes: int
     content_type: str
+    cache_control: str
 
 
 def _require_r2(settings: Settings) -> None:
@@ -98,6 +116,7 @@ def create_upload_slot(
         settings,
         key=key,
         content_type=ctype,
+        content_length=byte_size,
         expires_in=expires_in,
     )
     return AvatarUploadSlot(
@@ -107,16 +126,39 @@ def create_upload_slot(
         expires_in=expires_in,
         max_bytes=settings.avatar_max_bytes,
         content_type=ctype,
+        cache_control=r2_store.AVATAR_CACHE_CONTROL,
     )
 
 
 def _assert_key_owned_by_user(key: str, user_id: uuid.UUID) -> None:
     prefix = f'avatars/{user_id}/'
-    if not key.startswith(prefix) or key.count('/') != 2:
+    if not key.startswith(prefix) or not _AVATAR_KEY_RE.match(key):
         raise AvatarValidationError('invalid avatar key')
-    rest = key[len(prefix) :]
-    if not rest or '/' in rest or rest.startswith('.'):
+    # Ensure the path user_id segment matches the caller (regex alone allows any UUID).
+    rest = key[len('avatars/') :]
+    owner_segment = rest.split('/', 1)[0]
+    try:
+        owner_id = uuid.UUID(owner_segment)
+    except ValueError as exc:
+        raise AvatarValidationError('invalid avatar key') from exc
+    if owner_id != user_id:
         raise AvatarValidationError('invalid avatar key')
+
+
+def _owned_key_from_public_url(
+    settings: Settings,
+    url: str,
+    user_id: uuid.UUID,
+) -> str | None:
+    """Return key only when URL is ours and owned by ``user_id``."""
+    key = r2_store.key_from_public_url(settings, url)
+    if key is None:
+        return None
+    try:
+        _assert_key_owned_by_user(key, user_id)
+    except AvatarValidationError:
+        return None
+    return key
 
 
 async def confirm_avatar_upload(
@@ -128,20 +170,19 @@ async def confirm_avatar_upload(
 ) -> OwnedProfile:
     """Verify the object exists in R2 and set ``users.avatar_url``."""
     _require_r2(settings)
-    user = await users_repository.get_user_by_identity_id(
-        session,
-        identity_id,
-        for_update=True,
-    )
-    if user is None or user.username is None:
-        raise ProfileNotFoundError('profile not found')
 
-    _assert_key_owned_by_user(key, user.id)
+    # Resolve user id without holding a row lock across the R2 round-trip.
+    user_peek = await users_repository.get_user_by_identity_id(session, identity_id)
+    if user_peek is None or user_peek.username is None:
+        raise ProfileNotFoundError('profile not found')
+    _assert_key_owned_by_user(key, user_peek.id)
 
     try:
         head = await r2_store.head_object(settings, key)
-    except r2_store.R2ObjectError as exc:
+    except r2_store.R2ObjectMissingError as exc:
         raise AvatarObjectMissingError('uploaded object not found') from exc
+    except r2_store.R2ObjectError as exc:
+        raise AvatarStorageError('avatar storage temporarily unavailable') from exc
 
     ctype = (head.content_type or '').split(';')[0].strip().lower()
     if ctype not in ALLOWED_AVATAR_CONTENT_TYPES:
@@ -150,12 +191,25 @@ async def confirm_avatar_upload(
         raise AvatarValidationError('uploaded object has invalid content type')
 
     length = head.content_length or 0
-    if length < 1 or length > settings.avatar_max_bytes:
+    if length < 1:
+        with suppress(Exception):
+            await r2_store.delete_object(settings, key)
+        raise AvatarValidationError('uploaded object is empty')
+    if length > settings.avatar_max_bytes:
         with suppress(Exception):
             await r2_store.delete_object(settings, key)
         raise AvatarValidationError('uploaded object exceeds size limit')
 
     public_url = r2_store.public_object_url(settings, key)
+
+    user = await users_repository.get_user_by_identity_id(
+        session,
+        identity_id,
+        for_update=True,
+    )
+    if user is None or user.username is None:
+        raise ProfileNotFoundError('profile not found')
+
     previous = user.avatar_url
     await users_repository.update_user_profile(
         session,
@@ -165,10 +219,15 @@ async def confirm_avatar_upload(
     await session.commit()
 
     if previous and previous != public_url:
-        old_key = r2_store.key_from_public_url(settings, previous)
+        old_key = _owned_key_from_public_url(settings, previous, user.id)
         if old_key is not None:
-            with suppress(Exception):
+            try:
                 await r2_store.delete_object(settings, old_key)
+            except Exception:
+                logger.warning(
+                    'failed to delete previous avatar object key=%s',
+                    old_key,
+                )
 
     return await get_owned_profile(session, identity_id=identity_id)
 
@@ -189,6 +248,7 @@ async def delete_avatar(
         raise ProfileNotFoundError('profile not found')
 
     previous = user.avatar_url
+    user_id = user.id
     await users_repository.update_user_profile(
         session,
         user,
@@ -197,9 +257,11 @@ async def delete_avatar(
     await session.commit()
 
     if previous and r2_store.r2_configured(settings):
-        old_key = r2_store.key_from_public_url(settings, previous)
+        old_key = _owned_key_from_public_url(settings, previous, user_id)
         if old_key is not None:
-            with suppress(Exception):
+            try:
                 await r2_store.delete_object(settings, old_key)
+            except Exception:
+                logger.warning('failed to delete avatar object key=%s', old_key)
 
     return await get_owned_profile(session, identity_id=identity_id)

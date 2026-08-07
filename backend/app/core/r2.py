@@ -27,7 +27,11 @@ class R2NotConfiguredError(RuntimeError):
 
 
 class R2ObjectError(RuntimeError):
-    """Object missing or failed an R2 operation."""
+    """Failed an R2 operation (non-missing)."""
+
+
+class R2ObjectMissingError(R2ObjectError):
+    """HeadObject reported the key does not exist."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,9 +72,13 @@ def key_from_public_url(settings: Settings, url: str) -> str | None:
 
 
 def is_our_public_avatar_url(settings: Settings, url: str) -> bool:
-    """Whether ``url`` is an HTTPS object under the configured media base."""
+    """Whether ``url`` is an HTTPS object under the configured media base.
+
+    Does **not** assert caller ownership of ``avatars/{user_id}/…`` — callers that
+    mutate ``avatar_url`` must enforce that separately (prefer upload/confirm).
+    """
     key = key_from_public_url(settings, url)
-    if key is None:
+    if key is None or not key.startswith('avatars/'):
         return False
     parsed = urlparse(url)
     return parsed.scheme == 'https' and bool(parsed.netloc)
@@ -108,14 +116,23 @@ def get_s3_client(settings: Settings | None = None) -> S3Client:
     )
 
 
+# Immutable UUID avatar keys — long CDN cache is safe.
+AVATAR_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+
+
 def generate_presigned_put_url(
     settings: Settings,
     *,
     key: str,
     content_type: str,
+    content_length: int,
     expires_in: int,
 ) -> str:
-    """Mint a time-limited PUT URL on the R2 S3 API hostname."""
+    """Mint a time-limited PUT URL on the R2 S3 API hostname.
+
+    Signs ``ContentType``, ``ContentLength``, and ``CacheControl`` so the browser
+    PUT must match (size cannot exceed the declared upload-slot byte_size).
+    """
     client = get_s3_client(settings)
     url: str = client.generate_presigned_url(
         'put_object',
@@ -123,6 +140,8 @@ def generate_presigned_put_url(
             'Bucket': settings.r2_bucket.strip(),
             'Key': key,
             'ContentType': content_type,
+            'ContentLength': content_length,
+            'CacheControl': AVATAR_CACHE_CONTROL,
         },
         ExpiresIn=expires_in,
     )
@@ -137,7 +156,18 @@ def _head_object_sync(settings: Settings, key: str) -> R2ObjectHead:
             Key=key,
         )
     except ClientError as exc:
-        raise R2ObjectError(f'object not found: {key}') from exc
+        code = ''
+        response_meta = exc.response if isinstance(exc.response, dict) else {}
+        err = response_meta.get('Error')
+        if isinstance(err, dict):
+            raw_code = err.get('Code')
+            if isinstance(raw_code, str):
+                code = raw_code
+        http_status = response_meta.get('ResponseMetadata', {}).get('HTTPStatusCode')
+        if code in {'404', 'NoSuchKey', 'NotFound'} or http_status == 404:
+            raise R2ObjectMissingError(f'object not found: {key}') from exc
+        detail = code or http_status
+        raise R2ObjectError(f'head_object failed: {key} ({detail})') from exc
     length_raw = response.get('ContentLength')
     length = int(length_raw) if isinstance(length_raw, int) else None
     ctype = response.get('ContentType')

@@ -53,7 +53,7 @@ Bucket → **Settings** → **CORS policy**:
       "https://YOUR_PRODUCTION_DOMAIN"
     ],
     "AllowedMethods": ["PUT", "HEAD"],
-    "AllowedHeaders": ["Content-Type"],
+    "AllowedHeaders": ["Content-Type", "Cache-Control", "Content-Length"],
     "ExposeHeaders": ["ETag"],
     "MaxAgeSeconds": 3600
   }
@@ -61,6 +61,7 @@ Bucket → **Settings** → **CORS policy**:
 ```
 
 Presigned uploads hit `https://{ACCOUNT_ID}.r2.cloudflarestorage.com`, not the custom domain.
+The browser PUT must send the signed `Content-Type`, `Content-Length`, and `Cache-Control` headers.
 
 ## 6. App environment
 

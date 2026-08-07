@@ -219,6 +219,7 @@ class AvatarUploadUrlResponse(BaseModel):
     expires_in: int
     max_bytes: int
     content_type: str
+    cache_control: str
 
 
 class AvatarConfirmRequest(BaseModel):

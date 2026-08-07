@@ -44,3 +44,15 @@ services:
       # Upstash Redis TCP URL (rediss://…). Required for multi-instance cache/rate limits.
       - key: REDIS_URL
         sync: false
+      # Cloudflare R2 avatars (ADR-0014). Set in the Render dashboard; see
+      # docs/ops/cloudflare-r2-avatars.md. Empty → avatar upload endpoints 503.
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_PUBLIC_BASE_URL
+        sync: false
