@@ -43,6 +43,8 @@ Aperture stores profile photos in **Cloudflare R2** and serves them from a **cus
 
 ## 5. Bucket CORS (required for browser PUT)
 
+**Required.** Without this, the Settings upload fails in the browser with a generic network error (`CORS not configured for this bucket` on the OPTIONS preflight). Server-side / `curl` PUTs still work, which is misleading.
+
 Bucket → **Settings** → **CORS policy**:
 
 ```json
@@ -50,7 +52,7 @@ Bucket → **Settings** → **CORS policy**:
   {
     "AllowedOrigins": [
       "http://localhost:3000",
-      "https://YOUR_PRODUCTION_DOMAIN"
+      "https://aperture-sepia.vercel.app"
     ],
     "AllowedMethods": ["PUT", "HEAD"],
     "AllowedHeaders": ["Content-Type", "Cache-Control", "Content-Length"],
@@ -62,6 +64,16 @@ Bucket → **Settings** → **CORS policy**:
 
 Presigned uploads hit `https://{ACCOUNT_ID}.r2.cloudflarestorage.com`, not the custom domain.
 The browser PUT must send the signed `Content-Type`, `Content-Length`, and `Cache-Control` headers.
+
+Quick check (expect `Access-Control-Allow-Origin`, not `CORS not configured`):
+
+```bash
+curl -i -X OPTIONS \
+  "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com/$R2_BUCKET/" \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: PUT" \
+  -H "Access-Control-Request-Headers: content-type,cache-control,content-length"
+```
 
 ## 6. App environment
 

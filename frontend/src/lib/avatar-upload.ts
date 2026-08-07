@@ -112,14 +112,22 @@ export async function putAvatarToR2(
 ): Promise<void> {
   // Content-Length is a forbidden fetch header — the browser sets it from `blob`.
   // It must still match the size signed into the presigned URL (upload-url byte_size).
-  const res = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': contentType,
-      'Cache-Control': cacheControl,
-    },
-    body: blob,
-  });
+  let res: Response;
+  try {
+    res = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': cacheControl,
+      },
+      body: blob,
+    });
+  } catch {
+    // Browsers surface CORS / network blocks as TypeError ("Failed to fetch").
+    throw new AvatarUploadError(
+      'Could not reach avatar storage. Check R2 bucket CORS for this origin (AllowedOrigins + Content-Type, Cache-Control, Content-Length).',
+    );
+  }
   if (!res.ok) {
     throw new AvatarUploadError(
       `Upload to storage failed (HTTP ${res.status}).`,

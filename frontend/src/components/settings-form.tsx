@@ -177,7 +177,9 @@ export function SettingsForm() {
       const message =
         err instanceof AvatarUploadError
           ? err.message
-          : 'Could not upload photo.';
+          : err instanceof Error && err.message
+            ? err.message
+            : 'Could not upload photo.';
       setAvatarError(message);
     } finally {
       setAvatarPending(false);
