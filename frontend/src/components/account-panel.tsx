@@ -122,6 +122,7 @@ export function AccountPanel() {
           <ProfileAvatar
             username={username}
             displayName={me.user?.display_name}
+            avatarUrl={me.user?.avatar_url}
           />
           <div>
             <p className="type-card-title text-foreground">

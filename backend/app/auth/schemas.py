@@ -75,6 +75,7 @@ class UserSummary(BaseModel):
     id: uuid.UUID
     username: str | None
     display_name: str | None
+    avatar_url: str | None = None
 
 
 class MeResponse(BaseModel):

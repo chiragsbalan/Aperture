@@ -8,6 +8,14 @@ const isProd = process.env.NODE_ENV === 'production';
 const rawMediaHost = (process.env.NEXT_PUBLIC_MEDIA_HOST ?? '').trim();
 const mediaHost = /^[a-z0-9.-]+$/i.test(rawMediaHost) ? rawMediaHost : '';
 
+// Cloudflare account id for presigned PUTs (S3 API host). Prefer this over a
+// wildcard connect-src. Set NEXT_PUBLIC_R2_ACCOUNT_ID (same value as R2_ACCOUNT_ID).
+const rawR2AccountId = (process.env.NEXT_PUBLIC_R2_ACCOUNT_ID ?? '').trim();
+const r2AccountId = /^[a-f0-9]{32}$/i.test(rawR2AccountId) ? rawR2AccountId : '';
+const r2ConnectSrc = r2AccountId
+  ? `https://${r2AccountId}.r2.cloudflarestorage.com`
+  : '';
+
 const imgSrc = [
   "'self'",
   'data:',
@@ -18,6 +26,10 @@ const imgSrc = [
   ...(mediaHost ? [`https://${mediaHost}`] : []),
 ].join(' ');
 
+const connectSrc = ["'self'", ...(r2ConnectSrc ? [r2ConnectSrc] : [])].join(
+  ' ',
+);
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   // next/font and Next.js runtime need these in practice for the shell.
@@ -26,7 +38,7 @@ const contentSecurityPolicy = [
   `img-src ${imgSrc}`,
   "font-src 'self' data:",
   // Browser PUTs go to the R2 S3 API host (presigned); not the custom domain.
-  "connect-src 'self' https://*.r2.cloudflarestorage.com",
+  `connect-src ${connectSrc}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

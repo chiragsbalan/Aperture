@@ -180,9 +180,55 @@ def _delete_object_sync(settings: Settings, key: str) -> None:
     client.delete_object(Bucket=settings.r2_bucket.strip(), Key=key)
 
 
+def _get_object_prefix_sync(settings: Settings, key: str, *, max_bytes: int) -> bytes:
+    client = get_s3_client(settings)
+    end = max(0, max_bytes - 1)
+    try:
+        response = client.get_object(
+            Bucket=settings.r2_bucket.strip(),
+            Key=key,
+            Range=f'bytes=0-{end}',
+        )
+    except ClientError as exc:
+        code = ''
+        response_meta = exc.response if isinstance(exc.response, dict) else {}
+        err = response_meta.get('Error')
+        if isinstance(err, dict):
+            raw_code = err.get('Code')
+            if isinstance(raw_code, str):
+                code = raw_code
+        http_status = response_meta.get('ResponseMetadata', {}).get(
+            'HTTPStatusCode',
+        )
+        if code in {'404', 'NoSuchKey', 'NotFound', 'InvalidRange'} or http_status in {
+            404,
+            416,
+        }:
+            raise R2ObjectMissingError(f'object not found: {key}') from exc
+        detail = code or http_status
+        raise R2ObjectError(f'get_object failed: {key} ({detail})') from exc
+    body = response['Body'].read(max_bytes)
+    return bytes(body)
+
+
 async def head_object(settings: Settings, key: str) -> R2ObjectHead:
     """HeadObject in a worker thread (boto3 is sync)."""
     return await asyncio.to_thread(_head_object_sync, settings, key)
+
+
+async def get_object_prefix(
+    settings: Settings,
+    key: str,
+    *,
+    max_bytes: int = 32,
+) -> bytes:
+    """Read the first ``max_bytes`` of an object (for magic-byte sniffing)."""
+    return await asyncio.to_thread(
+        _get_object_prefix_sync,
+        settings,
+        key,
+        max_bytes=max_bytes,
+    )
 
 
 async def delete_object(settings: Settings, key: str) -> None:

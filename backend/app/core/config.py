@@ -108,6 +108,9 @@ class Settings(BaseSettings):
     r2_public_base_url: str = ''
     r2_upload_url_ttl_seconds: int = Field(default=120, ge=30, le=900)
     avatar_max_bytes: int = Field(default=2 * 1024 * 1024, ge=1024, le=10 * 1024 * 1024)
+    # Per-identity cap for avatar upload-url / confirm / delete (shared bucket).
+    avatar_rate_limit_window_seconds: int = Field(default=60, ge=10, le=3600)
+    avatar_rate_limit_max_writes: int = Field(default=20, ge=1, le=120)
 
     # Redis (P2.4). Empty = in-memory CacheBackend (tests / local without Redis).
     redis_url: str = ''

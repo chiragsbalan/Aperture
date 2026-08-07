@@ -203,6 +203,7 @@ async def me_endpoint(
             id=context.user.id,
             username=context.user.username,
             display_name=context.user.display_name,
+            avatar_url=context.user.avatar_url,
         )
     return MeResponse(
         identity_id=context.identity.id,

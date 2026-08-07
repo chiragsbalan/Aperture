@@ -96,6 +96,19 @@ def test_create_upload_slot_requires_r2() -> None:
         )
 
 
+def test_sniff_image_content_type() -> None:
+    assert avatars_service.sniff_image_content_type(b'\xff\xd8\xff\xe0') == 'image/jpeg'
+    assert (
+        avatars_service.sniff_image_content_type(b'\x89PNG\r\n\x1a\nxxxx')
+        == 'image/png'
+    )
+    assert (
+        avatars_service.sniff_image_content_type(b'RIFF\x00\x00\x00\x00WEBP....')
+        == 'image/webp'
+    )
+    assert avatars_service.sniff_image_content_type(b'GIF89a') is None
+
+
 def test_assert_key_owned_by_user() -> None:
     user_id = uuid.uuid4()
     key = f'avatars/{user_id}/{uuid.uuid4()}.webp'
@@ -161,6 +174,10 @@ async def test_confirm_avatar_happy_path() -> None:
                 content_type='image/webp',
                 content_length=2048,
             ),
+        ),
+        patch(
+            'app.users.avatars.r2_store.get_object_prefix',
+            return_value=b'RIFF\x00\x00\x00\x00WEBP....',
         ),
         patch(
             'app.users.avatars.get_owned_profile',

@@ -23,6 +23,9 @@ Profiles already store optional `users.avatar_url`, but upload/CDN was deferred.
 | Types / size | `image/jpeg` \| `image/png` \| `image/webp`, default max **2MB** (client resize + server HeadObject check) |
 | PATCH `/users/me` | When R2 is configured, `avatar_url` may only be **cleared** (`null`). Setting a photo must use upload/confirm (prevents IDOR on public CDN keys). |
 | Object cache | Presigned PUT signs `Cache-Control: public, max-age=31536000, immutable` + exact `ContentLength` |
+| Confirm | HeadObject + **magic-byte sniff** (JPEG/PNG/WebP); reject Content-Type spoofing |
+| Abuse | Per-identity rate limit on upload-url / confirm / delete (`AVATAR_RATE_LIMIT_*`) |
+| CSP | `img-src` media host; `connect-src` only `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com` |
 
 Upload flow:
 

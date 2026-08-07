@@ -31,6 +31,9 @@ _EXT_BY_TYPE: dict[str, str] = {
     'image/webp': 'webp',
 }
 
+_JPEG_MAGIC = b'\xff\xd8\xff'
+_PNG_MAGIC = b'\x89PNG\r\n\x1a\n'
+
 # avatars/{uuid}/{uuid}.jpg|png|webp
 _AVATAR_KEY_RE = re.compile(
     r'^avatars/'
@@ -130,6 +133,18 @@ def create_upload_slot(
     )
 
 
+def sniff_image_content_type(prefix: bytes) -> str | None:
+    """Return an allowed image content type from magic bytes, or None."""
+    if prefix.startswith(_JPEG_MAGIC):
+        return 'image/jpeg'
+    if prefix.startswith(_PNG_MAGIC):
+        return 'image/png'
+    # RIFF....WEBP
+    if len(prefix) >= 12 and prefix.startswith(b'RIFF') and prefix[8:12] == b'WEBP':
+        return 'image/webp'
+    return None
+
+
 def _assert_key_owned_by_user(key: str, user_id: uuid.UUID) -> None:
     prefix = f'avatars/{user_id}/'
     if not key.startswith(prefix) or not _AVATAR_KEY_RE.match(key):
@@ -184,8 +199,8 @@ async def confirm_avatar_upload(
     except r2_store.R2ObjectError as exc:
         raise AvatarStorageError('avatar storage temporarily unavailable') from exc
 
-    ctype = (head.content_type or '').split(';')[0].strip().lower()
-    if ctype not in ALLOWED_AVATAR_CONTENT_TYPES:
+    declared = (head.content_type or '').split(';')[0].strip().lower()
+    if declared not in ALLOWED_AVATAR_CONTENT_TYPES:
         with suppress(Exception):
             await r2_store.delete_object(settings, key)
         raise AvatarValidationError('uploaded object has invalid content type')
@@ -199,6 +214,21 @@ async def confirm_avatar_upload(
         with suppress(Exception):
             await r2_store.delete_object(settings, key)
         raise AvatarValidationError('uploaded object exceeds size limit')
+
+    try:
+        prefix = await r2_store.get_object_prefix(settings, key, max_bytes=16)
+    except r2_store.R2ObjectMissingError as exc:
+        raise AvatarObjectMissingError('uploaded object not found') from exc
+    except r2_store.R2ObjectError as exc:
+        raise AvatarStorageError('avatar storage temporarily unavailable') from exc
+
+    sniffed = sniff_image_content_type(prefix)
+    if sniffed is None or sniffed != declared:
+        with suppress(Exception):
+            await r2_store.delete_object(settings, key)
+        raise AvatarValidationError(
+            'uploaded object is not a valid JPEG, PNG, or WebP image',
+        )
 
     public_url = r2_store.public_object_url(settings, key)
 

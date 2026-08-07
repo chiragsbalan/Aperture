@@ -36,7 +36,7 @@ const MAX_LINKS = 3;
 
 export function SettingsForm() {
   const router = useRouter();
-  const { clearAuth } = useAuth();
+  const { clearAuth, refreshAuth } = useAuth();
   const usernameId = useId();
   const usernameHintId = useId();
   const displayNameId = useId();
@@ -171,6 +171,7 @@ export function SettingsForm() {
     try {
       const updated = await uploadAvatarFile(file);
       applyProfile(updated);
+      await refreshAuth();
       setSuccess('Profile photo updated.');
     } catch (err) {
       const message =
@@ -193,6 +194,7 @@ export function SettingsForm() {
     try {
       const updated = await deleteAvatar();
       applyProfile(updated);
+      await refreshAuth();
       setSuccess('Profile photo removed.');
     } catch (err) {
       const message =

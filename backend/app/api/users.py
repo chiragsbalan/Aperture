@@ -20,7 +20,10 @@ from app.lists.schemas import (
 )
 from app.users import avatars as avatars_service
 from app.users import service as users_service
-from app.users.rate_limit import enforce_users_public_rate_limit
+from app.users.rate_limit import (
+    enforce_avatar_write_rate_limit,
+    enforce_users_public_rate_limit,
+)
 from app.users.schemas import (
     AvatarConfirmRequest,
     AvatarUploadUrlRequest,
@@ -121,6 +124,11 @@ async def create_avatar_upload_url(
     settings: SettingsDep,
 ) -> AvatarUploadUrlResponse:
     """Mint a short-lived R2 presigned PUT URL for the caller's avatar."""
+    await enforce_avatar_write_rate_limit(
+        get_cache(),
+        settings=settings,
+        identity_id=identity.id,
+    )
     try:
         owned = await users_service.get_owned_profile(
             session,
@@ -166,6 +174,11 @@ async def confirm_avatar_upload(
     settings: SettingsDep,
 ) -> ProfileResponse:
     """After a successful R2 PUT, attach the object as the profile avatar."""
+    await enforce_avatar_write_rate_limit(
+        get_cache(),
+        settings=settings,
+        identity_id=identity.id,
+    )
     try:
         profile = await avatars_service.confirm_avatar_upload(
             session,
@@ -208,6 +221,11 @@ async def delete_avatar(
     settings: SettingsDep,
 ) -> ProfileResponse:
     """Remove the profile avatar (DB + R2 object when first-party)."""
+    await enforce_avatar_write_rate_limit(
+        get_cache(),
+        settings=settings,
+        identity_id=identity.id,
+    )
     try:
         profile = await avatars_service.delete_avatar(
             session,

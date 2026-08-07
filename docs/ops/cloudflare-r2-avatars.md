@@ -82,6 +82,8 @@ R2_PUBLIC_BASE_URL=https://media.yourdomain.com
 
 ```bash
 NEXT_PUBLIC_MEDIA_HOST=media.yourdomain.com
+# Same value as R2_ACCOUNT_ID — CSP connect-src for presigned PUTs:
+NEXT_PUBLIC_R2_ACCOUNT_ID=
 ```
 
 Restart the API and rebuild/redeploy the frontend after changing `NEXT_PUBLIC_*` (baked into CSP at build time).
