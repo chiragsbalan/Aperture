@@ -186,8 +186,9 @@ export async function putAvatarToR2(
     });
   } catch {
     // CORS misconfig or CSP connect-src missing the R2 S3 host.
+    // Keep the UI message short; ops detail lives in docs/ops/cloudflare-r2-avatars.md.
     throw new AvatarUploadError(
-      'Could not reach avatar storage. On production, ensure NEXT_PUBLIC_R2_ACCOUNT_ID is set and redeployed (CSP), and R2 bucket CORS allows this origin.',
+      'Could not reach avatar storage. Try again, or check R2 CORS / CSP connect-src configuration.',
     );
   }
   if (!res.ok) {
