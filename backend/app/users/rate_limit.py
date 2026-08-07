@@ -1,11 +1,11 @@
-"""Public profile / diary read rate limits via CacheBackend.
+"""Users rate limits via CacheBackend (public reads + avatar writes).
 
 Uses atomic ``incr`` with a fixed window (TTL set only on first hit).
 When Redis ``incr`` fails, falls back to a process-local counter so limits
 are not silently disabled (per-instance only while Redis is down).
 
-Keys are ``users:rl:public:ip:{sha256(subject)}``. Missing/empty client IPs
-use the shared ``unknown`` subject so limits still apply.
+Public keys: ``users:rl:public:ip:{sha256(subject)}``.
+Avatar keys: ``users:rl:avatar:id:{sha256(identity_id)}``.
 
 Client IP should come from ``resolve_client_ip`` (trusted
 ``X-Aperture-Client-IP`` when the BFF secret matches).
@@ -14,6 +14,7 @@ Client IP should come from ``resolve_client_ip`` (trusted
 from __future__ import annotations
 
 import logging
+import uuid
 
 from fastapi import HTTPException, status
 
@@ -36,8 +37,17 @@ def _public_rl_key(client_ip: str | None) -> str:
     return f'users:rl:public:ip:{hash_rate_limit_subject(subject)}'
 
 
+def _avatar_rl_key(*, identity_id: uuid.UUID) -> str:
+    return f'users:rl:avatar:id:{hash_rate_limit_subject(str(identity_id))}'
+
+
 def reset_users_public_rate_limit_fallback() -> None:
     """Clear process-local public-profile RL fallback (tests)."""
+    run_coro_sync(_local_rl_fallback.clear())
+
+
+def reset_avatar_rate_limit_fallback() -> None:
+    """Clear process-local avatar RL fallback (tests)."""
     run_coro_sync(_local_rl_fallback.clear())
 
 
@@ -62,4 +72,28 @@ async def enforce_users_public_rate_limit(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail='Too many profile requests. Try again later.',
+        )
+
+
+async def enforce_avatar_write_rate_limit(
+    cache: CacheBackend,
+    *,
+    settings: Settings,
+    identity_id: uuid.UUID,
+) -> None:
+    """Raise 429 when an identity exceeds avatar upload/confirm/delete window."""
+    key = _avatar_rl_key(identity_id=identity_id)
+    window = settings.avatar_rate_limit_window_seconds
+    max_writes = settings.avatar_rate_limit_max_writes
+    try:
+        count = await cache.incr(key, ttl_seconds=window)
+    except CacheBackendError:
+        logger.warning(
+            'avatar rate limit falling back to process-local counter',
+        )
+        count = await _local_rl_fallback.incr(key, ttl_seconds=window)
+    if count > max_writes:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail='Too many avatar updates. Try again later.',
         )

@@ -172,6 +172,7 @@ async def google_endpoint(
             identity=identity,
             sub=body.sub,
             email=str(body.email),
+            picture=body.picture,
             user_agent=user_agent,
             client_ip=client_ip,
         )
@@ -184,6 +185,7 @@ async def google_endpoint(
         email=str(body.email),
         given_name=body.given_name,
         family_name=body.family_name,
+        picture=body.picture,
         user_agent=user_agent,
         client_ip=client_ip,
     )
@@ -203,6 +205,7 @@ async def me_endpoint(
             id=context.user.id,
             username=context.user.username,
             display_name=context.user.display_name,
+            avatar_url=context.user.avatar_url,
         )
     return MeResponse(
         identity_id=context.identity.id,

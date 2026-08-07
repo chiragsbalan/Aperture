@@ -47,6 +47,7 @@ export function SiteHeader() {
           <AccountMenu
             username={me?.user?.username?.trim() || null}
             displayName={me?.user?.display_name ?? null}
+            avatarUrl={me?.user?.avatar_url ?? null}
           />
         ) : null}
       </nav>

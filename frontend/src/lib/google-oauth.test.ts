@@ -59,6 +59,7 @@ describe('google-oauth helpers', () => {
     expect(profile.sub).toContain('mock-google-sub-');
     expect(profile.email).toContain('@example.com');
     expect(profile.given_name).toBe('Mock');
+    expect(profile.picture).toBeNull();
   });
 
   it('exchangeCode uses mock when AUTH_GOOGLE_MOCK=true', async () => {

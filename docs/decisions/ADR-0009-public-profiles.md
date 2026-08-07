@@ -36,7 +36,7 @@ P1.4 shipped a minimal public profile (`GET /users/{username}` → username / di
 - **pc.2** adds always-public **Watchlist** tab (`/u/{username}/watchlist`) and **Lists** tab (`/u/{username}/lists`). Favorites are never on the public profile (owner-only `/library/favorites`). Activity/Reviews remain stubs until later slices.
 - Standalone Movies / Shows collection pages (`/u/{username}/movies|shows`) derive unique titles from the **public** diary for every viewer. Followers/following counters show API zeros until pc.6; sheets stay empty (no demo fixtures).
 - Account menu: header opens `/u/{username}`; nav is Library + Settings only. Owner Library (`/library/*`) is private workspace only.
-- Owner “Edit profile” → `/settings` (avatar/website/links). Avatar **display** is initials-only until upload/CDN + CSP; URL field may remain for later.
+- Owner “Edit profile” → `/settings` (avatar/website/links). Avatar upload/CDN is **[ADR-0014](ADR-0014-avatar-r2-cdn.md)** (R2 + custom domain); until R2 is configured, upload returns 503 and UI stays initials-only.
 - Profile tab content may mount while the shell header is still loading so tab fetches overlap the profile GET.
 
 ## Alternatives considered
@@ -57,5 +57,5 @@ P1.4 shipped a minimal public profile (`GET /users/{username}` → username / di
 
 ## Future evolution
 
-- Avatar upload / CDN; location field; richer link types.
+- Location field; richer link types. (Avatar upload / CDN → [ADR-0014](ADR-0014-avatar-r2-cdn.md).)
 - Real followers/following APIs and counters (pc.6).

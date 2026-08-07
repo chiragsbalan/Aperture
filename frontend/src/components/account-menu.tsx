@@ -118,9 +118,11 @@ function ChevronGlyph() {
 export function AccountMenu({
   username,
   displayName,
+  avatarUrl = null,
 }: {
   username: string | null;
   displayName: string | null;
+  avatarUrl?: string | null;
 }) {
   const pathname = usePathname();
   const panelId = useId();
@@ -389,6 +391,7 @@ export function AccountMenu({
           <ProfileAvatar
             username={ownUsername}
             displayName={displayName}
+            avatarUrl={avatarUrl}
             size="sm"
           />
         ) : (
@@ -447,6 +450,7 @@ export function AccountMenu({
                         <ProfileAvatar
                           username={ownUsername}
                           displayName={displayName}
+                          avatarUrl={avatarUrl}
                           size="sm"
                         />
                         <div className="min-w-0 flex-1">

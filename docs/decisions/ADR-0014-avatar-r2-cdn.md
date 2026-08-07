@@ -1,0 +1,63 @@
+# ADR-0014 — Profile avatars via Cloudflare R2 + CDN
+
+- **Status:** Accepted
+- **Date:** 2026-08-07
+- **Related:** [ADR-0009](ADR-0009-public-profiles.md) (profile shell / deferred upload); [ADR-0003](ADR-0003-hosting-and-bff.md) (Vercel BFF + Render API); [ADR-0005](ADR-0005-auth.md) (session AuthZ)
+- **Supersedes (partial):** ADR-0009 “HTTPS URL string only” / initials-only display for avatars
+
+## Context
+
+Profiles already store optional `users.avatar_url`, but upload/CDN was deferred. Arbitrary external URLs are a CSP and abuse hazard. We need first-party object storage with edge delivery, without pushing large multipart bodies through Render Free or the Next.js BFF.
+
+## Decision
+
+**Cloudflare R2** for blob storage + **R2 custom domain** (Cloudflare CDN) for public reads.
+
+| Concern | Choice |
+|---|---|
+| Write path | Browser **presigned PUT** to `https://{account_id}.r2.cloudflarestorage.com` (S3 API). Custom domains do **not** support presigned URLs. |
+| Read path | Public HTTPS on `R2_PUBLIC_BASE_URL` / `NEXT_PUBLIC_MEDIA_HOST` (e.g. `https://media.example.com/avatars/...`) |
+| AuthZ | FastAPI mints upload slots and confirms via `HeadObject`; keys scoped `avatars/{user_id}/{uuid}.{ext}` |
+| API | `POST /users/me/avatar/upload-url`, `POST /users/me/avatar/confirm`, `DELETE /users/me/avatar` |
+| DB | Continue storing the final CDN URL in `users.avatar_url` |
+| Types / size | `image/jpeg` \| `image/png` \| `image/webp`, default max **2MB** (client resize + server HeadObject check) |
+| PATCH `/users/me` | When R2 is configured, `avatar_url` may only be **cleared** (`null`). Setting a photo must use upload/confirm (prevents IDOR on public CDN keys). |
+| Object cache | Presigned PUT signs `Cache-Control: public, max-age=31536000, immutable` + exact `ContentLength` |
+| Confirm | HeadObject + **magic-byte sniff** (JPEG/PNG/WebP); reject Content-Type spoofing |
+| Abuse | Per-identity rate limit on upload-url / confirm / delete (`AVATAR_RATE_LIMIT_*`) |
+| CSP | `img-src` media host; `connect-src` only `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com` |
+| Google sign-in | BFF forwards id_token `picture`; API **best-effort ingests** into R2 when `avatar_url` is empty (never overwrites; never fails login). Skipped when R2 unset. |
+
+Upload flow:
+
+1. Authenticated client requests an upload slot with `content_type` + `byte_size`.
+2. API returns `{ upload_url, public_url, key, expires_in }`.
+3. Client PUTs bytes directly to R2 (CORS on the bucket).
+4. Client calls confirm; API `HeadObject`s, validates type/size, sets `avatar_url`, deletes previous first-party object best-effort.
+
+When R2 env vars are unset, upload endpoints return **503** (local/dev without Cloudflare). Google `picture` import is skipped in that case (we do not store third-party Google URLs in `avatar_url` once first-party storage is the product path).
+
+Google avatar ingest (server-side):
+
+1. After successful Google sign-in / link (and on later logins if still empty), API fetches the allowlisted `*.googleusercontent.com` HTTPS URL.
+2. Magic-byte sniff + size check; `PutObject` to `avatars/{user_id}/{uuid}.{ext}`.
+3. Set `users.avatar_url` to the CDN URL. Existing avatars are left alone so Settings uploads win.
+
+## Alternatives considered
+
+1. **Proxy multipart through FastAPI / BFF** — simpler AuthZ, worse for Render cold starts and body limits; rejected for the happy path.
+2. **Vercel Blob** — fine for Next-only apps; API is Python on Render, and CDN would not be Cloudflare-native.
+3. **Cloudflare Images** — managed variants; heavier product surface for v1 avatars. Revisit if we need `/cdn-cgi/image` transforms at scale.
+4. **Keep arbitrary HTTPS avatar URLs** — rejected once first-party storage exists (CSP allowlist + open redirect/hotlink abuse).
+
+## Consequences
+
+- Requires a Cloudflare account, R2 bucket, API token, bucket CORS. Early prod may use `*.r2.dev`; later prefer a custom media hostname on the zone.
+- Frontend CSP must allow `img-src` for `NEXT_PUBLIC_MEDIA_HOST` (hostname regex-validated at build) and `connect-src` for `https://*.r2.cloudflarestorage.com`.
+- Render Blueprint (`render.yaml`) lists `R2_*` as `sync: false` dashboard secrets; Vercel needs `NEXT_PUBLIC_MEDIA_HOST` and a redeploy after changes.
+- **Prod should** set a bucket lifecycle / prefix TTL on `avatars/` for unconfirmed orphans (see ops doc §8).
+- Optional later: edge Image Resizing on the media hostname for `sm`/`lg` variants without storing multiple keys.
+
+## Ops
+
+See [docs/ops/cloudflare-r2-avatars.md](../ops/cloudflare-r2-avatars.md).

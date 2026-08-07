@@ -55,6 +55,7 @@ class UserProfile:
     id: uuid.UUID
     username: str | None
     display_name: str | None
+    avatar_url: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,6 +186,7 @@ async def create_profile_for_identity(
         id=user.id,
         username=user.username,
         display_name=user.display_name,
+        avatar_url=user.avatar_url,
     )
 
 
@@ -209,6 +211,7 @@ async def create_profile_for_google(
         id=user.id,
         username=user.username,
         display_name=user.display_name,
+        avatar_url=user.avatar_url,
     )
 
 
@@ -225,6 +228,7 @@ async def get_profile_for_identity(
         id=user.id,
         username=user.username,
         display_name=user.display_name,
+        avatar_url=user.avatar_url,
     )
 
 

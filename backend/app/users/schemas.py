@@ -201,3 +201,28 @@ def normalize_links(raw: Any) -> list[ProfileLink]:
         except ValueError:
             continue
     return links
+
+
+class AvatarUploadUrlRequest(BaseModel):
+    """Request a short-lived R2 presigned PUT for an avatar."""
+
+    content_type: str = Field(..., min_length=8, max_length=64)
+    byte_size: int = Field(..., ge=1)
+
+
+class AvatarUploadUrlResponse(BaseModel):
+    """Presigned upload grant + final CDN URL after confirm."""
+
+    upload_url: str
+    public_url: str
+    key: str
+    expires_in: int
+    max_bytes: int
+    content_type: str
+    cache_control: str
+
+
+class AvatarConfirmRequest(BaseModel):
+    """Confirm a completed R2 PUT and attach it to the profile."""
+
+    key: str = Field(..., min_length=8, max_length=256)
