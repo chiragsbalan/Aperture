@@ -43,6 +43,8 @@ Aperture stores profile photos in **Cloudflare R2** and serves them from a **cus
 
 ## 5. Bucket CORS (required for browser PUT)
 
+**Required.** Without this, the Settings upload fails in the browser with a generic network error (`CORS not configured for this bucket` on the OPTIONS preflight). Server-side / `curl` PUTs still work, which is misleading.
+
 Bucket → **Settings** → **CORS policy**:
 
 ```json
@@ -50,7 +52,7 @@ Bucket → **Settings** → **CORS policy**:
   {
     "AllowedOrigins": [
       "http://localhost:3000",
-      "https://YOUR_PRODUCTION_DOMAIN"
+      "https://aperture-sepia.vercel.app"
     ],
     "AllowedMethods": ["PUT", "HEAD"],
     "AllowedHeaders": ["Content-Type", "Cache-Control", "Content-Length"],
@@ -62,6 +64,16 @@ Bucket → **Settings** → **CORS policy**:
 
 Presigned uploads hit `https://{ACCOUNT_ID}.r2.cloudflarestorage.com`, not the custom domain.
 The browser PUT must send the signed `Content-Type`, `Content-Length`, and `Cache-Control` headers.
+
+Quick check (expect `Access-Control-Allow-Origin`, not `CORS not configured`):
+
+```bash
+curl -i -X OPTIONS \
+  "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com/$R2_BUCKET/" \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: PUT" \
+  -H "Access-Control-Request-Headers: content-type,cache-control,content-length"
+```
 
 ## 6. App environment
 
@@ -86,7 +98,11 @@ NEXT_PUBLIC_MEDIA_HOST=media.yourdomain.com
 NEXT_PUBLIC_R2_ACCOUNT_ID=
 ```
 
-Restart the API and rebuild/redeploy the frontend after changing `NEXT_PUBLIC_*` (baked into CSP at build time).
+Restart the API and **redeploy** the frontend after changing `NEXT_PUBLIC_*` (baked into CSP at build time).
+
+**Prod check:** open `/settings` → response headers → `Content-Security-Policy`.  
+`connect-src` **must** include `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com`.  
+If it is only `'self'`, phone/desktop uploads fail even when CORS is correct — set `NEXT_PUBLIC_R2_ACCOUNT_ID` on Vercel (same value as `R2_ACCOUNT_ID`) and redeploy.
 
 ## 7. Verify
 

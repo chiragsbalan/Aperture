@@ -2,7 +2,7 @@
 
 import { apiErrorMessage, type OwnedProfile } from '@/lib/profile';
 
-const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_OUTPUT_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_EDGE_PX = 1024;
 
@@ -23,19 +23,79 @@ export class AvatarUploadError extends Error {
   }
 }
 
+type InputKind = 'jpeg' | 'png' | 'webp' | 'convert' | 'reject';
+
+function extensionOf(name: string): string {
+  const i = name.lastIndexOf('.');
+  return i >= 0 ? name.slice(i + 1).toLowerCase() : '';
+}
+
+/** Classify a picked file for mobile (empty MIME / HEIC) and desktop uploads. */
+export function classifyAvatarInput(file: File): InputKind {
+  const type = (file.type || '').toLowerCase();
+  if (type === 'image/jpeg' || type === 'image/jpg') {
+    return 'jpeg';
+  }
+  if (type === 'image/png') {
+    return 'png';
+  }
+  if (type === 'image/webp') {
+    return 'webp';
+  }
+  if (
+    type === 'image/heic' ||
+    type === 'image/heif' ||
+    type === 'image/heic-sequence' ||
+    type === 'image/heif-sequence'
+  ) {
+    return 'convert';
+  }
+
+  const ext = extensionOf(file.name);
+  if (ext === 'jpg' || ext === 'jpeg') {
+    return 'jpeg';
+  }
+  if (ext === 'png') {
+    return 'png';
+  }
+  if (ext === 'webp') {
+    return 'webp';
+  }
+  if (ext === 'heic' || ext === 'heif') {
+    return 'convert';
+  }
+
+  // iOS camera / Photos often omit MIME type; try decode → JPEG.
+  if (!type) {
+    return 'convert';
+  }
+  return 'reject';
+}
+
 /** Downscale large images client-side before upload (keeps JPEG for photo inputs). */
 export async function prepareAvatarBlob(file: File): Promise<{
   blob: Blob;
   contentType: string;
 }> {
-  if (!ALLOWED_TYPES.has(file.type)) {
+  const kind = classifyAvatarInput(file);
+  if (kind === 'reject') {
     throw new AvatarUploadError('Use a JPEG, PNG, or WebP image.');
   }
   if (file.size > MAX_BYTES * 4) {
     throw new AvatarUploadError('Image is too large.');
   }
 
-  const bitmap = await createImageBitmap(file);
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new AvatarUploadError(
+      kind === 'convert'
+        ? 'Could not read this photo. On iPhone, try “Most Compatible” in Settings → Camera, or export as JPEG.'
+        : 'Could not read this image.',
+    );
+  }
+
   try {
     const scale = Math.min(
       1,
@@ -52,10 +112,12 @@ export async function prepareAvatarBlob(file: File): Promise<{
     }
     ctx.drawImage(bitmap, 0, 0, width, height);
 
+    // HEIC / unknown → JPEG so R2 confirm magic-byte sniff stays happy.
     const contentType =
-      file.type === 'image/png' || file.type === 'image/webp'
-        ? file.type
-        : 'image/jpeg';
+      kind === 'png' || kind === 'webp' ? `image/${kind}` : 'image/jpeg';
+    if (!ALLOWED_OUTPUT_TYPES.has(contentType)) {
+      throw new AvatarUploadError('Use a JPEG, PNG, or WebP image.');
+    }
     const quality = contentType === 'image/jpeg' ? 0.9 : undefined;
     const blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
@@ -112,14 +174,23 @@ export async function putAvatarToR2(
 ): Promise<void> {
   // Content-Length is a forbidden fetch header — the browser sets it from `blob`.
   // It must still match the size signed into the presigned URL (upload-url byte_size).
-  const res = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': contentType,
-      'Cache-Control': cacheControl,
-    },
-    body: blob,
-  });
+  let res: Response;
+  try {
+    res = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': cacheControl,
+      },
+      body: blob,
+    });
+  } catch {
+    // CORS misconfig or CSP connect-src missing the R2 S3 host.
+    // Keep the UI message short; ops detail lives in docs/ops/cloudflare-r2-avatars.md.
+    throw new AvatarUploadError(
+      'Could not reach avatar storage. Try again, or check R2 CORS / CSP connect-src configuration.',
+    );
+  }
   if (!res.ok) {
     throw new AvatarUploadError(
       `Upload to storage failed (HTTP ${res.status}).`,
@@ -166,5 +237,6 @@ export async function uploadAvatarFile(file: File): Promise<OwnedProfile> {
 }
 
 export function avatarFileAccept(): string {
-  return 'image/jpeg,image/png,image/webp';
+  // image/* helps iOS Photos; we still normalize to JPEG/PNG/WebP client-side.
+  return 'image/jpeg,image/png,image/webp,image/heic,image/heif,image/*';
 }

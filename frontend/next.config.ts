@@ -18,6 +18,13 @@ const r2ConnectSrc = r2AccountId
   ? `https://${r2AccountId}.r2.cloudflarestorage.com`
   : '';
 
+if (isProd && mediaHost && !r2AccountId) {
+  console.warn(
+    '[Aperture] NEXT_PUBLIC_MEDIA_HOST is set but NEXT_PUBLIC_R2_ACCOUNT_ID is missing or invalid. ' +
+      'CSP connect-src will omit the R2 S3 host and browser avatar uploads will fail.',
+  );
+}
+
 const imgSrc = [
   "'self'",
   'data:',

@@ -174,6 +174,8 @@ export function SettingsForm() {
       await refreshAuth();
       setSuccess('Profile photo updated.');
     } catch (err) {
+      // Only surface AvatarUploadError text — other exceptions stay generic
+      // (avoids leaking unexpected Error.message into the UI).
       const message =
         err instanceof AvatarUploadError
           ? err.message
