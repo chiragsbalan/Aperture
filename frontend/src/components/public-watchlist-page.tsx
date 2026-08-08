@@ -93,9 +93,7 @@ export function PublicWatchlistPage({ username }: { username: string }) {
   }
 
   if (state.items.length === 0) {
-    return (
-      <p className="mt-6 text-muted">No titles added to watchlist yet.</p>
-    );
+    return <p className="mt-6 text-muted">No titles added to watchlist yet.</p>;
   }
 
   return (
