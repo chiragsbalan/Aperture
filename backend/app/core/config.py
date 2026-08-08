@@ -81,6 +81,15 @@ class Settings(BaseSettings):
     # Search (P2.3). CacheBackend counters; Redis-backed in P2.4.
     search_rate_limit_window_seconds: int = 60
     search_rate_limit_max_per_ip: int = 60
+    # Interim hybrid recall (ADR-0016). TMDb enrichment never blocks FTS.
+    search_tmdb_timeout_ms: int = Field(default=2000, ge=250, le=10_000)
+    search_external_cap: int = Field(default=12, ge=1, le=24)
+    search_related_cap: int = Field(default=12, ge=1, le=24)
+    search_external_cache_ttl_seconds: int = Field(default=3600, ge=60, le=86_400)
+    search_external_negative_cache_ttl_seconds: int = Field(default=60, ge=10, le=600)
+    # Weak locals (0 < title_hits < 3): live TMDb External only when true.
+    search_external_weak_live: bool = False
+    search_title_hits_strong: int = Field(default=3, ge=1, le=20)
 
     # Metadata resolve (on-click ingest). CacheBackend counters; Redis when available.
     # IP subject comes from resolve_client_ip (trusted X-Aperture-Client-IP when

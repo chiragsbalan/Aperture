@@ -41,6 +41,7 @@ Local Compose adds Redis when P2.4 lands. Cloud Redis provider/tier is chosen at
 | Stage | When | Scope |
 |---|---|---|
 | Search v1 | **P2.3** | PostgreSQL FTS across movies / TV / people |
+| Interim recall | **pre-P6** | Hybrid façade: warm FTS + TMDb `external` / `related` sections ([ADR-0016](ADR-0016-interim-search-recall.md)); does **not** replace OpenSearch |
 | Host decision | **P5 exit** | Record OpenSearch hosting in **ADR-0007** (before P6 dual-write) |
 | Search platform | **P6** | OpenSearch dual-write, autocomplete/facets; **verified PG FTS fallback** under outage test |
 | Later | P8+ | Semantic/vector search may sit beside the same public search API |
@@ -83,6 +84,7 @@ Home rails remain TMDb-pool cached (rebuild from TMDb on miss), unchanged.
 ## Future evolution
 
 - ADR-0007: OpenSearch provider, sizing, and network placement (P5 exit).
+- **ADR-0016:** Interim TMDb External/Related sections on `/search` until P6; remap warm `results[]` to OpenSearch then keep sections as optional enrichment.
 - **P11:** Redis HA, eviction policy review, cache hit SLOs; **migrate auth rate-limit counters** to shared Redis `CacheBackend` (ADR-0005); keep Postgres counters as durable audit/backup if useful.
 - Vector/semantic index (P8+) should reuse the same “derived index + API façade” pattern; supersede or extend this ADR if the fallback matrix changes.
 - Finer enrichment subsection keys / distributed locks — see ADR-0013 Future evolution.

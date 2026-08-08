@@ -24,7 +24,7 @@ async def get_stats(
     """Return stored aggregate for a title, if any.
 
     If ``content_rating_stats`` is missing (app ahead of migrate), treat as
-    empty so title detail can still serve the TMDB fallback score.
+    empty so title detail can still serve the TMDB rating fallback score.
     """
     try:
         result = await session.execute(
@@ -44,6 +44,35 @@ async def get_stats(
             return None
         raise
     return result.scalar_one_or_none()
+
+
+async def get_stats_for_content_ids(
+    session: AsyncSession,
+    *,
+    content_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, ContentRatingStats]:
+    """Batch-load rating stats keyed by ``content_id`` (any content_type)."""
+    if not content_ids:
+        return {}
+    try:
+        result = await session.execute(
+            select(ContentRatingStats).where(
+                ContentRatingStats.content_id.in_(content_ids),
+            )
+        )
+    except ProgrammingError as exc:
+        msg = str(exc.orig) if exc.orig is not None else str(exc)
+        if 'content_rating_stats' in msg and 'does not exist' in msg:
+            logger.warning(
+                'content_rating_stats missing; search popularity uses TMDB only'
+            )
+            await session.rollback()
+            return {}
+        raise
+    out: dict[uuid.UUID, ContentRatingStats] = {}
+    for row in result.scalars().all():
+        out[row.content_id] = row
+    return out
 
 
 def aperture_average(stats: ContentRatingStats) -> float | None:

@@ -1,24 +1,39 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { AccountMenu } from '@/components/account-menu';
 import { useAuth } from '@/components/auth-provider';
+import { SearchPageForm } from '@/components/search-page-form';
 import { SiteSearch } from '@/components/site-search';
 
 function HeaderSearch() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const headerQuery =
-    pathname === '/search' ? (searchParams.get('q') ?? '') : '';
-  return <SiteSearch key={pathname} initialQuery={headerQuery} />;
+  // On /search: expanded field in the same nav slot as the icon trigger.
+  // Elsewhere: icon that opens the search overlay.
+  if (pathname === '/search') {
+    return (
+      <Suspense
+        fallback={
+          <div
+            className="h-11 w-28 shrink-0 sm:h-12 sm:w-32"
+            aria-hidden="true"
+          />
+        }
+      >
+        <SearchPageForm />
+      </Suspense>
+    );
+  }
+  return <SiteSearch key={pathname} />;
 }
 
 /**
  * Sparse chrome: brand → `/`, search, and AccountMenu when signed in.
  * Guests use landing CTAs for auth (no header Sign in / Create account).
+ * Search and account share one right-aligned cluster (same gap on every page).
  */
 export function SiteHeader() {
   const { status, me } = useAuth();
@@ -28,21 +43,11 @@ export function SiteHeader() {
       <Link href="/" className="type-page shrink-0 text-foreground">
         Aperture
       </Link>
-      <div className="min-w-0 flex-1" aria-hidden="true" />
       <nav
         aria-label="Primary"
-        className="flex shrink-0 items-center gap-1.5 sm:gap-2"
+        className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2"
       >
-        <Suspense
-          fallback={
-            <div
-              className="h-11 w-11 shrink-0 sm:h-12 sm:w-12"
-              aria-hidden="true"
-            />
-          }
-        >
-          <HeaderSearch />
-        </Suspense>
+        <HeaderSearch />
         {status === 'signed_in' ? (
           <AccountMenu
             username={me?.user?.username?.trim() || null}

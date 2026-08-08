@@ -25,7 +25,7 @@ async def search_catalog(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=50),
 ) -> SearchResponse:
-    """Full-text search across movies, TV shows, and people (seed catalog)."""
+    """Catalog FTS plus optional TMDb External/Related sections (ADR-0016)."""
     await enforce_search_rate_limit(
         get_cache(),
         settings=settings,
@@ -34,6 +34,7 @@ async def search_catalog(
     try:
         return await search_service.search(
             session,
+            settings=settings,
             q=q,
             types=types,
             page=page,
