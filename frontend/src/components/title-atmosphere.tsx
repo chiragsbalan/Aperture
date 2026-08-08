@@ -187,8 +187,11 @@ export function TitleAtmosphere({
       {backdropUrl ? (
         <div
           aria-hidden
+          data-title-backdrop=""
           // Pin top + ``h-svh`` only — avoid ``inset-0``/``dvh``, which resize
           // when mobile browser chrome toggles on scroll (same as guest mosaic).
+          // ``data-title-backdrop``: title-poster-flight clears this on morph
+          // click so Similar→title does not leave the old art under the FLIP.
           className="pointer-events-none fixed top-0 left-0 z-0 h-svh w-screen overflow-hidden"
         >
           <Image
