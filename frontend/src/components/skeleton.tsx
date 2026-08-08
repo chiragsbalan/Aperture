@@ -1,8 +1,9 @@
 /**
- * Shared loading skeletons — soft pulse bars/grids so navigation and client
+ * Shared loading skeletons — shimmer bars/grids so navigation and client
  * fetches read as in-progress (not empty static chrome).
  *
- * Motion: ``.skeleton-pulse`` in globals.css (disabled under reduced-motion).
+ * Motion: ``.skeleton-pulse`` shimmer in globals.css (off under reduced-motion).
+ * Soft App Router navigations also arm ``NavigationPending`` on link click.
  */
 
 import {

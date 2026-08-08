@@ -1811,20 +1811,66 @@
   }
 }
 
-/* Soft loading pulse for skeleton bars / posters (see ``skeleton.tsx``). */
+/*
+ * Loading skeletons — shimmer sweep (see ``skeleton.tsx``).
+ * Opacity-only pulses on ``--color-bg-elevated`` were too subtle against the
+ * page bg; a light sweep reads clearly as “in progress”.
+ */
 .skeleton-pulse {
   background-color: var(--color-bg-elevated);
-  animation: skeleton-pulse 1.35s var(--ease-out, ease-in-out) infinite;
+  background-image: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 38%,
+    color-mix(in srgb, var(--color-fg) 14%, transparent) 50%,
+    transparent 62%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  background-position: 120% 0;
+  animation: skeleton-shimmer 1.15s var(--ease-out) infinite;
 }
 
-@keyframes skeleton-pulse {
-  0%,
-  100% {
-    opacity: 0.5;
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 120% 0;
   }
 
-  50% {
-    opacity: 1;
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+/* Click-immediate route pending bar (``navigation-pending.tsx``). */
+.nav-pending {
+  pointer-events: none;
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: calc(var(--z-header) + 5);
+  height: 2px;
+  overflow: hidden;
+}
+
+.nav-pending-bar {
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-accent),
+    transparent
+  );
+  animation: nav-pending-slide 0.9s var(--ease-out) infinite;
+}
+
+@keyframes nav-pending-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(320%);
   }
 }
 
@@ -1840,12 +1886,21 @@
   .diary-entry-item,
   .diary-entry-item.is-leaving,
   .status-pulse::before,
-  .skeleton-pulse {
+  .skeleton-pulse,
+  .nav-pending-bar {
     animation: none !important;
   }
 
   .skeleton-pulse {
-    opacity: 0.72;
+    background-image: none;
+    opacity: 0.85;
+  }
+
+  .nav-pending-bar {
+    width: 100%;
+    transform: none;
+    opacity: 0.7;
+    background: var(--color-accent);
   }
 
   .title-tab-indicator,
