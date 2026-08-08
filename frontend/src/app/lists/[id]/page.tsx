@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 
 import { CustomListDetailPage } from '@/components/custom-list-detail-page';
+import { ShelfPageSkeleton } from '@/components/skeleton';
 import { SiteHeader } from '@/components/site-header';
 import type { Metadata } from 'next';
 
@@ -22,13 +23,7 @@ export default async function PublicListPage({
       </a>
       <SiteHeader />
       <main id="main-content" className="relative z-[1] w-full">
-        <Suspense
-          fallback={
-            <p className="layout-content mt-10 text-muted" role="status">
-              Loading…
-            </p>
-          }
-        >
+        <Suspense fallback={<ShelfPageSkeleton />}>
           <CustomListDetailPage listId={id} />
         </Suspense>
       </main>

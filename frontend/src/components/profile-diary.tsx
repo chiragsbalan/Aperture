@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { DiaryEntryCard } from '@/components/diary-entry-card';
 import { DiaryEntrySheet } from '@/components/diary-entry-sheet';
 import { useProfileIsOwner } from '@/components/public-profile';
+import { DiaryCardsSkeleton } from '@/components/skeleton';
 import {
   compareWatchEntriesNewestFirst,
   groupDiaryEntriesByMonth,
@@ -215,9 +216,10 @@ export function ProfileDiary({ username }: ProfileDiaryProps) {
   return (
     <section className="mt-10 text-left">
       {state.status === 'loading' ? (
-        <p className="text-muted" role="status">
-          Loading…
-        </p>
+        <div role="status" aria-busy="true">
+          <span className="sr-only">Loading…</span>
+          <DiaryCardsSkeleton className="mt-0" />
+        </div>
       ) : null}
 
       {state.status === 'error' ? (

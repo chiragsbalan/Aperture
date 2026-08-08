@@ -11,6 +11,7 @@ import {
   CheckOutlineIcon,
   PencilOutlineIcon,
 } from '@/components/shelf-chrome-icons';
+import { PosterGridSkeleton } from '@/components/skeleton';
 import {
   addLibraryItem,
   fetchSystemList,
@@ -268,9 +269,10 @@ export function LibraryListPage({
       <LibraryNav />
 
       {state.status === 'loading' ? (
-        <p className="mt-10 text-muted" role="status">
-          Loading…
-        </p>
+        <div role="status" aria-busy="true">
+          <span className="sr-only">Loading…</span>
+          <PosterGridSkeleton />
+        </div>
       ) : null}
 
       {state.status === 'signed_out' ? (

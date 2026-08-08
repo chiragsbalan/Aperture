@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { DiaryEntryCard } from '@/components/diary-entry-card';
 import { DiaryEntrySheet } from '@/components/diary-entry-sheet';
 import { LibraryNav } from '@/components/library-nav';
+import { DiaryCardsSkeleton } from '@/components/skeleton';
 import {
   compareWatchEntriesNewestFirst,
   groupDiaryEntriesByMonth,
@@ -147,9 +148,10 @@ export function DiaryPage() {
       <LibraryNav />
 
       {state.status === 'loading' ? (
-        <p className="mt-10 text-muted" role="status">
-          Loading…
-        </p>
+        <div role="status" aria-busy="true">
+          <span className="sr-only">Loading…</span>
+          <DiaryCardsSkeleton className="mt-10" />
+        </div>
       ) : null}
 
       {state.status === 'signed_out' ? (

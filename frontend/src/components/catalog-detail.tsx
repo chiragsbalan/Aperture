@@ -6,6 +6,7 @@ import { LibraryActions } from '@/components/library-actions';
 import { MoreLikeThis } from '@/components/more-like-this';
 import { RecordTitlePosterHero } from '@/components/record-title-poster-hero';
 import { SharedTitlePoster } from '@/components/shared-title-poster';
+import { DetailHeroSkeleton } from '@/components/skeleton';
 import { TitlePosterFlightTarget } from '@/components/title-poster-flight-target';
 import { SiteHeader } from '@/components/site-header';
 import { TitleAtmosphere } from '@/components/title-atmosphere';
@@ -175,40 +176,7 @@ export function CatalogStatusShell({ children }: { children: ReactNode }) {
 }
 
 export function CatalogLoading() {
-  return (
-    <div
-      className="layout-content layout-shell-pad-top motion-fade-in relative z-[1] pb-16 sm:pb-24"
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-    >
-      <span className="sr-only">Loading catalog…</span>
-      <div className="grid grid-cols-[minmax(0,1fr)_6.75rem] gap-x-4 gap-y-5 sm:grid-cols-[minmax(0,1fr)_18rem] sm:gap-x-12 sm:gap-y-0">
-        <div
-          aria-hidden
-          className="col-start-2 row-span-2 row-start-1 aspect-[2/3] w-full bg-[var(--color-bg-elevated)] sm:mt-10"
-        />
-        <div className="col-start-1 row-span-2 row-start-1 flex min-w-0 flex-col justify-center space-y-3 py-0.5 sm:row-span-1 sm:justify-start sm:space-y-4 sm:py-0">
-          <div
-            aria-hidden
-            className="h-8 w-full max-w-[12rem] bg-[var(--color-bg-elevated)] sm:h-10 sm:max-w-md"
-          />
-          <div
-            aria-hidden
-            className="h-3 w-28 bg-[var(--color-bg-elevated)] sm:h-4 sm:w-48"
-          />
-        </div>
-        <div
-          aria-hidden
-          className="col-span-2 col-start-1 row-start-3 space-y-2 sm:col-span-1 sm:row-start-2 sm:mt-8 sm:max-w-2xl"
-        >
-          <div className="h-3 w-full bg-[var(--color-bg-elevated)] sm:h-4" />
-          <div className="h-3 w-11/12 bg-[var(--color-bg-elevated)] sm:h-4" />
-          <div className="h-3 w-4/5 bg-[var(--color-bg-elevated)] sm:h-4" />
-        </div>
-      </div>
-    </div>
-  );
+  return <DetailHeroSkeleton />;
 }
 
 function TitleDetailShell({

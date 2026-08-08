@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { ProfileAvatar } from '@/components/profile-avatar';
+import { ListRowsSkeleton } from '@/components/skeleton';
 import { TitleShelfView } from '@/components/title-shelf-view';
 import type { LibraryContentType } from '@/lib/library';
 
@@ -54,9 +55,10 @@ export function ProfileCollectionView({
         <h1 className="type-page-lg text-foreground">{title}</h1>
 
         {status === 'loading' ? (
-          <p className="mt-10 text-muted" role="status">
-            Loading…
-          </p>
+          <div role="status" aria-busy="true">
+            <span className="sr-only">Loading…</span>
+            <ListRowsSkeleton className="mt-10" />
+          </div>
         ) : null}
 
         {status === 'error' ? (

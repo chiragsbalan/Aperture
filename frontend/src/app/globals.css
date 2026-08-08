@@ -1811,6 +1811,76 @@
   }
 }
 
+/*
+ * Loading skeletons — shimmer sweep (see ``skeleton.tsx``).
+ * Opacity-only pulses on ``--color-bg-elevated`` were too subtle against the
+ * page bg; a light sweep reads clearly as “in progress”.
+ */
+.skeleton-pulse {
+  background-color: color-mix(
+    in srgb,
+    var(--color-fg) 8%,
+    var(--color-bg-elevated)
+  );
+  background-image: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 35%,
+    color-mix(in srgb, var(--color-fg) 28%, transparent) 50%,
+    transparent 65%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  background-position: 120% 0;
+  animation: skeleton-shimmer 1.05s linear infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+/* Click-immediate route pending bar (``navigation-pending.tsx``). */
+.nav-pending {
+  pointer-events: none;
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: calc(var(--z-overlay) + 20);
+  height: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+
+.nav-pending-bar {
+  height: 100%;
+  width: 45%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-accent),
+    var(--color-focus),
+    var(--color-accent),
+    transparent
+  );
+  animation: nav-pending-slide 0.85s linear infinite;
+}
+
+@keyframes nav-pending-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(320%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .motion-fade-rise,
   .motion-fade-rise-delay,
@@ -1822,8 +1892,22 @@
   .overlay-panel-motion.is-leaving,
   .diary-entry-item,
   .diary-entry-item.is-leaving,
-  .status-pulse::before {
+  .status-pulse::before,
+  .skeleton-pulse,
+  .nav-pending-bar {
     animation: none !important;
+  }
+
+  .skeleton-pulse {
+    background-image: none;
+    opacity: 0.85;
+  }
+
+  .nav-pending-bar {
+    width: 100%;
+    transform: none;
+    opacity: 0.7;
+    background: var(--color-accent);
   }
 
   .title-tab-indicator,
