@@ -1293,9 +1293,7 @@ async def search_catalog(
             if hit.get('type') in ('movie', 'tv') and hit.get('id') is not None
         }
         fts_uuid_ids = {
-            id_
-            if isinstance(id_, uuid.UUID)
-            else uuid.UUID(str(id_))
+            id_ if isinstance(id_, uuid.UUID) else uuid.UUID(str(id_))
             for id_ in fts_ids
         }
         substr_rows = await metadata_repository.search_content_items_substring(
