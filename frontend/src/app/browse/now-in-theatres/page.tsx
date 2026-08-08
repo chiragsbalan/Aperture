@@ -13,7 +13,7 @@ export default async function BrowseNowInTheatresPage() {
   return (
     <BrowseShelfPage
       title={HOME_CATALOG_RAIL_HEADINGS[0]}
-      description="The most popular movies playing in theatres right now."
+      description="Now playing in theatres."
       emptyMessage="Now in theatres is unavailable right now. Try again shortly."
       items={items}
       kind="movie"

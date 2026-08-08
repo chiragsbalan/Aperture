@@ -30,7 +30,7 @@ export function HomeCatalogRails({
         headingId="now-in-theatres-heading"
         headingLevel={firstHeadingLevel}
         title={theatresHeading}
-        description="The most popular movies playing in theatres right now."
+        description="Now playing in theatres."
         emptyMessage="Now in theatres is unavailable right now. Try again shortly."
         items={inTheatres}
         kind="movie"
