@@ -21,10 +21,7 @@ export function SearchPageForm() {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState(initialQuery);
-  const widthCh = Math.min(
-    MAX_WIDTH_CH,
-    Math.max(MIN_WIDTH_CH, q.length + 2),
-  );
+  const widthCh = Math.min(MAX_WIDTH_CH, Math.max(MIN_WIDTH_CH, q.length + 2));
 
   useEffect(() => {
     setQ(initialQuery);

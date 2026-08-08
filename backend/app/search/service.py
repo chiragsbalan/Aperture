@@ -8,12 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.metadata import service as metadata_service
+from app.search.popularity import attach_card_popularity, attach_hit_popularity
 from app.search.query import (
     SearchQueryError,
     normalize_search_query,
     parse_types_param,
 )
-from app.search.popularity import attach_card_popularity, attach_hit_popularity
 from app.search.schemas import (
     MatchQuality,
     SearchHit,

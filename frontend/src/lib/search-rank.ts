@@ -55,7 +55,10 @@ export function titleMatchTier(
 }
 
 /** Sort comparator: tier → catalog-before-TMDb → higher popularity → stable. */
-export function compareRankableTitles(a: RankableTitle, b: RankableTitle): number {
+export function compareRankableTitles(
+  a: RankableTitle,
+  b: RankableTitle,
+): number {
   if (a.tier !== b.tier) {
     return a.tier - b.tier;
   }

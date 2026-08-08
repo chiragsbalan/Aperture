@@ -187,13 +187,7 @@ export function SearchResults({
   }, [query, initialResults, initialError]);
 
   const titles = useMemo(
-    () =>
-      unifyTitles(
-        query,
-        results ?? [],
-        related ?? [],
-        external ?? [],
-      ),
+    () => unifyTitles(query, results ?? [], related ?? [], external ?? []),
     [query, results, related, external],
   );
   const people = (results ?? []).filter((hit) => hit.type === 'person');
