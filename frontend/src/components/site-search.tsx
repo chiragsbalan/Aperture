@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
+import { SearchIcon } from '@/components/search-icon';
 import { MOTION_DURATION_MED_MS } from '@/lib/motion';
 import {
   applySiblingInert,
@@ -30,26 +31,6 @@ import {
 } from '@/lib/overlay_chrome';
 
 type OverlayPhase = 'closed' | 'open' | 'closing';
-
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <circle cx="11" cy="11" r="7" />
-      <path d="M20 20l-3.5-3.5" />
-    </svg>
-  );
-}
 
 function CloseIcon({ className }: { className?: string }) {
   return (

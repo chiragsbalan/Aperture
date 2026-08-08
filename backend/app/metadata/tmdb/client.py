@@ -185,6 +185,22 @@ class TmdbClient:
         data = await self._get(f'/person/{tmdb_id}')
         return TmdbPerson.model_validate(data)
 
+    async def search_multi(self, query: str, *, page: int = 1) -> dict[str, Any]:
+        """TMDb multi-search (movies, TV, people). Caller filters media types."""
+        cleaned = query.strip()
+        if not cleaned:
+            raise ValueError('query must not be empty')
+        if page < 1:
+            raise ValueError('page must be >= 1')
+        return await self._get(
+            '/search/multi',
+            {
+                'query': cleaned,
+                'page': str(page),
+                'include_adult': 'false',
+            },
+        )
+
     async def get_movie_top_rated(self, *, page: int = 1) -> dict[str, Any]:
         """Fetch one page of TMDb all-time top-rated movies."""
         if page < 1:

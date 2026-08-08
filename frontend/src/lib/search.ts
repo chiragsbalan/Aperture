@@ -3,6 +3,8 @@
  */
 
 export type SearchHitType = 'movie' | 'tv' | 'person';
+export type SearchCardType = 'movie' | 'tv';
+export type MatchQuality = 'strong' | 'weak' | 'none';
 
 export interface SearchHit {
   type: SearchHitType;
@@ -10,6 +12,20 @@ export interface SearchHit {
   title: string;
   year: number | null;
   poster_url: string | null;
+  /** Hybrid rater count for within-tier sort (optional on older payloads). */
+  popularity?: number;
+}
+
+/** Cold or warm title card for Related / External sections (ADR-0016). */
+export interface SearchCard {
+  type: SearchCardType;
+  title: string;
+  year: number | null;
+  poster_url: string | null;
+  tmdb_id: number;
+  content_id: string | null;
+  /** Hybrid rater count for within-tier sort (optional on older payloads). */
+  popularity?: number;
 }
 
 export interface SearchResponse {
@@ -18,6 +34,9 @@ export interface SearchResponse {
   limit: number;
   total: number;
   results: SearchHit[];
+  match_quality?: MatchQuality | null;
+  related?: SearchCard[] | null;
+  external?: SearchCard[] | null;
 }
 
 export type SearchFetchResult =

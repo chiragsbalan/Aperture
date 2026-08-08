@@ -2,34 +2,133 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { SearchResultsSkeleton } from '@/components/skeleton';
-import { TitlePosterLink } from '@/components/title-poster-link';
+import { TitleNavPoster } from '@/components/title-nav-poster';
 import { POSTER_GRID_SIZES } from '@/lib/poster';
 import {
   fetchSearch,
   hrefForHit,
   labelForHitType,
+  type SearchCard,
   type SearchHit,
+  type SearchResponse,
 } from '@/lib/search';
+import { compareRankableTitles, titleMatchTier } from '@/lib/search-rank';
 
 const DEBOUNCE_MS = 250;
+
+interface UnifiedTitle {
+  key: string;
+  kind: 'movie' | 'tv';
+  title: string;
+  year: number | null;
+  posterUrl: string | null;
+  contentId: string | null;
+  tmdbId: number | null;
+  tier: number;
+  popularity: number;
+  order: number;
+}
+
+function unifyTitles(
+  query: string,
+  results: SearchHit[],
+  related: SearchCard[],
+  external: SearchCard[],
+): UnifiedTitle[] {
+  const seen = new Set<string>();
+  const out: UnifiedTitle[] = [];
+  let order = 0;
+
+  function push(card: UnifiedTitle) {
+    if (seen.has(card.key)) {
+      return;
+    }
+    seen.add(card.key);
+    out.push(card);
+  }
+
+  for (const hit of results) {
+    if (hit.type !== 'movie' && hit.type !== 'tv') {
+      continue;
+    }
+    push({
+      key: `warm:${hit.type}:${hit.id}`,
+      kind: hit.type,
+      title: hit.title,
+      year: hit.year,
+      posterUrl: hit.poster_url,
+      contentId: hit.id,
+      tmdbId: null,
+      tier: titleMatchTier(query, hit.title, 'fts'),
+      popularity: hit.popularity ?? 0,
+      order: order++,
+    });
+  }
+
+  for (const card of external) {
+    const idKey =
+      card.content_id != null
+        ? `warm:${card.type}:${card.content_id}`
+        : `tmdb:${card.type}:${card.tmdb_id}`;
+    push({
+      key: idKey,
+      kind: card.type,
+      title: card.title,
+      year: card.year,
+      posterUrl: card.poster_url,
+      contentId: card.content_id,
+      tmdbId: card.tmdb_id,
+      tier: titleMatchTier(query, card.title, 'external'),
+      popularity: card.popularity ?? 0,
+      order: order++,
+    });
+  }
+
+  for (const card of related) {
+    const idKey =
+      card.content_id != null
+        ? `warm:${card.type}:${card.content_id}`
+        : `tmdb:${card.type}:${card.tmdb_id}`;
+    push({
+      key: idKey,
+      kind: card.type,
+      title: card.title,
+      year: card.year,
+      posterUrl: card.poster_url,
+      contentId: card.content_id,
+      tmdbId: card.tmdb_id,
+      tier: titleMatchTier(query, card.title, 'related'),
+      popularity: card.popularity ?? 0,
+      order: order++,
+    });
+  }
+
+  out.sort(compareRankableTitles);
+  return out;
+}
 
 export function SearchResults({
   query,
   initialResults = null,
-  initialTotal = 0,
+  initialRelated = null,
+  initialExternal = null,
   initialError = null,
 }: {
   query: string;
   initialResults?: SearchHit[] | null;
-  initialTotal?: number;
+  initialRelated?: SearchCard[] | null;
+  initialExternal?: SearchCard[] | null;
   initialError?: string | null;
 }) {
   const ssrQueryRef = useRef(query.trim());
   const [results, setResults] = useState<SearchHit[] | null>(initialResults);
-  const [total, setTotal] = useState(initialTotal);
+  const [related, setRelated] = useState<SearchCard[] | null>(initialRelated);
+  const [external, setExternal] = useState<SearchCard[] | null>(
+    initialExternal,
+  );
   const [error, setError] = useState<string | null>(initialError);
   const [loading, setLoading] = useState(false);
 
@@ -37,13 +136,14 @@ export function SearchResults({
     const cleaned = query.trim();
     if (!cleaned) {
       setResults([]);
-      setTotal(0);
+      setRelated([]);
+      setExternal([]);
       setError(null);
       setLoading(false);
       return;
     }
 
-    // First paint already has SSR results for this q — skip the debounce refetch.
+    // First paint already has SSR results for this q; skip the debounce refetch.
     if (
       cleaned === ssrQueryRef.current &&
       (initialResults != null || initialError != null)
@@ -63,13 +163,13 @@ export function SearchResults({
         if (!res.ok) {
           setError(res.error);
           setResults([]);
-          setTotal(0);
+          setRelated([]);
+          setExternal([]);
           setLoading(false);
           return;
         }
+        applyResponse(res.data);
         setError(null);
-        setResults(res.data.results);
-        setTotal(res.data.total);
         setLoading(false);
       })();
     }, DEBOUNCE_MS);
@@ -78,14 +178,22 @@ export function SearchResults({
       cancelled = true;
       window.clearTimeout(timer);
     };
+
+    function applyResponse(data: SearchResponse) {
+      setResults(data.results);
+      setRelated(data.related ?? []);
+      setExternal(data.external ?? []);
+    }
   }, [query, initialResults, initialError]);
 
+  const titles = useMemo(
+    () => unifyTitles(query, results ?? [], related ?? [], external ?? []),
+    [query, results, related, external],
+  );
+  const people = (results ?? []).filter((hit) => hit.type === 'person');
+
   if (!query.trim()) {
-    return (
-      <p className="text-muted">
-        Type a title or person name to search the catalog.
-      </p>
-    );
+    return null;
   }
 
   if (loading && results == null) {
@@ -100,7 +208,7 @@ export function SearchResults({
     );
   }
 
-  if (results != null && results.length === 0) {
+  if (titles.length === 0 && people.length === 0) {
     return (
       <p className="text-muted">
         No results for “{query.trim()}”. Try another title or name.
@@ -108,79 +216,74 @@ export function SearchResults({
     );
   }
 
-  const titles = (results ?? []).filter(
-    (hit) => hit.type === 'movie' || hit.type === 'tv',
-  );
-  const people = (results ?? []).filter((hit) => hit.type === 'person');
-
   return (
-    <div className="space-y-8">
-      <p className="text-sm text-muted">
-        {total} result{total === 1 ? '' : 's'}
-        {loading ? ' · updating…' : ''}
-      </p>
-
+    <div className="space-y-10">
       {titles.length > 0 ? (
         <ul className="poster-grid">
-          {titles.map((hit) => (
-            <li key={`${hit.type}:${hit.id}`} className="min-w-0">
-              <TitlePosterLink
-                href={hrefForHit(hit)}
-                contentId={hit.id}
-                posterUrl={hit.poster_url}
-                posterAlt=""
-                ariaLabel={
-                  hit.year != null ? `${hit.title} (${hit.year})` : hit.title
-                }
-                sizes={POSTER_GRID_SIZES}
-                className="block min-w-0 overflow-hidden transition hover:opacity-90"
-              >
-                <div className="poster-meta">
-                  <p className="mt-2 text-xs uppercase tracking-wide text-muted">
-                    {labelForHitType(hit.type)}
-                    {hit.year != null ? ` · ${hit.year}` : ''}
-                  </p>
-                  <p className="truncate font-display text-sm font-medium text-foreground">
-                    {hit.title}
-                  </p>
-                </div>
-              </TitlePosterLink>
-            </li>
-          ))}
+          {titles.map((card) => {
+            const ariaLabel =
+              card.year != null ? `${card.title} (${card.year})` : card.title;
+            return (
+              <li key={card.key} className="min-w-0">
+                <TitleNavPoster
+                  contentId={card.contentId}
+                  tmdbId={card.tmdbId}
+                  kind={card.kind}
+                  posterUrl={card.posterUrl}
+                  posterAlt=""
+                  ariaLabel={ariaLabel}
+                  sizes={POSTER_GRID_SIZES}
+                  className="block min-w-0 overflow-hidden transition hover:opacity-90"
+                >
+                  <div className="poster-meta">
+                    <p className="mt-2 truncate font-display text-sm font-medium text-foreground">
+                      {card.title}
+                    </p>
+                    {card.year != null ? (
+                      <p className="truncate text-xs text-muted">{card.year}</p>
+                    ) : null}
+                  </div>
+                </TitleNavPoster>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
 
       {people.length > 0 ? (
-        <ul className="divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
-          {people.map((hit) => (
-            <li key={`${hit.type}:${hit.id}`}>
-              <Link
-                href={hrefForHit(hit)}
-                className="flex gap-4 py-4 transition hover:bg-[var(--color-surface)]/40"
-              >
-                <div className="relative h-20 w-14 shrink-0 overflow-hidden bg-[var(--color-surface)]">
-                  {hit.poster_url ? (
-                    <Image
-                      src={hit.poster_url}
-                      alt=""
-                      fill
-                      className="object-cover"
-                      sizes="56px"
-                    />
-                  ) : null}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs uppercase tracking-wide text-muted">
-                    {labelForHitType(hit.type)}
-                  </p>
-                  <p className="font-display [font-size:var(--text-subsection)] text-foreground">
-                    {hit.title}
-                  </p>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <section className="space-y-4">
+          <h2 className="type-subsection text-foreground">People</h2>
+          <ul className="divide-y divide-[var(--color-border)]">
+            {people.map((hit) => (
+              <li key={`${hit.type}:${hit.id}`}>
+                <Link
+                  href={hrefForHit(hit)}
+                  className="flex gap-4 py-4 transition hover:bg-[var(--color-surface)]/40"
+                >
+                  <div className="relative h-20 w-14 shrink-0 overflow-hidden bg-[var(--color-surface)]">
+                    {hit.poster_url ? (
+                      <Image
+                        src={hit.poster_url}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        sizes="56px"
+                      />
+                    ) : null}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs uppercase tracking-wide text-muted">
+                      {labelForHitType(hit.type)}
+                    </p>
+                    <p className="font-display [font-size:var(--text-subsection)] text-foreground">
+                      {hit.title}
+                    </p>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
     </div>
   );

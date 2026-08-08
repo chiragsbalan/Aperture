@@ -58,6 +58,29 @@ export function CheckOutlineIcon({ className }: { className?: string }) {
   );
 }
 
+/**
+ * Filled membership tick for selected add-to-list rows (right-aligned).
+ * Same fill language as library action icons when active.
+ */
+export function MembershipMarkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4.6 12.4 6.2 10.8 10.2 14.8 17.6 6.1 19.4 7.7 10.2 18.4Z" />
+    </svg>
+  );
+}
+
 export function SettingsOutlineIcon({ className }: { className?: string }) {
   return (
     <svg

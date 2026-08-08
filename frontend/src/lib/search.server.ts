@@ -22,7 +22,16 @@ export async function fetchSearchServer(
   if (!cleaned) {
     return {
       ok: true,
-      data: { q: '', page: 1, limit: 20, total: 0, results: [] },
+      data: {
+        q: '',
+        page: 1,
+        limit: 20,
+        total: 0,
+        results: [],
+        match_quality: 'none',
+        related: [],
+        external: [],
+      },
     };
   }
 

@@ -28,18 +28,14 @@ export default async function SearchPage({
         id="main-content"
         className="layout-content layout-shell-pad-top relative z-[1] pb-16 motion-fade-rise"
       >
-        <h1 className="type-page-lg text-foreground">Search</h1>
-        <p className="mt-2 text-muted">
-          Find movies, TV shows, and people in the catalog.
-        </p>
-        <div className="mt-8">
-          <SearchResults
-            query={q}
-            initialResults={initial?.ok ? initial.data.results : null}
-            initialTotal={initial?.ok ? initial.data.total : 0}
-            initialError={initial != null && !initial.ok ? initial.error : null}
-          />
-        </div>
+        <h1 className="sr-only">Search</h1>
+        <SearchResults
+          query={q}
+          initialResults={initial?.ok ? initial.data.results : null}
+          initialRelated={initial?.ok ? (initial.data.related ?? []) : null}
+          initialExternal={initial?.ok ? (initial.data.external ?? []) : null}
+          initialError={initial != null && !initial.ok ? initial.error : null}
+        />
       </main>
     </div>
   );

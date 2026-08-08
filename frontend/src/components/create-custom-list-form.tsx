@@ -33,7 +33,7 @@ export function CreateCustomListForm({
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [visibility, setVisibility] = useState<ListVisibility>('private');
+  const [visibility, setVisibility] = useState<ListVisibility>('public');
   const [creating, setCreating] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 

@@ -1215,11 +1215,13 @@ async def search_catalog(
     types: frozenset[str],
     page: int,
     limit: int,
-) -> tuple[list[dict[str, object]], int]:
+) -> tuple[list[dict[str, object]], int, int, dict[str, object] | None]:
     """Run PG FTS across requested catalog types.
 
     ``types`` uses public API values: ``movie``, ``tv``, ``person``.
-    Returns ``(hit dicts, total)`` ordered by rank (mixed when multiple types).
+    Returns ``(page hits, total, title_total, top_title)`` where
+    ``title_total`` is the unpaginated movie+tv match count and ``top_title``
+    is the highest-ranked title hit (or ``None``).
     """
     offset = (page - 1) * limit
     db_types: set[str] = set()
@@ -1230,6 +1232,8 @@ async def search_catalog(
 
     hits: list[tuple[float, dict[str, object]]] = []
     total = 0
+    title_total = 0
+    top_title: dict[str, object] | None = None
 
     if db_types:
         # Fetch a wider window so mixed ranking across people works at seed scale.
@@ -1242,21 +1246,20 @@ async def search_catalog(
             offset=0,
         )
         total += content_total
+        title_total = content_total
         for item, rank, year in content_rows:
             public_type = 'movie' if item.content_type == 'movie' else 'tv'
-            hits.append(
-                (
-                    rank,
-                    {
-                        'type': public_type,
-                        'id': item.id,
-                        'title': item.title,
-                        'year': year,
-                        'poster_url': _image_url(item.poster_path),
-                        'rank': rank,
-                    },
-                )
-            )
+            hit = {
+                'type': public_type,
+                'id': item.id,
+                'title': item.title,
+                'year': year,
+                'poster_url': _image_url(item.poster_path),
+                'rank': rank,
+            }
+            if top_title is None:
+                top_title = hit
+            hits.append((rank, hit))
 
     if 'person' in types:
         fetch_limit = offset + limit
@@ -1282,6 +1285,100 @@ async def search_catalog(
                 )
             )
 
+    # Additive ILIKE title matches FTS may miss (short tokens / stemming).
+    if db_types:
+        fts_ids = {
+            hit['id']
+            for _, hit in hits
+            if hit.get('type') in ('movie', 'tv') and hit.get('id') is not None
+        }
+        fts_uuid_ids = {
+            id_ if isinstance(id_, uuid.UUID) else uuid.UUID(str(id_))
+            for id_ in fts_ids
+        }
+        substr_rows = await metadata_repository.search_content_items_substring(
+            session,
+            query=query,
+            content_types=frozenset(db_types),
+            limit=offset + limit,
+            exclude_ids=frozenset(fts_uuid_ids),
+        )
+        title_total += len(substr_rows)
+        total += len(substr_rows)
+        for item, rank, year in substr_rows:
+            public_type = 'movie' if item.content_type == 'movie' else 'tv'
+            hit = {
+                'type': public_type,
+                'id': item.id,
+                'title': item.title,
+                'year': year,
+                'poster_url': _image_url(item.poster_path),
+                'rank': rank,
+            }
+            if top_title is None:
+                top_title = hit
+            hits.append((rank, hit))
+
     hits.sort(key=lambda row: (-row[0], str(row[1]['title']).lower()))
+    top_title = None
+    for _rank, hit in hits:
+        if hit.get('type') in ('movie', 'tv'):
+            top_title = hit
+            break
     page_hits = [row[1] for row in hits[offset : offset + limit]]
-    return page_hits, total
+    return page_hits, total, title_total, top_title
+
+
+async def fetch_search_related_similar(
+    session: AsyncSession,
+    *,
+    content_id: uuid.UUID,
+    kind: str,
+    settings: Settings,
+    cap: int,
+) -> list[dict[str, Any]]:
+    """Return similar/recommendation rows for search Related (ADR-0016).
+
+    Cache-first enrichment; live TMDb on miss. Degrades to ``[]`` on failure.
+    Each row: ``tmdb_id``, ``title``, ``year``, ``poster_path``.
+    """
+    if kind not in ('movie', 'tv'):
+        return []
+    source_namespace = 'movie' if kind == 'movie' else 'tv'
+    cached = await _load_cached_enrichment(
+        content_item_id=content_id,
+        source_namespace=source_namespace,
+    )
+    extras: dict[str, Any] | None = None
+    if _is_enrichment_negative(cached):
+        return []
+    if cached is not None and isinstance(cached.get('similar'), list):
+        extras = cached
+    else:
+        live = await _live_enrichment_extras(
+            session,
+            content_item_id=content_id,
+            source_namespace=source_namespace,
+            settings=settings,
+        )
+        if live is None:
+            return []
+        extras = live
+        await _cache_enrichment_doc(
+            content_item_id=content_id,
+            source_namespace=source_namespace,
+            extras=live,
+            settings=settings,
+        )
+
+    similar = extras.get('similar') if extras else None
+    if not isinstance(similar, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for row in similar:
+        if not isinstance(row, dict) or not row.get('tmdb_id') or not row.get('title'):
+            continue
+        out.append(row)
+        if len(out) >= cap:
+            break
+    return out

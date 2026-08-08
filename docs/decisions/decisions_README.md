@@ -44,6 +44,8 @@ ADR-0011-title-poster-morph.md
 ADR-0012-brand-shell-atmosphere.md
 ADR-0013-lean-catalog-option-b.md
 ADR-0014-avatar-r2-cdn.md
+ADR-0015-title-ratings.md
+ADR-0016-interim-search-recall.md
 ```
 
 Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
@@ -64,6 +66,7 @@ Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
 | [ADR-0013](ADR-0013-lean-catalog-option-b.md) | Lean Postgres stubs + Redis/TMDb enrichment (Option B) |
 | [ADR-0014](ADR-0014-avatar-r2-cdn.md) | Profile avatars via Cloudflare R2 + custom-domain CDN |
 | [ADR-0015](ADR-0015-title-ratings.md) | Hybrid title ratings (TMDB → Aperture @ 100) |
+| [ADR-0016](ADR-0016-interim-search-recall.md) | Interim hybrid search recall (TMDb External + Related) before OpenSearch P6 |
 
 Reserved / not yet written: **ADR-0007** — OpenSearch hosting (due at P5 exit per PLAN).
 ## Template

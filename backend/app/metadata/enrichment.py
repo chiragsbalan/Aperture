@@ -385,12 +385,18 @@ def build_extras_from_tmdb_payload(
             and date_value[:4].isdigit()
         ):
             year = int(date_value[:4])
+        vote_raw = row.get('vote_count')
+        try:
+            vote_count = max(0, int(vote_raw)) if vote_raw is not None else 0
+        except (TypeError, ValueError):
+            vote_count = 0
         similar.append(
             {
                 'tmdb_id': row.get('id'),
                 'title': title,
                 'year': year,
                 'poster_path': row.get('poster_path'),
+                'vote_count': vote_count,
             }
         )
         if len(similar) >= _MAX_SIMILAR:

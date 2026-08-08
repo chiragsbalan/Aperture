@@ -848,6 +848,130 @@ async def search_content_items(
     return items, total
 
 
+async def search_content_items_substring(
+    session: AsyncSession,
+    *,
+    query: str,
+    content_types: frozenset[str],
+    limit: int,
+    exclude_ids: frozenset[uuid.UUID] | None = None,
+) -> list[tuple[ContentItem, float, int | None]]:
+    """ILIKE title / original_title match (additive to FTS; ADR-0016).
+
+    Returns rows with a synthetic rank: ``2.0`` word-boundary style, ``1.0``
+    embedded substring. Does not paginate beyond ``limit``.
+    """
+    if not content_types or not query.strip():
+        return []
+
+    types = sorted(content_types)
+    excluded = list(exclude_ids or ())
+    if excluded:
+        list_stmt = text(
+            """
+            SELECT
+                c.id,
+                COALESCE(
+                    EXTRACT(YEAR FROM m.release_date),
+                    EXTRACT(YEAR FROM t.first_air_date)
+                )::int AS year,
+                c.title,
+                c.original_title
+            FROM content_items c
+            LEFT JOIN movies m ON m.content_item_id = c.id
+            LEFT JOIN tv_shows t ON t.content_item_id = c.id
+            WHERE c.content_type IN :types
+              AND (
+                c.title ILIKE :pattern
+                OR COALESCE(c.original_title, '') ILIKE :pattern
+              )
+              AND c.id NOT IN :exclude_ids
+            ORDER BY c.title ASC
+            LIMIT :limit
+            """
+        ).bindparams(
+            bindparam('types', expanding=True),
+            bindparam('exclude_ids', expanding=True),
+        )
+        params: dict[str, object] = {
+            'types': types,
+            'pattern': f'%{query}%',
+            'exclude_ids': excluded,
+            'limit': limit,
+        }
+    else:
+        list_stmt = text(
+            """
+            SELECT
+                c.id,
+                COALESCE(
+                    EXTRACT(YEAR FROM m.release_date),
+                    EXTRACT(YEAR FROM t.first_air_date)
+                )::int AS year,
+                c.title,
+                c.original_title
+            FROM content_items c
+            LEFT JOIN movies m ON m.content_item_id = c.id
+            LEFT JOIN tv_shows t ON t.content_item_id = c.id
+            WHERE c.content_type IN :types
+              AND (
+                c.title ILIKE :pattern
+                OR COALESCE(c.original_title, '') ILIKE :pattern
+              )
+            ORDER BY c.title ASC
+            LIMIT :limit
+            """
+        ).bindparams(bindparam('types', expanding=True))
+        params = {
+            'types': types,
+            'pattern': f'%{query}%',
+            'limit': limit,
+        }
+    result = await session.execute(list_stmt, params)
+    hit_rows = result.all()
+    if not hit_rows:
+        return []
+
+    ids = [row.id for row in hit_rows]
+    loaded = await session.execute(select(ContentItem).where(ContentItem.id.in_(ids)))
+    by_id = {item.id: item for item in loaded.scalars().all()}
+    items: list[tuple[ContentItem, float, int | None]] = []
+    q_lower = query.casefold()
+    for row in hit_rows:
+        item = by_id.get(row.id)
+        if item is None:
+            continue
+        year = int(row.year) if row.year is not None else None
+        title_l = str(row.title or '').casefold()
+        original_l = str(row.original_title or '').casefold()
+        rank = (
+            2.0
+            if _has_word_boundary_match(title_l, q_lower)
+            or _has_word_boundary_match(original_l, q_lower)
+            else 1.0
+        )
+        items.append((item, rank, year))
+    items.sort(key=lambda row: (-row[1], row[0].title.lower()))
+    return items
+
+
+def _has_word_boundary_match(haystack: str, needle: str) -> bool:
+    """True when ``needle`` appears not glued inside a longer alnum run."""
+    if not needle or needle not in haystack:
+        return False
+    start = 0
+    while True:
+        idx = haystack.find(needle, start)
+        if idx < 0:
+            return False
+        before_ok = idx == 0 or not haystack[idx - 1].isalnum()
+        end = idx + len(needle)
+        after_ok = end >= len(haystack) or not haystack[end].isalnum()
+        if before_ok and after_ok:
+            return True
+        start = idx + 1
+
+
 async def search_people(
     session: AsyncSession,
     *,

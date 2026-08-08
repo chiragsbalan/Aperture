@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CollectionSheet } from '@/components/collection-sheet';
 import { CreateCustomListForm } from '@/components/create-custom-list-form';
 import { ListTitleWithVisibility } from '@/components/list-title-with-visibility';
+import { MembershipMarkIcon } from '@/components/shelf-chrome-icons';
 import type { CustomListSummary } from '@/lib/library';
 
 interface LibraryAddToListSheetProps {
@@ -107,18 +108,34 @@ export function LibraryAddToListSheet({
       ) : (
         <>
           {lists.length === 0 ? (
-            <p className="text-sm text-muted">No custom lists yet.</p>
+            <p className="text-muted">No custom lists yet.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-1">
               {lists.map((list) => {
                 const checked = Boolean(listMembership[list.id]);
                 const isNewList = list.id === focusCreatedListId;
                 return (
                   <li key={list.id}>
-                    <label className="flex cursor-pointer items-center gap-3 text-sm">
+                    <label
+                      className={[
+                        'flex cursor-pointer items-center gap-3 px-2 py-2.5 -mx-2 rounded-[var(--radius-sm)] transition-colors',
+                        'has-[:focus-visible]:outline has-[:focus-visible]:outline-2',
+                        'has-[:focus-visible]:outline-offset-2',
+                        'has-[:focus-visible]:outline-[var(--color-focus)]',
+                        checked
+                          ? 'bg-[var(--color-accent-soft)]'
+                          : pending
+                            ? ''
+                            : 'hover:bg-[var(--color-surface)]/40',
+                        pending ? 'opacity-60' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
                       <input
                         ref={isNewList ? newListCheckboxRef : undefined}
                         type="checkbox"
+                        className="sr-only"
                         checked={checked}
                         disabled={pending}
                         onChange={() => {
@@ -128,7 +145,11 @@ export function LibraryAddToListSheet({
                       <ListTitleWithVisibility
                         title={list.title}
                         visibility={list.visibility}
+                        className="min-w-0 flex-1 font-medium text-foreground"
                       />
+                      {checked ? (
+                        <MembershipMarkIcon className="shrink-0 text-[var(--color-accent)]" />
+                      ) : null}
                     </label>
                   </li>
                 );
@@ -136,28 +157,30 @@ export function LibraryAddToListSheet({
             </ul>
           )}
           {error ? (
-            <p className="mt-4 text-sm text-[var(--color-danger)]" role="alert">
+            <p className="mt-3 text-sm text-[var(--color-danger)]" role="alert">
               {error}
             </p>
           ) : null}
-          <button
-            ref={createControlRef}
-            type="button"
-            className="btn btn-ghost mt-6"
-            onClick={() => {
-              setMode('create');
-            }}
-          >
-            Create new list
-          </button>
-          <button
-            ref={doneButtonRef}
-            type="button"
-            className="btn mt-3"
-            onClick={onDismiss}
-          >
-            Done
-          </button>
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <button
+              ref={createControlRef}
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setMode('create');
+              }}
+            >
+              Create new list
+            </button>
+            <button
+              ref={doneButtonRef}
+              type="button"
+              className="btn"
+              onClick={onDismiss}
+            >
+              Done
+            </button>
+          </div>
         </>
       )}
     </CollectionSheet>
