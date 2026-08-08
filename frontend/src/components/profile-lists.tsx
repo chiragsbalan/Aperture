@@ -65,7 +65,7 @@ export function ProfileLists({ username }: { username: string }) {
   return (
     <section className="mt-6 text-left">
       {state.lists.length === 0 ? (
-        <p className="text-muted">No lists to show.</p>
+        <p className="text-muted">No lists yet.</p>
       ) : (
         <ul className="divide-y divide-[var(--color-border)] border-b border-[var(--color-border)]">
           {state.lists.map((list) => {
