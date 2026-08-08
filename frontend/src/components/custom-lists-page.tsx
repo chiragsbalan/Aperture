@@ -8,6 +8,7 @@ import { CreateCustomListSheet } from '@/components/create-custom-list-sheet';
 import { LibraryNav } from '@/components/library-nav';
 import { ListTitleWithVisibility } from '@/components/list-title-with-visibility';
 import { PlusOutlineIcon } from '@/components/shelf-chrome-icons';
+import { ListRowsSkeleton } from '@/components/skeleton';
 import { fetchMyCustomLists, type CustomListSummary } from '@/lib/library';
 import { listDetailHref } from '@/lib/list-nav';
 
@@ -83,9 +84,10 @@ export function CustomListsPage() {
       <LibraryNav />
 
       {state.status === 'loading' ? (
-        <p className="mt-10 text-muted" role="status">
-          Loading…
-        </p>
+        <div role="status" aria-busy="true">
+          <span className="sr-only">Loading…</span>
+          <ListRowsSkeleton className="mt-10" />
+        </div>
       ) : null}
 
       {state.status === 'signed_out' ? (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { PosterGridSkeleton } from '@/components/skeleton';
 import { TitlePosterLink } from '@/components/title-poster-link';
 import {
   fetchPublicWatchlist,
@@ -76,9 +77,10 @@ export function PublicWatchlistPage({ username }: { username: string }) {
 
   if (state.status === 'loading') {
     return (
-      <p className="mt-6 text-muted" role="status">
-        Loading…
-      </p>
+      <div role="status" aria-busy="true">
+        <span className="sr-only">Loading…</span>
+        <PosterGridSkeleton className="mt-6" />
+      </div>
     );
   }
 

@@ -1,4 +1,5 @@
 import { PublicProfileView } from '@/components/public-profile';
+import { ProfileHeaderSkeleton } from '@/components/skeleton';
 import { SiteHeader } from '@/components/site-header';
 import { Suspense, type ReactNode } from 'react';
 
@@ -23,9 +24,7 @@ export default async function ProfileShellLayout({
         id="main-content"
         className="layout-content motion-fade-rise relative z-[1] w-full"
       >
-        <Suspense
-          fallback={<p className="mt-8 text-muted">Loading profile…</p>}
-        >
+        <Suspense fallback={<ProfileHeaderSkeleton />}>
           <PublicProfileView username={username}>{children}</PublicProfileView>
         </Suspense>
       </main>

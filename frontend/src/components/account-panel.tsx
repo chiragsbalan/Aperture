@@ -2,6 +2,7 @@
 
 import { useAuth, type MeResponse } from '@/components/auth-provider';
 import { ProfileAvatar } from '@/components/profile-avatar';
+import { FormSkeleton } from '@/components/skeleton';
 import { oauthErrorMessage } from '@/lib/google-oauth-errors';
 import { invalidatePublicWatchEntries } from '@/lib/library';
 import Link from 'next/link';
@@ -63,11 +64,7 @@ export function AccountPanel() {
   }, [authStatus, authMe]);
 
   if (state.status === 'loading') {
-    return (
-      <p className="mt-8 text-muted" role="status">
-        Loading account…
-      </p>
-    );
+    return <FormSkeleton rows={3} />;
   }
 
   if (state.status === 'error') {
