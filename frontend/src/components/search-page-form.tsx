@@ -6,13 +6,17 @@ import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { SearchIcon } from '@/components/search-icon';
 
 const DEBOUNCE_MS = 250;
-/** Min / max width of the growing field (ch units ≈ character width). */
+/** Minimum field width (ch ≈ character width of the current font). */
 const MIN_WIDTH_CH = 10;
-const MAX_WIDTH_CH = 28;
+/** Backend ``MAX_QUERY_LENGTH`` — keep typing within the API contract. */
+const MAX_QUERY_LENGTH = 100;
 
 /**
  * Expanded navbar search field used on ``/search`` in place of the icon
  * trigger. Same slot as ``SiteSearch`` (immediately left of AccountMenu).
+ *
+ * Grows with the query; capped at half the viewport on mobile and one third
+ * on ``sm+`` (anchored in the right-side header cluster).
  */
 export function SearchPageForm() {
   const router = useRouter();
@@ -21,7 +25,7 @@ export function SearchPageForm() {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState(initialQuery);
-  const widthCh = Math.min(MAX_WIDTH_CH, Math.max(MIN_WIDTH_CH, q.length + 2));
+  const widthCh = Math.max(MIN_WIDTH_CH, q.length + 2);
 
   useEffect(() => {
     setQ(initialQuery);
@@ -51,7 +55,7 @@ export function SearchPageForm() {
           : '/search';
       const current = `${window.location.pathname}${window.location.search}`;
       if (current !== next) {
-        router.replace(next);
+        router.replace(next, { scroll: false });
       }
     }, DEBOUNCE_MS);
     return () => {
@@ -63,19 +67,21 @@ export function SearchPageForm() {
     event.preventDefault();
     const cleaned = q.trim();
     if (!cleaned) {
-      router.replace('/search');
+      router.replace('/search', { scroll: false });
       return;
     }
-    router.replace(`/search?q=${encodeURIComponent(cleaned)}`);
+    router.replace(`/search?q=${encodeURIComponent(cleaned)}`, {
+      scroll: false,
+    });
   }
 
   return (
-    <form role="search" onSubmit={onSubmit} className="shrink-0">
+    <form role="search" onSubmit={onSubmit} className="min-w-0 shrink">
       <label htmlFor={inputId} className="sr-only">
         Search titles and people
       </label>
       <div
-        className="flex h-11 items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--overlay-surface-bg)] px-2.5 backdrop-blur-[14px] sm:h-12 sm:gap-2.5 sm:px-3"
+        className="flex h-11 max-w-[50vw] items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--overlay-surface-bg)] px-2.5 backdrop-blur-[14px] sm:h-12 sm:max-w-[33.333vw] sm:gap-2.5 sm:px-3"
         style={{ width: `${widthCh}ch` }}
       >
         <input
@@ -89,7 +95,7 @@ export function SearchPageForm() {
           }}
           placeholder="Search"
           autoComplete="off"
-          maxLength={100}
+          maxLength={MAX_QUERY_LENGTH}
           className="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted outline-none focus-visible:outline-none sm:text-base"
         />
         <SearchIcon className="h-5 w-5 shrink-0 text-muted sm:h-6 sm:w-6" />
