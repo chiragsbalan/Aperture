@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { SearchResultsSkeleton } from '@/components/skeleton';
@@ -16,8 +17,6 @@ import {
   type SearchResponse,
 } from '@/lib/search';
 import { compareRankableTitles, titleMatchTier } from '@/lib/search-rank';
-
-const DEBOUNCE_MS = 250;
 
 interface UnifiedTitle {
   key: string;
@@ -111,19 +110,24 @@ function unifyTitles(
 }
 
 export function SearchResults({
-  query,
+  query: queryProp,
   initialResults = null,
   initialRelated = null,
   initialExternal = null,
   initialError = null,
 }: {
+  /** SSR / first-paint query; live typing prefers ``useSearchParams``. */
   query: string;
   initialResults?: SearchHit[] | null;
   initialRelated?: SearchCard[] | null;
   initialExternal?: SearchCard[] | null;
   initialError?: string | null;
 }) {
-  const ssrQueryRef = useRef(query.trim());
+  const searchParams = useSearchParams();
+  const query = searchParams.get('q') ?? queryProp;
+  const cleaned = query.trim();
+
+  const ssrQueryRef = useRef(queryProp.trim());
   const [results, setResults] = useState<SearchHit[] | null>(initialResults);
   const [related, setRelated] = useState<SearchCard[] | null>(initialRelated);
   const [external, setExternal] = useState<SearchCard[] | null>(
@@ -133,7 +137,6 @@ export function SearchResults({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const cleaned = query.trim();
     if (!cleaned) {
       setResults([]);
       setRelated([]);
@@ -143,40 +146,44 @@ export function SearchResults({
       return;
     }
 
-    // First paint already has SSR results for this q; skip the debounce refetch.
+    // First paint already has SSR results for this q; skip the client refetch.
     if (
       cleaned === ssrQueryRef.current &&
       (initialResults != null || initialError != null)
     ) {
       ssrQueryRef.current = '';
+      setResults(initialResults ?? []);
+      setRelated(initialRelated ?? []);
+      setExternal(initialExternal ?? []);
+      setError(initialError);
+      setLoading(false);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        const res = await fetchSearch(cleaned);
-        if (cancelled) {
-          return;
-        }
-        if (!res.ok) {
-          setError(res.error);
-          setResults([]);
-          setRelated([]);
-          setExternal([]);
-          setLoading(false);
-          return;
-        }
-        applyResponse(res.data);
-        setError(null);
+    setError(null);
+
+    void (async () => {
+      const res = await fetchSearch(cleaned);
+      if (cancelled) {
+        return;
+      }
+      if (!res.ok) {
+        setError(res.error);
+        setResults([]);
+        setRelated([]);
+        setExternal([]);
         setLoading(false);
-      })();
-    }, DEBOUNCE_MS);
+        return;
+      }
+      applyResponse(res.data);
+      setError(null);
+      setLoading(false);
+    })();
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
     };
 
     function applyResponse(data: SearchResponse) {
@@ -184,19 +191,21 @@ export function SearchResults({
       setRelated(data.related ?? []);
       setExternal(data.external ?? []);
     }
-  }, [query, initialResults, initialError]);
+  }, [cleaned, initialResults, initialRelated, initialExternal, initialError]);
 
   const titles = useMemo(
-    () => unifyTitles(query, results ?? [], related ?? [], external ?? []),
-    [query, results, related, external],
+    () => unifyTitles(cleaned, results ?? [], related ?? [], external ?? []),
+    [cleaned, results, related, external],
   );
   const people = (results ?? []).filter((hit) => hit.type === 'person');
 
-  if (!query.trim()) {
+  if (!cleaned) {
     return null;
   }
 
-  if (loading && results == null) {
+  // Always show the shared skeleton while a request is in flight (including
+  // when a prior empty ``[]`` would otherwise flash “No results”).
+  if (loading) {
     return <SearchResultsSkeleton />;
   }
 
@@ -211,7 +220,9 @@ export function SearchResults({
   if (titles.length === 0 && people.length === 0) {
     return (
       <p className="text-muted">
-        No results for “{query.trim()}”. Try another title or name.
+        No results for “{cleaned}”.
+        <br />
+        Try another title or name.
       </p>
     );
   }

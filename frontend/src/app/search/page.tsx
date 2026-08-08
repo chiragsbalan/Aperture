@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
 import { SearchResults } from '@/components/search-results';
+import { SearchResultsSkeleton } from '@/components/skeleton';
 import { SiteHeader } from '@/components/site-header';
 import { fetchSearchServer } from '@/lib/search.server';
 
@@ -29,13 +31,15 @@ export default async function SearchPage({
         className="layout-content layout-shell-pad-top relative z-[1] pb-16 motion-fade-rise"
       >
         <h1 className="sr-only">Search</h1>
-        <SearchResults
-          query={q}
-          initialResults={initial?.ok ? initial.data.results : null}
-          initialRelated={initial?.ok ? (initial.data.related ?? []) : null}
-          initialExternal={initial?.ok ? (initial.data.external ?? []) : null}
-          initialError={initial != null && !initial.ok ? initial.error : null}
-        />
+        <Suspense fallback={<SearchResultsSkeleton />}>
+          <SearchResults
+            query={q}
+            initialResults={initial?.ok ? initial.data.results : null}
+            initialRelated={initial?.ok ? (initial.data.related ?? []) : null}
+            initialExternal={initial?.ok ? (initial.data.external ?? []) : null}
+            initialError={initial != null && !initial.ok ? initial.error : null}
+          />
+        </Suspense>
       </main>
     </div>
   );
