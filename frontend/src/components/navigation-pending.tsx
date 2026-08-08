@@ -5,12 +5,15 @@ import { useEffect, useRef, useState } from 'react';
 
 import { isTitlePosterFlightActive } from '@/lib/title-poster-flight';
 
+/** Keep the bar visible long enough to read (soft navs often finish in &lt;1 frame). */
+const MIN_VISIBLE_MS = 450;
+
 /**
  * Immediate navigation feedback for App Router soft navigations.
  *
  * ``loading.tsx`` often stays hidden until the RSC payload arrives (React keeps
  * the previous UI during the transition). This bar arms on internal link click
- * so the user sees motion right away; it clears when the URL settles.
+ * so the user sees motion right away.
  *
  * Skipped while a title-poster FLIP is active — the morph is already the cue.
  */
@@ -20,10 +23,44 @@ export function NavigationPending() {
   const [pending, setPending] = useState(false);
   const urlKey = `${pathname}?${searchParams.toString()}`;
   const urlKeyRef = useRef(urlKey);
+  const armedAtRef = useRef<number | null>(null);
+  const hideTimerRef = useRef<number | null>(null);
   urlKeyRef.current = urlKey;
 
+  function clearHideTimer(): void {
+    if (hideTimerRef.current != null) {
+      window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }
+
+  function armPending(): void {
+    clearHideTimer();
+    armedAtRef.current = performance.now();
+    setPending(true);
+  }
+
+  function scheduleClear(): void {
+    if (armedAtRef.current == null) {
+      setPending(false);
+      return;
+    }
+    const elapsed = performance.now() - armedAtRef.current;
+    const wait = Math.max(0, MIN_VISIBLE_MS - elapsed);
+    clearHideTimer();
+    hideTimerRef.current = window.setTimeout(() => {
+      armedAtRef.current = null;
+      hideTimerRef.current = null;
+      setPending(false);
+    }, wait);
+  }
+
   useEffect(() => {
-    setPending(false);
+    // URL settled — clear after the minimum visible window.
+    if (armedAtRef.current != null) {
+      scheduleClear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to URL changes
   }, [urlKey]);
 
   useEffect(() => {
@@ -32,6 +69,7 @@ export function NavigationPending() {
     }
     // Safety: never leave the bar stuck if a navigation is aborted.
     const timer = window.setTimeout(() => {
+      armedAtRef.current = null;
       setPending(false);
     }, 10_000);
     return () => {
@@ -40,24 +78,23 @@ export function NavigationPending() {
   }, [pending]);
 
   useEffect(() => {
-    function shouldIgnoreClick(event: MouseEvent): boolean {
+    return () => {
+      clearHideTimer();
+    };
+  }, []);
+
+  useEffect(() => {
+    function onClick(event: MouseEvent): void {
       if (
-        event.defaultPrevented ||
         event.button !== 0 ||
         event.metaKey ||
         event.ctrlKey ||
         event.shiftKey ||
         event.altKey
       ) {
-        return true;
-      }
-      return false;
-    }
-
-    function onClick(event: MouseEvent): void {
-      if (shouldIgnoreClick(event)) {
         return;
       }
+      // Capture phase runs before Link handlers; do not require !defaultPrevented.
       if (isTitlePosterFlightActive()) {
         return;
       }
@@ -97,7 +134,7 @@ export function NavigationPending() {
         return;
       }
 
-      setPending(true);
+      armPending();
     }
 
     document.addEventListener('click', onClick, true);
