@@ -6,8 +6,6 @@ import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { SearchIcon } from '@/components/search-icon';
 
 const DEBOUNCE_MS = 250;
-/** Minimum field width (ch ≈ character width of the current font). */
-const MIN_WIDTH_CH = 10;
 /** Backend ``MAX_QUERY_LENGTH`` — keep typing within the API contract. */
 const MAX_QUERY_LENGTH = 100;
 
@@ -15,8 +13,9 @@ const MAX_QUERY_LENGTH = 100;
  * Expanded navbar search field used on ``/search`` in place of the icon
  * trigger. Same slot as ``SiteSearch`` (immediately left of AccountMenu).
  *
- * Grows with the query; capped at half the viewport on mobile and one third
- * on ``sm+`` (anchored in the right-side header cluster).
+ * Grows with the typed query via an invisible text sizer (real glyph width),
+ * so the magnifier chrome does not clip characters. Capped at half the
+ * viewport on mobile and one third on ``sm+``.
  */
 export function SearchPageForm() {
   const router = useRouter();
@@ -25,7 +24,6 @@ export function SearchPageForm() {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState(initialQuery);
-  const widthCh = Math.max(MIN_WIDTH_CH, q.length + 2);
 
   useEffect(() => {
     setQ(initialQuery);
@@ -75,29 +73,38 @@ export function SearchPageForm() {
     });
   }
 
+  const sizerText = q.length > 0 ? q : 'Search';
+
   return (
     <form role="search" onSubmit={onSubmit} className="min-w-0 shrink">
       <label htmlFor={inputId} className="sr-only">
         Search titles and people
       </label>
-      <div
-        className="flex h-11 max-w-[50vw] items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--overlay-surface-bg)] px-2.5 backdrop-blur-[14px] sm:h-12 sm:max-w-[33.333vw] sm:gap-2.5 sm:px-3"
-        style={{ width: `${widthCh}ch` }}
-      >
-        <input
-          ref={inputRef}
-          id={inputId}
-          name="q"
-          type="search"
-          value={q}
-          onChange={(event) => {
-            setQ(event.target.value);
-          }}
-          placeholder="Search"
-          autoComplete="off"
-          maxLength={MAX_QUERY_LENGTH}
-          className="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted outline-none focus-visible:outline-none sm:text-base"
-        />
+      <div className="inline-grid h-11 max-w-[50vw] grid-cols-[minmax(0,auto)_auto] items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--overlay-surface-bg)] px-2.5 backdrop-blur-[14px] sm:h-12 sm:max-w-[33.333vw] sm:gap-2.5 sm:px-3">
+        <div className="inline-grid min-w-[4.5rem] max-w-full items-center overflow-x-auto">
+          <span
+            aria-hidden
+            className="invisible col-start-1 row-start-1 whitespace-pre text-sm sm:text-base"
+          >
+            {sizerText}
+            {/* Caret pad so the last glyph is not flush against the icon. */}
+            {'\u00a0\u00a0'}
+          </span>
+          <input
+            ref={inputRef}
+            id={inputId}
+            name="q"
+            type="search"
+            value={q}
+            onChange={(event) => {
+              setQ(event.target.value);
+            }}
+            placeholder="Search"
+            autoComplete="off"
+            maxLength={MAX_QUERY_LENGTH}
+            className="col-start-1 row-start-1 w-full min-w-0 bg-transparent text-sm text-foreground placeholder:text-muted outline-none focus-visible:outline-none sm:text-base [&::-webkit-search-cancel-button]:appearance-none"
+          />
+        </div>
         <SearchIcon className="h-5 w-5 shrink-0 text-muted sm:h-6 sm:w-6" />
       </div>
     </form>
