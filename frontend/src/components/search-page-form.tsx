@@ -81,7 +81,7 @@ export function SearchPageForm() {
         Search titles and people
       </label>
       <div className="inline-grid h-11 max-w-[50vw] grid-cols-[minmax(0,auto)_auto] items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--overlay-surface-bg)] px-2.5 backdrop-blur-[14px] sm:h-12 sm:max-w-[33.333vw] sm:gap-2.5 sm:px-3">
-        <div className="inline-grid min-w-[4.5rem] max-w-full items-center overflow-x-auto">
+        <div className="inline-grid min-w-[4.5rem] max-w-full items-center overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <span
             aria-hidden
             className="invisible col-start-1 row-start-1 whitespace-pre text-sm sm:text-base"
@@ -102,7 +102,7 @@ export function SearchPageForm() {
             placeholder="Search"
             autoComplete="off"
             maxLength={MAX_QUERY_LENGTH}
-            className="col-start-1 row-start-1 w-full min-w-0 bg-transparent text-sm text-foreground placeholder:text-muted outline-none focus-visible:outline-none sm:text-base [&::-webkit-search-cancel-button]:appearance-none"
+            className="col-start-1 row-start-1 w-full min-w-0 bg-transparent text-sm text-foreground placeholder:text-muted outline-none focus-visible:outline-none sm:text-base [&::-webkit-search-cancel-button]:appearance-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           />
         </div>
         <SearchIcon className="h-5 w-5 shrink-0 text-muted sm:h-6 sm:w-6" />
