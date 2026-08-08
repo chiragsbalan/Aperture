@@ -27,40 +27,21 @@ export function NavigationPending() {
   const hideTimerRef = useRef<number | null>(null);
   urlKeyRef.current = urlKey;
 
-  function clearHideTimer(): void {
-    if (hideTimerRef.current != null) {
-      window.clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-  }
-
-  function armPending(): void {
-    clearHideTimer();
-    armedAtRef.current = performance.now();
-    setPending(true);
-  }
-
-  function scheduleClear(): void {
+  useEffect(() => {
+    // URL settled — clear after the minimum visible window.
     if (armedAtRef.current == null) {
-      setPending(false);
       return;
     }
     const elapsed = performance.now() - armedAtRef.current;
     const wait = Math.max(0, MIN_VISIBLE_MS - elapsed);
-    clearHideTimer();
+    if (hideTimerRef.current != null) {
+      window.clearTimeout(hideTimerRef.current);
+    }
     hideTimerRef.current = window.setTimeout(() => {
       armedAtRef.current = null;
       hideTimerRef.current = null;
       setPending(false);
     }, wait);
-  }
-
-  useEffect(() => {
-    // URL settled — clear after the minimum visible window.
-    if (armedAtRef.current != null) {
-      scheduleClear();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to URL changes
   }, [urlKey]);
 
   useEffect(() => {
@@ -76,12 +57,6 @@ export function NavigationPending() {
       window.clearTimeout(timer);
     };
   }, [pending]);
-
-  useEffect(() => {
-    return () => {
-      clearHideTimer();
-    };
-  }, []);
 
   useEffect(() => {
     function onClick(event: MouseEvent): void {
@@ -134,12 +109,20 @@ export function NavigationPending() {
         return;
       }
 
-      armPending();
+      if (hideTimerRef.current != null) {
+        window.clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+      armedAtRef.current = performance.now();
+      setPending(true);
     }
 
     document.addEventListener('click', onClick, true);
     return () => {
       document.removeEventListener('click', onClick, true);
+      if (hideTimerRef.current != null) {
+        window.clearTimeout(hideTimerRef.current);
+      }
     };
   }, []);
 
