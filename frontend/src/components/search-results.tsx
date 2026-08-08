@@ -220,7 +220,9 @@ export function SearchResults({
   if (titles.length === 0 && people.length === 0) {
     return (
       <p className="text-muted">
-        No results for “{cleaned}”. Try another title or name.
+        No results for “{cleaned}”.
+        <br />
+        Try another title or name.
       </p>
     );
   }
