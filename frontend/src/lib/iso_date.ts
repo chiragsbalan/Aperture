@@ -83,6 +83,29 @@ export function formatMonthYearLabel(year: number, month: number): string {
   }).format(date);
 }
 
+const MONTH_YEAR_UTC = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
+/** Catalog title / person dates (`March 1999`) from `YYYY-MM-DD`. */
+export function formatIsoMonthYear(
+  isoDate: string | null | undefined,
+): string | null {
+  if (!isoDate) {
+    return null;
+  }
+  const parts = parseIsoDate(isoDate);
+  if (parts == null) {
+    const year = isoDate.slice(0, 4);
+    return /^\d{4}$/.test(year) ? year : null;
+  }
+  return MONTH_YEAR_UTC.format(
+    new Date(Date.UTC(parts.year, parts.month - 1, parts.day)),
+  );
+}
+
 export function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }

@@ -90,19 +90,85 @@ export function DetailHeroSkeleton({
       aria-busy="true"
     >
       <span className="sr-only">Loading…</span>
-      <div className="grid grid-cols-[minmax(0,1fr)_6.75rem] gap-x-4 gap-y-5 sm:grid-cols-[minmax(0,1fr)_18rem] sm:gap-x-12 sm:gap-y-0">
-        <SkeletonPoster className="col-start-2 row-span-2 row-start-1 sm:mt-10" />
-        <div className="col-start-1 row-span-2 row-start-1 flex min-w-0 flex-col justify-center space-y-3 py-0.5 sm:row-span-1 sm:justify-start sm:space-y-4 sm:py-0">
+      <div className="catalog-detail-hero">
+        <SkeletonPoster className="catalog-detail-hero-art" />
+        <div className="catalog-detail-hero-heading space-y-3 sm:space-y-4">
           <SkeletonBlock className="h-8 w-full max-w-[12rem] rounded-sm sm:h-10 sm:max-w-md" />
           <SkeletonBlock className="h-3 w-28 rounded-sm sm:h-4 sm:w-48" />
         </div>
         <div
           aria-hidden
-          className="col-span-2 col-start-1 row-start-3 space-y-2 sm:col-span-1 sm:row-start-2 sm:mt-8 sm:max-w-2xl"
+          className="catalog-detail-hero-body space-y-2 sm:max-w-2xl"
         >
           <SkeletonBlock className="h-3 w-full rounded-sm sm:h-4" />
           <SkeletonBlock className="h-3 w-11/12 rounded-sm sm:h-4" />
           <SkeletonBlock className="h-3 w-4/5 rounded-sm sm:h-4" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Person profile: same hero tracks + Known for posters + text filmography. */
+export function PersonDetailSkeleton() {
+  return (
+    <div
+      className="layout-content layout-shell-pad-top motion-fade-in relative z-[1] pb-16 sm:pb-24"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span className="sr-only">Loading person…</span>
+      <div className="catalog-detail-hero">
+        <SkeletonPoster className="catalog-detail-hero-art" />
+        <div className="catalog-detail-hero-heading space-y-3 sm:space-y-4">
+          <SkeletonBlock className="h-8 w-48 max-w-full rounded-sm sm:h-10 sm:w-72" />
+          <SkeletonBlock className="h-3 w-28 rounded-sm" />
+          <SkeletonBlock className="h-3 w-40 rounded-sm" />
+        </div>
+        <div className="catalog-detail-hero-body">
+          <div className="space-y-2 sm:max-w-2xl">
+            <SkeletonBlock className="h-3 w-full rounded-sm sm:h-4" />
+            <SkeletonBlock className="h-3 w-11/12 rounded-sm sm:h-4" />
+            <SkeletonBlock className="h-3 w-4/5 rounded-sm sm:h-4" />
+          </div>
+          <hr className="title-actions-rule" />
+          <div className="mt-8 sm:mt-10">
+            <div className="border-b border-[var(--color-border)] pb-2">
+              <SkeletonBlock className="h-5 w-28 rounded-sm" />
+            </div>
+            <PosterGridSkeleton className="mt-4" count={12} />
+          </div>
+          <div className="mt-8 sm:mt-10">
+            <div className="border-b border-[var(--color-border)] pb-2">
+              <SkeletonBlock className="h-5 w-48 rounded-sm sm:w-72" />
+            </div>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div className="w-full space-y-1 sm:w-56">
+                <SkeletonBlock className="h-3 w-20 rounded-sm" />
+                <SkeletonBlock className="h-10 w-full rounded-[var(--radius-sm)]" />
+              </div>
+              <div className="w-full space-y-1 sm:w-56">
+                <SkeletonBlock className="h-3 w-12 rounded-sm" />
+                <SkeletonBlock className="h-10 w-full rounded-[var(--radius-sm)]" />
+              </div>
+            </div>
+            <div className="mt-4" aria-hidden>
+              <SkeletonBlock className="h-3 w-12 rounded-sm" />
+              <ul className="mt-2 divide-y divide-[var(--color-border)]">
+                {Array.from({ length: 6 }, (_, index) => (
+                  <li
+                    key={index}
+                    className="flex items-baseline gap-3 py-3 sm:gap-4"
+                  >
+                    <SkeletonBlock className="h-3 w-10 shrink-0 rounded-sm" />
+                    <SkeletonBlock className="h-3.5 w-40 max-w-[45%] rounded-sm sm:w-56" />
+                    <SkeletonBlock className="ml-auto h-3 w-20 max-w-[30%] rounded-sm sm:w-28" />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>

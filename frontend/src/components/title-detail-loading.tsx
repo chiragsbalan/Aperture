@@ -55,8 +55,8 @@ export function TitleDetailLoading({
           aria-busy="true"
         >
           <span className="sr-only">Loading catalog…</span>
-          <div className="grid grid-cols-[minmax(0,1fr)_6.75rem] gap-x-4 gap-y-5 sm:grid-cols-[minmax(0,1fr)_18rem] sm:gap-x-12 sm:gap-y-0">
-            <div className="col-start-2 row-span-2 row-start-1 w-full sm:mt-12">
+          <div className="catalog-detail-hero">
+            <div className="catalog-detail-hero-art">
               {armed != null && shareId != null ? (
                 <TitlePosterFlightTarget contentId={shareId} mode="hold">
                   <SharedTitlePoster
@@ -71,13 +71,13 @@ export function TitleDetailLoading({
                 <SkeletonPoster className="ring-1 ring-[var(--color-border)]" />
               )}
             </div>
-            <div className="motion-fade-in col-start-1 row-span-2 row-start-1 flex min-w-0 flex-col justify-center space-y-3 py-0.5 sm:row-span-1 sm:justify-start sm:space-y-4 sm:py-0">
+            <div className="motion-fade-in catalog-detail-hero-heading space-y-3 sm:space-y-4">
               <SkeletonBlock className="h-8 w-full max-w-[12rem] rounded-sm sm:h-10 sm:max-w-md" />
               <SkeletonBlock className="h-3 w-28 rounded-sm sm:h-4 sm:w-48" />
             </div>
             <div
               aria-hidden
-              className="motion-fade-in col-span-2 col-start-1 row-start-3 space-y-2 sm:col-span-1 sm:row-start-2 sm:mt-1 sm:max-w-2xl"
+              className="motion-fade-in catalog-detail-hero-body space-y-2 sm:max-w-2xl"
             >
               <SkeletonBlock className="h-3 w-full rounded-sm sm:h-4" />
               <SkeletonBlock className="h-3 w-11/12 rounded-sm sm:h-4" />

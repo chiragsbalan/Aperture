@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from app.core.cache import CacheBackend, get_cache
 from app.core.config import Settings
 from app.core.deps import DbSessionDep, SettingsDep
-from app.core.trusted_client import resolve_client_ip
+from app.core.trusted_client import bff_attested_client_ip, resolve_client_ip
 from app.metadata import resolve as metadata_resolve
 from app.metadata import service as metadata_service
 from app.metadata.cache_keys import (
@@ -64,6 +64,7 @@ _now_in_theatres_singleflight = asyncio.Lock()
 # Per-content_id detail MISS coalesce (JSON payload — never ORM).
 _movie_detail_flights: dict[uuid.UUID, asyncio.Future[str]] = {}
 _tv_detail_flights: dict[uuid.UUID, asyncio.Future[str]] = {}
+_person_detail_flights: dict[uuid.UUID, asyncio.Future[str]] = {}
 _detail_flights_lock = asyncio.Lock()
 
 
@@ -72,6 +73,7 @@ def reset_detail_flights() -> None:
     global _detail_flights_lock
     _movie_detail_flights.clear()
     _tv_detail_flights.clear()
+    _person_detail_flights.clear()
     _detail_flights_lock = asyncio.Lock()
 
 
@@ -782,11 +784,12 @@ async def get_tv_season(
 @router.get('/people/{person_id}', response_model=PersonDetail)
 async def get_person(
     person_id: uuid.UUID,
+    request: Request,
     session: DbSessionDep,
     settings: SettingsDep,
     response: Response,
 ) -> PersonDetail:
-    """Return curated person detail for a canonical person id."""
+    """Return hybrid person detail for a canonical person id (ADR-0017)."""
     response.headers['Cache-Control'] = _CACHE_CONTROL
     cache = get_cache()
     key = person_detail_key(person_id)
@@ -794,14 +797,39 @@ async def get_person(
     if cached is not None:
         response.headers['X-Cache'] = 'HIT'
         return PersonDetail.model_validate_json(cached)
+
+    attested_ip = bff_attested_client_ip(request, settings)
+
+    async def _assemble() -> str:
+        again = await cache.get(key)
+        if again is not None:
+            return again
+        try:
+            detail = await metadata_service.get_person_detail(
+                session,
+                person_id,
+                settings=settings,
+                attested_client_ip=attested_ip,
+            )
+        except metadata_service.CatalogNotFoundError as exc:
+            raise _not_found('Person not found') from exc
+        payload = detail.model_dump_json()
+        await cache.set(
+            key,
+            payload,
+            ttl_seconds=settings.metadata_cache_ttl_seconds,
+        )
+        return payload
+
     try:
-        detail = await metadata_service.get_person_detail(session, person_id)
+        payload, is_leader = await _coalesce_detail_miss(
+            content_id=person_id,
+            flights=_person_detail_flights,
+            leader_work=_assemble,
+        )
+    except HTTPException:
+        raise
     except metadata_service.CatalogNotFoundError as exc:
         raise _not_found('Person not found') from exc
-    await cache.set(
-        key,
-        detail.model_dump_json(),
-        ttl_seconds=settings.metadata_cache_ttl_seconds,
-    )
-    response.headers['X-Cache'] = 'MISS'
-    return detail
+    response.headers['X-Cache'] = 'MISS' if is_leader else 'HIT'
+    return PersonDetail.model_validate_json(payload)

@@ -213,6 +213,30 @@ export interface PersonCreditRef {
   job: string | null;
 }
 
+/** Warm or cold title card on person known-for / filmography (ADR-0017). */
+export interface PersonTitleCard {
+  type: 'movie' | 'tv';
+  content_id: string | null;
+  tmdb_id: number | null;
+  title: string;
+  year: number | null;
+  poster_url: string | null;
+  credit_kind: string | null;
+  character: string | null;
+  job: string | null;
+  department: string | null;
+  popularity: number | null;
+  release_date: string | null;
+  runtime_minutes: number | null;
+  rating: TitleRating | null;
+}
+
+export interface PersonSocialLink {
+  kind: string;
+  label: string;
+  url: string;
+}
+
 export interface PersonDetail {
   type: 'person';
   id: string;
@@ -222,7 +246,12 @@ export interface PersonDetail {
   deathday: string | null;
   place_of_birth: string | null;
   profile_url: string | null;
-  credits: PersonCreditRef[];
+  known_for_department: string | null;
+  also_known_as: string[];
+  socials: PersonSocialLink[];
+  known_for: PersonTitleCard[];
+  filmography: PersonTitleCard[];
+  departments: string[];
 }
 
 export type CatalogFetchResult<T> =
@@ -230,6 +259,7 @@ export type CatalogFetchResult<T> =
 
 async function fetchCatalogJson<T>(
   path: string,
+  options?: { trustedClientIp?: boolean },
 ): Promise<CatalogFetchResult<T>> {
   let base: string;
   try {
@@ -239,12 +269,15 @@ async function fetchCatalogJson<T>(
   }
 
   try {
+    const requestHeaders = options?.trustedClientIp
+      ? await catalogUpstreamHeaders()
+      : new Headers({ Accept: 'application/json' });
     // Avoid sticky Data Cache in local dev so schema/fixture changes show up.
     const res = await fetch(`${base}${path}`, {
       ...(process.env.NODE_ENV === 'development'
         ? { cache: 'no-store' as const }
         : { next: { revalidate: 300 } }),
-      headers: { Accept: 'application/json' },
+      headers: requestHeaders,
       signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS),
     });
     if (res.status === 404) {
@@ -561,8 +594,10 @@ export const fetchTv = cache(function fetchTv(
 export const fetchPerson = cache(function fetchPerson(
   id: string,
 ): Promise<CatalogFetchResult<PersonDetail>> {
+  // Trusted IP headers required for dual person-enrich RL (ADR-0017).
   return fetchCatalogJson<PersonDetail>(
     `/api/v1/people/${encodeURIComponent(id)}`,
+    { trustedClientIp: true },
   );
 });
 

@@ -1,7 +1,5 @@
-import {
-  CatalogUnavailable,
-  PersonDetailView,
-} from '@/components/catalog-detail';
+import { CatalogUnavailable } from '@/components/catalog-detail';
+import { PersonDetailView } from '@/components/person-detail-view';
 import { SiteHeader } from '@/components/site-header';
 import { fetchPerson } from '@/lib/catalog';
 import type { Metadata } from 'next';

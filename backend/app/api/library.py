@@ -20,6 +20,7 @@ from app.library.schemas import (
     PatchWatchEntryBody,
     WatchEntriesContainsResponse,
     WatchEntriesPageResponse,
+    WatchEntriesRatingsResponse,
     WatchEntryResponse,
 )
 from app.lists import service as lists_service
@@ -67,14 +68,19 @@ def _map_lists_error(exc: Exception) -> HTTPException | None:
 
 
 _MAX_CONTAINS_IDS = 50
+_MAX_RATINGS_IDS = 150
 
 
-def _parse_contains_ids(raw: list[str]) -> list[tuple[str, uuid.UUID]]:
-    """Parse ``type:uuid`` tokens from the contains query."""
-    if len(raw) > _MAX_CONTAINS_IDS:
+def _parse_contains_ids(
+    raw: list[str],
+    *,
+    max_ids: int = _MAX_CONTAINS_IDS,
+) -> list[tuple[str, uuid.UUID]]:
+    """Parse ``type:uuid`` tokens from the contains / ratings query."""
+    if len(raw) > max_ids:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=f'At most {_MAX_CONTAINS_IDS} ids are allowed',
+            detail=f'At most {max_ids} ids are allowed',
         )
     refs: list[tuple[str, uuid.UUID]] = []
     for token in raw:
@@ -141,6 +147,36 @@ async def watch_entries_contains(
     refs = _parse_contains_ids(ids)
     try:
         return await library_service.contains_logged_titles(
+            session,
+            identity_id=identity.id,
+            refs=refs,
+        )
+    except Exception as exc:
+        mapped = _map_library_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.get(
+    '/me/watch-entries/ratings',
+    response_model=WatchEntriesRatingsResponse,
+)
+async def watch_entries_ratings(
+    identity: CurrentIdentityDep,
+    session: DbSessionDep,
+    settings: SettingsDep,
+    ids: Annotated[list[str], Query(min_length=1)],
+) -> WatchEntriesRatingsResponse:
+    """Batch latest non-null diary ratings for the caller (cap 150 ids)."""
+    await enforce_watch_entries_contains_rate_limit(
+        get_cache(),
+        settings=settings,
+        identity_id=identity.id,
+    )
+    refs = _parse_contains_ids(ids, max_ids=_MAX_RATINGS_IDS)
+    try:
+        return await library_service.latest_ratings_for_titles(
             session,
             identity_id=identity.id,
             refs=refs,

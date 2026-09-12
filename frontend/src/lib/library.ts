@@ -345,6 +345,34 @@ export async function fetchWatchEntriesContains(
   return { ok: true, membership: body.membership };
 }
 
+interface RatingsResponse {
+  ratings: Record<string, number>;
+}
+
+/** Latest non-null diary rating per title (omits unrated ids). */
+export async function fetchWatchEntryRatings(
+  refs: Array<{ type: LibraryContentType; id: string }>,
+): Promise<
+  { ok: true; ratings: Record<string, number> } | { ok: false; status: number }
+> {
+  if (refs.length === 0) {
+    return { ok: true, ratings: {} };
+  }
+  const params = new URLSearchParams();
+  for (const ref of refs.slice(0, 150)) {
+    params.append('ids', membershipKey(ref.type, ref.id));
+  }
+  const res = await fetch(
+    `/api/proxy/api/v1/me/watch-entries/ratings?${params.toString()}`,
+    { cache: 'no-store' },
+  );
+  if (!res.ok) {
+    return { ok: false, status: res.status };
+  }
+  const body = (await res.json()) as RatingsResponse;
+  return { ok: true, ratings: body.ratings };
+}
+
 export async function fetchMyCustomLists(): Promise<
   | { ok: true; lists: CustomListSummary[] }
   | { ok: false; status: number; error: string }

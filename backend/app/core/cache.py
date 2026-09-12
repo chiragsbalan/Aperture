@@ -35,6 +35,9 @@ class CacheBackend(Protocol):
     async def set(self, key: str, value: str, *, ttl_seconds: int) -> None:
         """Store ``value`` under ``key`` for ``ttl_seconds``."""
 
+    async def set_nx(self, key: str, value: str, *, ttl_seconds: int) -> bool:
+        """Store ``value`` only if ``key`` is absent. Return True if acquired."""
+
     async def delete(self, key: str) -> None:
         """Remove ``key`` if present."""
 
@@ -81,6 +84,21 @@ class InMemoryCacheBackend:
                 value=value,
                 expires_at=time.monotonic() + ttl_seconds,
             )
+
+    async def set_nx(self, key: str, value: str, *, ttl_seconds: int) -> bool:
+        async with self._lock:
+            now = time.monotonic()
+            entry = self._entries.get(key)
+            if entry is not None and entry.expires_at > now:
+                return False
+            if ttl_seconds <= 0:
+                self._entries.pop(key, None)
+                return True
+            self._entries[key] = _CacheEntry(
+                value=value,
+                expires_at=now + ttl_seconds,
+            )
+            return True
 
     async def delete(self, key: str) -> None:
         async with self._lock:
@@ -152,6 +170,19 @@ class RedisCacheBackend:
             await self._redis.set(key, value, ex=ttl_seconds)
         except Exception:
             logger.warning('redis set failed; continuing without cache', exc_info=True)
+
+    async def set_nx(self, key: str, value: str, *, ttl_seconds: int) -> bool:
+        if ttl_seconds <= 0:
+            await self.delete(key)
+            return True
+        try:
+            acquired = await self._redis.set(key, value, ex=ttl_seconds, nx=True)
+        except Exception:
+            logger.warning(
+                'redis set_nx failed; treating as not acquired', exc_info=True
+            )
+            return False
+        return bool(acquired)
 
     async def delete(self, key: str) -> None:
         try:

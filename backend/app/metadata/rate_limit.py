@@ -7,9 +7,12 @@ are not silently disabled (per-instance only while Redis is down).
 Keys are ``metadata:rl:resolve:ip:{sha256}``,
 ``metadata:rl:ingest:ip:{sha256}``,
 ``metadata:rl:season-hydrate:ip:{sha256}``,
-``metadata:rl:landing:ip:{sha256}``, and
-``metadata:rl:top-movies:ip:{sha256}``. Missing/empty client IPs use the shared
-``unknown`` subject so limits still apply.
+``metadata:rl:landing:ip:{sha256}``,
+``metadata:rl:top-movies:ip:{sha256}``,
+``metadata:rl:person-enrich:ip:{sha256}``, and
+``metadata:rl:person-enrich:global``. Missing/empty client IPs use the shared
+``unknown`` subject so limits still apply (except person-enrich dual RL, which
+routes unattested traffic to the global bucket).
 
 Client IP should come from ``resolve_client_ip`` (trusted
 ``X-Aperture-Client-IP`` when BFF secret matches; otherwise peer /
@@ -159,3 +162,41 @@ async def enforce_top_movies_rate_limit(
         window_seconds=settings.top_movies_rate_limit_window_seconds,
         detail='Too many top movies requests. Try again later.',
     )
+
+
+async def enforce_person_enrich_rate_limit(
+    cache: CacheBackend,
+    *,
+    settings: Settings,
+    attested_client_ip: str | None,
+) -> None:
+    """Dual RL for live person enrich (ADR-0017).
+
+    BFF-attested IPs use a per-IP bucket; unattested / SSR-without-IP traffic
+    shares a separate global budget. Call only when about to hit TMDb.
+    """
+    window = settings.metadata_person_enrich_rate_limit_window_seconds
+    if attested_client_ip:
+        await _enforce(
+            cache,
+            client_ip=attested_client_ip,
+            bucket='person-enrich',
+            max_per_ip=settings.metadata_person_enrich_rate_limit_max_per_ip,
+            window_seconds=window,
+            detail='Too many person enrich requests. Try again later.',
+        )
+        return
+    # Global bucket (not IP-hashed): one shared counter for unattested traffic.
+    key = 'metadata:rl:person-enrich:global'
+    try:
+        count = await cache.incr(key, ttl_seconds=window)
+    except CacheBackendError:
+        logger.warning(
+            'metadata person-enrich global rate limit falling back to process-local',
+        )
+        count = await _local_rl_fallback.incr(key, ttl_seconds=window)
+    if count > settings.metadata_person_enrich_rate_limit_max_global:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail='Too many person enrich requests. Try again later.',
+        )

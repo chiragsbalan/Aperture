@@ -22,7 +22,7 @@ from app.metadata.enrichment import (
     merge_enrichment_extras,
 )
 from app.metadata.images import InvalidImagePathError, tmdb_image_url
-from app.metadata.models import ContentCredit, ContentItem, Person
+from app.metadata.models import ContentCredit, ContentItem
 from app.metadata.rate_limit import enforce_season_hydrate_rate_limit
 from app.metadata.schemas import (
     AlternativeTitle,
@@ -37,7 +37,6 @@ from app.metadata.schemas import (
     MovieDetail,
     NamedId,
     NowInTheatresResponse,
-    PersonCreditRef,
     PersonDetail,
     ReleaseEvent,
     SeasonDetail,
@@ -912,35 +911,6 @@ async def _resolve_extras_doc(
     return merged
 
 
-def _person_detail(person: Person) -> PersonDetail:
-    credit_refs: list[PersonCreditRef] = []
-    for credit in person.credits:
-        item = credit.content_item
-        credit_refs.append(
-            PersonCreditRef(
-                type='movie' if item.content_type == 'movie' else 'tv_show',
-                id=item.id,
-                title=item.title,
-                poster_url=_image_url(item.poster_path),
-                credit_kind=credit.credit_kind,
-                character=credit.character or None,
-                job=credit.job or None,
-            )
-        )
-    credit_refs.sort(key=lambda c: (c.title.lower(), c.credit_kind))
-    return PersonDetail(
-        type='person',
-        id=person.id,
-        name=person.name,
-        biography=person.biography,
-        birthday=person.birthday,
-        deathday=person.deathday,
-        place_of_birth=person.place_of_birth,
-        profile_url=_image_url(person.profile_path, size='h632'),
-        credits=credit_refs,
-    )
-
-
 def _content_year(item: ContentItem) -> int | None:
     if item.movie is not None and item.movie.release_date is not None:
         return item.movie.release_date.year
@@ -1200,12 +1170,22 @@ async def get_tv_season_detail(
 async def get_person_detail(
     session: AsyncSession,
     person_id: uuid.UUID,
+    *,
+    settings: Settings,
+    attested_client_ip: str | None = None,
 ) -> PersonDetail:
-    """Load a person detail DTO or raise :class:`CatalogNotFoundError`."""
-    person = await metadata_repository.get_person_by_id(session, person_id)
-    if person is None:
-        raise CatalogNotFoundError('person not found')
-    return _person_detail(person)
+    """Load hybrid person detail (ADR-0017) or raise :class:`CatalogNotFoundError`."""
+    from app.metadata.person_detail import get_person_detail as _hybrid_person_detail
+
+    try:
+        return await _hybrid_person_detail(
+            session,
+            person_id,
+            settings=settings,
+            attested_client_ip=attested_client_ip,
+        )
+    except KeyError as exc:
+        raise CatalogNotFoundError('person not found') from exc
 
 
 async def search_catalog(
