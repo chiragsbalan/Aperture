@@ -3,10 +3,12 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
 const MOBILE_MQ = '(max-width: 639px)';
+const MOBILE_LINE_COUNT = 3;
+const DESKTOP_LINE_COUNT = 6;
 
 /**
- * Title synopsis: full text on desktop; on mobile clamps to 3 lines and
- * toggles open/closed via an overlay button (no “show more” chrome).
+ * Synopsis / biography: clamps by default (3 lines mobile, 6 desktop) and
+ * toggles open/closed via an overlay control (no “show more” chrome).
  */
 export function TitleOverview({
   text,
@@ -30,13 +32,7 @@ export function TitleOverview({
 
     const measure = () => {
       const mobile = window.matchMedia(MOBILE_MQ).matches;
-      if (!mobile) {
-        setCollapsible(false);
-        setExpanded(false);
-        setCollapsedHeight(0);
-        setFullHeight(0);
-        return;
-      }
+      const lineCount = mobile ? MOBILE_LINE_COUNT : DESKTOP_LINE_COUNT;
 
       const previousMaxHeight = el.style.maxHeight;
       const previousOverflow = el.style.overflow;
@@ -49,15 +45,19 @@ export function TitleOverview({
       const lineHeight = Number.isFinite(parsedLineHeight)
         ? parsedLineHeight
         : fontSize * 1.625;
-      const threeLines = lineHeight * 3;
+      const collapsed = lineHeight * lineCount;
       const full = el.scrollHeight;
 
       el.style.maxHeight = previousMaxHeight;
       el.style.overflow = previousOverflow;
 
-      setCollapsedHeight(threeLines);
+      setCollapsedHeight(collapsed);
       setFullHeight(full);
-      setCollapsible(full > threeLines + 1);
+      const needsClamp = full > collapsed + 1;
+      setCollapsible(needsClamp);
+      if (!needsClamp) {
+        setExpanded(false);
+      }
     };
 
     measure();
@@ -85,9 +85,6 @@ export function TitleOverview({
     if (!interactive) {
       return;
     }
-    if (!window.matchMedia(MOBILE_MQ).matches) {
-      return;
-    }
     setExpanded((value) => !value);
   }
 
@@ -113,7 +110,7 @@ export function TitleOverview({
       {interactive ? (
         <button
           type="button"
-          className="absolute inset-0 cursor-pointer sm:cursor-default"
+          className="absolute inset-0 cursor-pointer"
           aria-expanded={expanded}
           aria-controls={synopsisId}
           aria-label={expanded ? 'Hide full overview' : 'Show full overview'}

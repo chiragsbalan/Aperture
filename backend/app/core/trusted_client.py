@@ -19,6 +19,27 @@ def bff_secret_matches(configured: str, provided: str) -> bool:
     return secrets.compare_digest(configured, provided)
 
 
+def bff_attested_client_ip(request: Request, settings: Settings) -> str | None:
+    """Return client IP only when BFF secret matches and the IP header is set.
+
+    Used for dual rate-limit buckets that must not treat socket peer / SSR
+    hops as an attested end-user IP.
+    """
+    configured = settings.auth_bff_shared_secret
+    if not configured:
+        return None
+    provided = request.headers.get('x-aperture-bff-secret') or ''
+    if not bff_secret_matches(configured, provided):
+        return None
+    raw = request.headers.get('x-aperture-client-ip')
+    if not raw:
+        return None
+    ip = raw.strip()
+    if not ip:
+        return None
+    return ip[:64]
+
+
 def resolve_client_ip(request: Request, settings: Settings) -> str | None:
     """Trusted BFF client IP when secret matches; else socket peer.
 
@@ -27,15 +48,9 @@ def resolve_client_ip(request: Request, settings: Settings) -> str | None:
     is set and matches ``X-Aperture-BFF-Secret``. Never returns a
     whitespace-only IP.
     """
-    configured = settings.auth_bff_shared_secret
-    if configured:
-        provided = request.headers.get('x-aperture-bff-secret') or ''
-        if bff_secret_matches(configured, provided):
-            raw = request.headers.get('x-aperture-client-ip')
-            if raw:
-                ip = raw.strip()
-                if ip:
-                    return ip[:64]
+    attested = bff_attested_client_ip(request, settings)
+    if attested is not None:
+        return attested
     if request.client is None:
         return None
     host = request.client.host

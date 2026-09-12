@@ -46,6 +46,7 @@ ADR-0013-lean-catalog-option-b.md
 ADR-0014-avatar-r2-cdn.md
 ADR-0015-title-ratings.md
 ADR-0016-interim-search-recall.md
+ADR-0017-person-profile-enrichment.md
 ```
 
 Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
@@ -67,6 +68,7 @@ Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
 | [ADR-0014](ADR-0014-avatar-r2-cdn.md) | Profile avatars via Cloudflare R2 + custom-domain CDN |
 | [ADR-0015](ADR-0015-title-ratings.md) | Hybrid title ratings (TMDB → Aperture @ 100) |
 | [ADR-0016](ADR-0016-interim-search-recall.md) | Interim hybrid search recall (TMDb External + Related) before OpenSearch P6 |
+| [ADR-0017](ADR-0017-person-profile-enrichment.md) | Person profile hybrid enrich (Known for poster grid ≤30, text filmography timeline, Redis/TMDb + capped PG fallback) |
 
 Reserved / not yet written: **ADR-0007** — OpenSearch hosting (due at P5 exit per PLAN).
 ## Template

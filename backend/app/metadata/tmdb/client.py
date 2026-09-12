@@ -30,6 +30,8 @@ _MOVIE_ENRICH_APPEND = (
     'keywords,release_dates,alternative_titles,recommendations,watch/providers'
 )
 _TV_ENRICH_APPEND = 'recommendations,content_ratings,watch/providers'
+# Person hybrid detail: filmography + social external ids (ADR-0017).
+_PERSON_ENRICH_APPEND = 'combined_credits,external_ids'
 
 _shared_http_client: httpx.AsyncClient | None = None
 _shared_http_client_lock = asyncio.Lock()
@@ -184,6 +186,13 @@ class TmdbClient:
         """Fetch person detail."""
         data = await self._get(f'/person/{tmdb_id}')
         return TmdbPerson.model_validate(data)
+
+    async def get_person_enrichment(self, tmdb_id: int) -> dict[str, Any]:
+        """Fetch person + combined_credits + external_ids for hybrid detail."""
+        return await self._get(
+            f'/person/{tmdb_id}',
+            {'append_to_response': _PERSON_ENRICH_APPEND},
+        )
 
     async def search_multi(self, query: str, *, page: int = 1) -> dict[str, Any]:
         """TMDb multi-search (movies, TV, people). Caller filters media types."""

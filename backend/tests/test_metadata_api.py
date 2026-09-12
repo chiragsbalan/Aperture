@@ -132,7 +132,14 @@ def test_person_detail_200(
     assert body['type'] == 'person'
     assert body['name'] == 'Morgan Freeman'
     assert body['biography']
-    assert any(c['title'] == 'The Shawshank Redemption' for c in body['credits'])
+    # Without TMDb, filmography comes from capped PG credit fallback (ADR-0017).
+    titles = [c['title'] for c in body.get('filmography', [])] + [
+        c['title'] for c in body.get('known_for', [])
+    ]
+    assert 'The Shawshank Redemption' in titles
+    assert isinstance(body.get('departments'), list)
+    assert isinstance(body.get('socials'), list)
+    assert isinstance(body.get('also_known_as'), list)
 
 
 @pytest.mark.integration

@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { CatalogPoster } from '@/components/catalog-poster';
 import { LibraryActions } from '@/components/library-actions';
 import { MoreLikeThis } from '@/components/more-like-this';
 import { RecordTitlePosterHero } from '@/components/record-title-poster-hero';
@@ -10,47 +9,24 @@ import { DetailHeroSkeleton } from '@/components/skeleton';
 import { TitlePosterFlightTarget } from '@/components/title-poster-flight-target';
 import { SiteHeader } from '@/components/site-header';
 import { TitleAtmosphere } from '@/components/title-atmosphere';
+import { TitleMetaRow, TitleMetaStack } from '@/components/title-meta-stack';
 import { TitleMetaTabs } from '@/components/title-meta-tabs';
 import { TitleOverview } from '@/components/title-overview';
-import { TitlePosterLink } from '@/components/title-poster-link';
 import { TitleScore } from '@/components/title-score';
 import { TitleSeasons } from '@/components/title-seasons';
 import { WhereToWatch } from '@/components/where-to-watch';
 import type {
   CreditPersonRef,
   MovieDetail,
-  PersonDetail,
   SeasonDetail,
   TitleExtras,
   TitleRating,
   TvDetail,
 } from '@/lib/catalog';
-import { POSTER_GRID_SIZES } from '@/lib/poster';
+import { formatIsoMonthYear } from '@/lib/iso_date';
 import { formatTvStatusLabel } from '@/lib/tv-status';
 
-const MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat('en-US', {
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-
-function formatMonthYear(isoDate: string | null | undefined): string | null {
-  if (!isoDate) {
-    return null;
-  }
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
-  if (!match) {
-    const year = isoDate.slice(0, 4);
-    return /^\d{4}$/.test(year) ? year : null;
-  }
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  if (month < 1 || month > 12 || day < 1 || day > 31) {
-    return String(year);
-  }
-  return MONTH_YEAR_FORMATTER.format(new Date(Date.UTC(year, month - 1, day)));
-}
+export { PersonDetailView } from '@/components/person-detail-view';
 
 function uniquePeople(credits: CreditPersonRef[]): CreditPersonRef[] {
   const seenIds = new Set<string>();
@@ -110,22 +86,6 @@ function HomeLink() {
         Home
       </Link>
     </p>
-  );
-}
-
-function TitleMetaStack({ children }: { children: ReactNode }) {
-  return (
-    <div className="mt-2 flex flex-col gap-y-1 text-xs text-muted sm:mt-3 sm:gap-y-1.5 sm:text-sm">
-      {children}
-    </div>
-  );
-}
-
-function TitleMetaRow({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 sm:gap-x-3">
-      {children}
-    </div>
   );
 }
 
@@ -238,8 +198,8 @@ function TitleDetailShell({
             so a list→detail morph does not get a second translateY nudge when
             the loaded page replaces the loading shell.
           */}
-          <div className="grid grid-cols-[minmax(0,1fr)_6.75rem] gap-x-4 gap-y-5 sm:grid-cols-[minmax(0,1fr)_18rem] sm:gap-x-12 sm:gap-y-0">
-            <div className="col-start-2 row-span-2 row-start-1 w-full sm:mt-12">
+          <div className="catalog-detail-hero">
+            <div className="catalog-detail-hero-art">
               <TitlePosterFlightTarget contentId={contentId}>
                 <SharedTitlePoster
                   key={contentId}
@@ -258,12 +218,12 @@ function TitleDetailShell({
               </div>
             </div>
 
-            <div className="motion-fade-rise col-start-1 row-span-2 row-start-1 flex min-w-0 flex-col justify-center py-0.5 sm:row-span-1 sm:justify-start sm:py-0">
+            <div className="motion-fade-rise catalog-detail-hero-heading">
               {heading}
               {meta}
             </div>
 
-            <div className="motion-fade-rise col-span-2 col-start-1 row-start-3 min-w-0 sm:col-span-1 sm:row-start-2 sm:mt-1">
+            <div className="motion-fade-rise catalog-detail-hero-body">
               {rating != null ? <TitleScore rating={rating} /> : null}
               {tagline ? (
                 <p
@@ -288,7 +248,7 @@ function TitleDetailShell({
                   No overview yet.
                 </p>
               )}
-              <hr className="title-actions-rule mt-5 border-0 border-t border-[var(--color-border)] sm:mt-6" />
+              <hr className="title-actions-rule" />
               <LibraryActions contentType={contentType} contentId={contentId} />
               <TitleMetaTabs
                 cast={cast}
@@ -320,7 +280,7 @@ function TitleDetailShell({
 }
 
 export function MovieDetailView({ movie }: { movie: MovieDetail }) {
-  const releaseLabel = formatMonthYear(movie.release_date);
+  const releaseLabel = formatIsoMonthYear(movie.release_date);
   const directors = directorsFromCrew(movie.crew);
 
   return (
@@ -363,8 +323,8 @@ export function MovieDetailView({ movie }: { movie: MovieDetail }) {
 }
 
 export function TvDetailView({ show }: { show: TvDetail }) {
-  const firstAir = formatMonthYear(show.first_air_date);
-  const lastAir = formatMonthYear(show.last_air_date);
+  const firstAir = formatIsoMonthYear(show.first_air_date);
+  const lastAir = formatIsoMonthYear(show.last_air_date);
   const airLabel =
     firstAir && lastAir && firstAir !== lastAir
       ? `${firstAir} – ${lastAir}`
@@ -432,76 +392,5 @@ export function TvDetailView({ show }: { show: TvDetail }) {
       }
       overview={show.overview}
     />
-  );
-}
-
-export function PersonDetailView({ person }: { person: PersonDetail }) {
-  return (
-    <article className="layout-content layout-shell-pad-top motion-fade-rise relative z-[1] pb-16 text-left sm:pb-24">
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
-        <div className="mx-auto w-[7.5rem] shrink-0 sm:mx-0 sm:mt-6 sm:w-full sm:max-w-[14rem]">
-          <CatalogPoster
-            url={person.profile_url}
-            alt={person.name}
-            priority
-            sizes="(max-width: 640px) 120px, 224px"
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="type-title-person text-foreground">{person.name}</h1>
-          <div className="mt-3 space-y-1 text-sm text-muted">
-            {person.birthday ? <p>Born {person.birthday}</p> : null}
-            {person.deathday ? <p>Died {person.deathday}</p> : null}
-            {person.place_of_birth ? <p>{person.place_of_birth}</p> : null}
-          </div>
-          {person.biography ? (
-            <p className="mt-6 whitespace-pre-wrap text-foreground">
-              {person.biography}
-            </p>
-          ) : (
-            <p className="mt-6 text-sm text-muted">No biography yet.</p>
-          )}
-        </div>
-      </div>
-      {person.credits.length > 0 ? (
-        <section className="mt-10">
-          <h2 className="type-subsection text-foreground">Known for</h2>
-          <ul className="poster-grid mt-4">
-            {person.credits.map((credit) => {
-              const href =
-                credit.type === 'movie'
-                  ? `/movies/${credit.id}`
-                  : `/tv/${credit.id}`;
-              const creditLabel = `${credit.title} (${credit.character || credit.job || credit.credit_kind})`;
-              return (
-                <li
-                  key={`${credit.id}-${credit.credit_kind}-${credit.job ?? ''}-${credit.character ?? ''}`}
-                  className="min-w-0"
-                >
-                  <TitlePosterLink
-                    href={href}
-                    contentId={credit.id}
-                    posterUrl={credit.poster_url}
-                    posterAlt={`${credit.title} poster`}
-                    ariaLabel={creditLabel}
-                    sizes={POSTER_GRID_SIZES}
-                    className="block min-w-0 overflow-hidden transition hover:opacity-90"
-                  >
-                    <div className="poster-meta">
-                      <p className="mt-2 truncate font-display text-sm font-medium text-foreground">
-                        {credit.title}
-                      </p>
-                      <p className="truncate text-xs text-muted">
-                        {credit.character || credit.job || credit.credit_kind}
-                      </p>
-                    </div>
-                  </TitlePosterLink>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
-    </article>
   );
 }

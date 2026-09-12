@@ -152,6 +152,39 @@ async def content_refs_with_entries(
     return {(row[0], row[1]) for row in result.all()}
 
 
+async def latest_ratings_for_refs(
+    session: AsyncSession,
+    *,
+    owner_user_id: uuid.UUID,
+    refs: list[tuple[str, uuid.UUID]],
+) -> dict[tuple[str, uuid.UUID], Decimal]:
+    """Latest non-null diary rating per ``(content_type, content_id)``."""
+    if not refs:
+        return {}
+    result = await session.execute(
+        select(WatchEntry.content_type, WatchEntry.content_id, WatchEntry.rating)
+        .where(
+            WatchEntry.owner_user_id == owner_user_id,
+            WatchEntry.rating.is_not(None),
+            tuple_(WatchEntry.content_type, WatchEntry.content_id).in_(refs),
+        )
+        .distinct(WatchEntry.content_type, WatchEntry.content_id)
+        .order_by(
+            WatchEntry.content_type,
+            WatchEntry.content_id,
+            WatchEntry.watched_at.desc(),
+            WatchEntry.created_at.desc(),
+            WatchEntry.id.desc(),
+        )
+    )
+    out: dict[tuple[str, uuid.UUID], Decimal] = {}
+    for content_type, content_id, rating in result.all():
+        if rating is None:
+            continue
+        out[(content_type, content_id)] = rating
+    return out
+
+
 def _apply_date_filters(stmt: Any, *, year: int | None, month: int | None) -> Any:
     if year is not None:
         stmt = stmt.where(func.extract('year', WatchEntry.watched_at) == year)

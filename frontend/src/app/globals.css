@@ -295,6 +295,77 @@
   }
 
   /*
+   * Catalog detail hero (movie / TV / person) — copy left, art right.
+   * Keep loading shells on the same tracks so the title-poster morph does not shift.
+   */
+  .catalog-detail-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 6.75rem;
+    column-gap: 1rem;
+    row-gap: 1.25rem;
+  }
+
+  .catalog-detail-hero-art {
+    grid-column-start: 2;
+    grid-row: 1 / span 2;
+    width: 100%;
+  }
+
+  .catalog-detail-hero-heading {
+    grid-column-start: 1;
+    grid-row: 1 / span 2;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    padding-block: 0.125rem;
+  }
+
+  .catalog-detail-hero-body {
+    grid-column: 1 / span 2;
+    grid-row-start: 3;
+    min-width: 0;
+  }
+
+  @media (min-width: 640px) {
+    .catalog-detail-hero {
+      grid-template-columns: minmax(0, 1fr) 18rem;
+      column-gap: 3rem;
+      row-gap: 0;
+    }
+
+    .catalog-detail-hero-art {
+      margin-top: 3rem;
+    }
+
+    .catalog-detail-hero-heading {
+      grid-row: 1 / span 1;
+      justify-content: flex-start;
+      padding-block: 0;
+    }
+
+    .catalog-detail-hero-body {
+      grid-column: 1 / span 1;
+      grid-row-start: 2;
+      margin-top: 0.25rem;
+    }
+  }
+
+  /* Hairline after overview / biography, before actions or the next section. */
+  .title-actions-rule {
+    margin-block: 0;
+    margin-top: 1.25rem;
+    border: 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  @media (min-width: 640px) {
+    .title-actions-rule {
+      margin-top: 1.5rem;
+    }
+  }
+
+  /*
    * Shared overlay chrome — account menu, search, CollectionSheet, form
    * selects, and any popup. Purple + blue wash (page atmosphere language).
    */
@@ -1435,7 +1506,7 @@
       min-width var(--duration-slow) var(--ease-out);
   }
 
-  /* Mobile synopsis clamp: soft fade hints more content on tap. */
+  /* Synopsis clamp: soft fade hints more content on tap (mobile + desktop). */
   .title-overview-clamped {
     -webkit-mask-image: linear-gradient(
       to bottom,

@@ -1,5 +1,5 @@
-import { CatalogLoading } from '@/components/catalog-detail';
 import { SiteHeader } from '@/components/site-header';
+import { PersonDetailSkeleton } from '@/components/skeleton';
 
 export default function PersonLoading() {
   return (
@@ -9,7 +9,7 @@ export default function PersonLoading() {
       </a>
       <SiteHeader />
       <main id="main-content" className="relative z-[1]">
-        <CatalogLoading />
+        <PersonDetailSkeleton />
       </main>
     </div>
   );

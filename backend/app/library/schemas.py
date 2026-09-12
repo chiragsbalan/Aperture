@@ -102,3 +102,9 @@ class WatchEntriesContainsResponse(BaseModel):
     """Batch flags: owner has at least one diary row for each ``type:id``."""
 
     membership: dict[str, bool]
+
+
+class WatchEntriesRatingsResponse(BaseModel):
+    """Latest non-null diary rating per ``type:id`` (omits unrated / unknown)."""
+
+    ratings: dict[str, float]

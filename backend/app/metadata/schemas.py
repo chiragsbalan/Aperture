@@ -296,7 +296,10 @@ class TvDetail(BaseModel):
 
 
 class PersonCreditRef(BaseModel):
-    """Content stub on a person detail page."""
+    """Legacy content stub on a person detail page (pre-v2).
+
+    Prefer :class:`PersonTitleCard` on PersonDetail v2.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -309,8 +312,35 @@ class PersonCreditRef(BaseModel):
     job: str | None = None
 
 
+class PersonTitleCard(BaseModel):
+    """Warm or cold title card for person known-for / filmography."""
+
+    type: str = Field(examples=['movie', 'tv'])
+    content_id: uuid.UUID | None = None
+    tmdb_id: int | None = None
+    title: str
+    year: int | None = None
+    poster_url: str | None = None
+    credit_kind: str | None = None
+    character: str | None = None
+    job: str | None = None
+    department: str | None = None
+    popularity: float | None = None
+    release_date: str | None = None
+    runtime_minutes: int | None = None
+    rating: TitleRating | None = None
+
+
+class PersonSocialLink(BaseModel):
+    """Allowlisted HTTPS social / external profile link."""
+
+    kind: str
+    label: str
+    url: str
+
+
 class PersonDetail(BaseModel):
-    """Curated person detail response."""
+    """Curated person detail response (hybrid enrich)."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -322,4 +352,9 @@ class PersonDetail(BaseModel):
     deathday: date | None = None
     place_of_birth: str | None = None
     profile_url: str | None = None
-    credits: list[PersonCreditRef] = Field(default_factory=list)
+    known_for_department: str | None = None
+    also_known_as: list[str] = Field(default_factory=list)
+    socials: list[PersonSocialLink] = Field(default_factory=list)
+    known_for: list[PersonTitleCard] = Field(default_factory=list)
+    filmography: list[PersonTitleCard] = Field(default_factory=list)
+    departments: list[str] = Field(default_factory=list)

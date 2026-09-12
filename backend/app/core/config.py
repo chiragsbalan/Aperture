@@ -133,6 +133,15 @@ class Settings(BaseSettings):
     metadata_enrichment_cache_ttl_seconds: int = 60 * 60 * 6
     # Short TTL when TMDb enrichment fails so we do not stampede forever.
     metadata_enrichment_negative_cache_ttl_seconds: int = 60
+    # Person enrich (ADR-0017). Live TMDb hard timeout; dual RL charged only
+    # when about to call TMDb (HIT / neg skip).
+    metadata_person_enrich_timeout_ms: int = Field(default=2000, ge=250, le=10_000)
+    metadata_person_enrich_inflight_max: int = Field(default=16, ge=1, le=64)
+    metadata_person_enrich_lock_ttl_seconds: int = Field(default=5, ge=1, le=30)
+    metadata_person_enrich_rate_limit_window_seconds: int = 60
+    metadata_person_enrich_rate_limit_max_per_ip: int = 20
+    # Shared budget when the client IP is not BFF-attested (SSR peer / scrapers).
+    metadata_person_enrich_rate_limit_max_global: int = 60
     # Lazy stub refresh for TMDb ≤6‑month ToS (days since refreshed_at).
     metadata_stub_max_age_days: int = Field(default=150, ge=1, le=180)
     # Landing poster mosaic (TMDb top-rated). Long TTL — list changes slowly.

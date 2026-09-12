@@ -143,6 +143,11 @@ class TmdbPerson(BaseModel):
     deathday: str | None = None
     place_of_birth: str | None = None
     profile_path: str | None = None
+    known_for_department: str | None = None
+    also_known_as: list[str] = Field(default_factory=list)
+    homepage: str | None = None
+    external_ids: dict[str, Any] | None = None
+    combined_credits: dict[str, Any] | None = None
 
 
 def parse_movie_list(raw: list[dict[str, Any]]) -> list[TmdbMovie]:

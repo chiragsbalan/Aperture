@@ -21,6 +21,7 @@ from app.library.schemas import (
     ContentSummary,
     WatchEntriesContainsResponse,
     WatchEntriesPageResponse,
+    WatchEntriesRatingsResponse,
     WatchEntryResponse,
 )
 from app.metadata import service as metadata_service
@@ -243,6 +244,47 @@ async def contains_logged_titles(
         key = f'{public_type}:{content_id}'
         membership[key] = (db_type, content_id) in present
     return WatchEntriesContainsResponse(membership=membership)
+
+
+async def latest_ratings_for_titles(
+    session: AsyncSession,
+    *,
+    identity_id: uuid.UUID,
+    refs: list[tuple[str, uuid.UUID]],
+) -> WatchEntriesRatingsResponse:
+    """Latest non-null diary rating per public ``type:id``.
+
+    Unknown, unsupported, and unrated ids are omitted (not listed as null).
+    """
+    owner_user_id = await _require_owner_user_id(
+        session,
+        identity_id=identity_id,
+    )
+    parsed: list[tuple[str, str, uuid.UUID]] = []
+    seen: set[tuple[str, uuid.UUID]] = set()
+    for content_type, content_id in refs:
+        try:
+            ref = _parse_ref(content_type=content_type, content_id=content_id)
+        except UnsupportedWatchContentError:
+            continue
+        key = (ref.db_type, ref.content_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        parsed.append((ref.public_type, ref.db_type, ref.content_id))
+
+    found = await library_repository.latest_ratings_for_refs(
+        session,
+        owner_user_id=owner_user_id,
+        refs=[(db_type, content_id) for _, db_type, content_id in parsed],
+    )
+    ratings: dict[str, float] = {}
+    for public_type, db_type, content_id in parsed:
+        value = found.get((db_type, content_id))
+        if value is None:
+            continue
+        ratings[f'{public_type}:{content_id}'] = float(value)
+    return WatchEntriesRatingsResponse(ratings=ratings)
 
 
 async def list_entries_for_owner(

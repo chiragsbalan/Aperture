@@ -138,16 +138,39 @@ async def get_external_id_for_content(
     return result.scalar_one_or_none()
 
 
+async def get_external_id_for_person(
+    session: AsyncSession,
+    *,
+    source: str,
+    person_id: uuid.UUID,
+) -> ExternalId | None:
+    """Return the provider mapping for a person, if any."""
+    result = await session.execute(
+        select(ExternalId).where(
+            ExternalId.source == source,
+            ExternalId.source_namespace == 'person',
+            ExternalId.person_id == person_id,
+            ExternalId.entity_type == 'person',
+        )
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_person_by_id(
     session: AsyncSession,
     person_id: uuid.UUID,
 ) -> Person | None:
-    """Return a person with credits and linked content titles."""
+    """Return a person with credits and linked content titles (+ years)."""
     result = await session.execute(
         select(Person)
         .where(Person.id == person_id)
         .options(
-            selectinload(Person.credits).selectinload(ContentCredit.content_item),
+            selectinload(Person.credits)
+            .selectinload(ContentCredit.content_item)
+            .selectinload(ContentItem.movie),
+            selectinload(Person.credits)
+            .selectinload(ContentCredit.content_item)
+            .selectinload(ContentItem.tv_show),
         )
     )
     return result.scalar_one_or_none()

@@ -714,6 +714,85 @@ def test_watch_entries_contains_unsupported_type_is_false(
 
 
 @pytest.mark.integration
+def test_watch_entries_ratings_latest_non_null_omits_unknown(
+    api_client: TestClient,
+    seeded_ids: dict[str, uuid.UUID],
+) -> None:
+    access = _register(api_client, prefix='werat')
+    headers = {'Authorization': f'Bearer {access}'}
+    movie_id = str(seeded_ids['movie'])
+    tv_id = str(seeded_ids['tv'])
+    person_id = str(seeded_ids['person'])
+    unknown_id = str(uuid.uuid4())
+
+    unauth = api_client.get(
+        '/api/v1/me/watch-entries/ratings',
+        params=[('ids', f'movie:{movie_id}')],
+    )
+    assert unauth.status_code == 401
+
+    first = api_client.post(
+        '/api/v1/me/watch-entries',
+        headers=headers,
+        json={
+            'type': 'movie',
+            'id': movie_id,
+            'watched_at': '2026-01-01',
+            'rating': 4.5,
+        },
+    )
+    assert first.status_code == 201, first.text
+
+    second = api_client.post(
+        '/api/v1/me/watch-entries',
+        headers=headers,
+        json={
+            'type': 'movie',
+            'id': movie_id,
+            'watched_at': '2026-02-01',
+            'rating': 3.0,
+        },
+    )
+    assert second.status_code == 201, second.text
+
+    later_unrated = api_client.post(
+        '/api/v1/me/watch-entries',
+        headers=headers,
+        json={
+            'type': 'movie',
+            'id': movie_id,
+            'watched_at': '2026-03-01',
+        },
+    )
+    assert later_unrated.status_code == 201, later_unrated.text
+
+    res = api_client.get(
+        '/api/v1/me/watch-entries/ratings',
+        headers=headers,
+        params=[
+            ('ids', f'movie:{movie_id}'),
+            ('ids', f'tv:{tv_id}'),
+            ('ids', f'movie:{unknown_id}'),
+            ('ids', f'person:{person_id}'),
+        ],
+    )
+    assert res.status_code == 200, res.text
+    ratings = res.json()['ratings']
+    assert ratings[f'movie:{movie_id}'] == 3.0
+    assert f'tv:{tv_id}' not in ratings
+    assert f'movie:{unknown_id}' not in ratings
+    assert f'person:{person_id}' not in ratings
+
+    too_many = api_client.get(
+        '/api/v1/me/watch-entries/ratings',
+        headers=headers,
+        params=[('ids', f'movie:{uuid.uuid4()}') for _ in range(151)],
+    )
+    assert too_many.status_code == 422
+    assert '150' in too_many.json()['detail']
+
+
+@pytest.mark.integration
 def test_watch_entries_contains_rate_limit_independent_of_writes(
     api_client: TestClient,
     seeded_ids: dict[str, uuid.UUID],
