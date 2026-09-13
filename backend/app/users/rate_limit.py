@@ -45,9 +45,7 @@ def _avatar_rl_key(*, identity_id: uuid.UUID) -> str:
 
 def _availability_rl_key(client_ip: str | None) -> str:
     subject = (client_ip or '').strip() or 'unknown'
-    return (
-        f'users:rl:username-availability:ip:{hash_rate_limit_subject(subject)}'
-    )
+    return f'users:rl:username-availability:ip:{hash_rate_limit_subject(subject)}'
 
 
 def reset_users_public_rate_limit_fallback() -> None:

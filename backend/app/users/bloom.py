@@ -199,9 +199,7 @@ class RedisUsernameBloomStore:
 
     async def rebuild(self, usernames: Iterable[str]) -> None:
         names = [
-            (raw or '').strip().lower()
-            for raw in usernames
-            if (raw or '').strip()
+            (raw or '').strip().lower() for raw in usernames if (raw or '').strip()
         ]
         try:
             pipe = self._redis.pipeline(transaction=True)

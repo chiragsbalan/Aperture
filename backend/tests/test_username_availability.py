@@ -200,9 +200,7 @@ def test_username_availability_rate_limit(
         headers=headers,
     )
     assert limited.status_code == 429
-    assert limited.json()['detail'] == (
-        'Too many username checks. Try again later.'
-    )
+    assert limited.json()['detail'] == ('Too many username checks. Try again later.')
 
 
 @pytest.mark.integration
