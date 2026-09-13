@@ -40,11 +40,11 @@ def _clear_settings_cache() -> Iterator[None]:
     from app.metadata.tmdb.client import reset_shared_tmdb_client
     from app.metadata.tv_season_hydrate import reset_tv_season_hydrate_flights
     from app.search.rate_limit import reset_search_rate_limit_fallback
+    from app.users.bloom import reset_username_bloom
     from app.users.rate_limit import (
         reset_username_availability_rate_limit_fallback,
         reset_users_public_rate_limit_fallback,
     )
-    from app.users.bloom import reset_username_bloom
 
     get_settings.cache_clear()
     reset_cache()

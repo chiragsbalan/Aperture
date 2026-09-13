@@ -96,5 +96,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  return NextResponse.json({ detail: 'Invalid upstream response' }, { status: 502 });
+  return NextResponse.json(
+    { detail: 'Invalid upstream response' },
+    { status: 502 },
+  );
 }

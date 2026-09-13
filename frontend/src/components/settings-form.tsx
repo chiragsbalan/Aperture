@@ -269,8 +269,7 @@ export function SettingsForm() {
   const { status: usernameAvailability, message: availabilityMessage } =
     useUsernameAvailability(username, {
       enabled: state.status === 'ok' && !renameLocked,
-      currentUsername:
-        state.status === 'ok' ? state.profile.username : null,
+      currentUsername: state.status === 'ok' ? state.profile.username : null,
     });
   const availabilityHintId = `${usernameHintId}-live`;
   const usernameDescribedBy = [

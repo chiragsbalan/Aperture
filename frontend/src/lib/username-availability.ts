@@ -3,12 +3,7 @@
  */
 
 export type UsernameAvailabilityStatus =
-  | 'available'
-  | 'taken'
-  | 'invalid'
-  | 'checking'
-  | 'idle'
-  | 'error';
+  'available' | 'taken' | 'invalid' | 'checking' | 'idle' | 'error';
 
 export interface UsernameAvailabilityResult {
   status: 'available' | 'taken' | 'invalid';
