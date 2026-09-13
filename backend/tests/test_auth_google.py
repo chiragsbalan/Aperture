@@ -125,6 +125,45 @@ def test_google_existing_login_returns_tokens(api_client: TestClient) -> None:
 
 
 @pytest.mark.integration
+def test_google_sign_in_is_mode_agnostic_create_or_login(
+    api_client: TestClient,
+) -> None:
+    """Guest login and signup both use intent=sign_in (create or login).
+
+    Login page + new Google account → create (same as signup-with-Google).
+    Signup page + existing Google account → login (same as login-with-Google).
+    """
+    payload = _google_payload(given_name='Cross', family_name='Flow')
+    # Simulates Continue with Google from the login page for a brand-new user.
+    created = api_client.post(
+        '/api/v1/auth/google',
+        json={**payload, 'intent': 'sign_in'},
+        headers=_bff_headers('203.0.113.60'),
+    )
+    assert created.status_code == 200, created.text
+    assert created.json()['access_token']
+
+    # Simulates Continue with Google from the signup page for that same user.
+    logged_in = api_client.post(
+        '/api/v1/auth/google',
+        json={**payload, 'intent': 'sign_in'},
+        headers=_bff_headers('203.0.113.61'),
+    )
+    assert logged_in.status_code == 200, logged_in.text
+    assert logged_in.json()['access_token']
+
+    me = api_client.get(
+        '/api/v1/auth/me',
+        headers={
+            'Authorization': f'Bearer {logged_in.json()["access_token"]}',
+        },
+    )
+    assert me.status_code == 200
+    assert me.json()['providers'] == ['google']
+    assert me.json()['email'] == payload['email']
+
+
+@pytest.mark.integration
 def test_google_email_collision_no_auto_link(api_client: TestClient) -> None:
     email = _unique_email()
     username = _unique_username()

@@ -62,6 +62,32 @@ async def get_user_by_username(
     return result.scalar_one_or_none()
 
 
+async def get_username_holder_id(
+    session: AsyncSession,
+    username: str,
+    *,
+    include_deleted: bool = False,
+) -> uuid.UUID | None:
+    """Return the user id holding ``username``, if any.
+
+    When ``include_deleted`` is True, soft-deleted rows count (matches
+    ``uq_users_username`` until reclaim ships — ADR-0018).
+    """
+    stmt = select(User.id).where(User.username == username).limit(1)
+    if not include_deleted:
+        stmt = stmt.where(User.deleted_at.is_(None))
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def list_all_usernames(session: AsyncSession) -> list[str]:
+    """Return every non-null username, including soft-deleted (bloom rebuild)."""
+    result = await session.execute(
+        select(User.username).where(User.username.is_not(None))
+    )
+    return [name for (name,) in result.all() if isinstance(name, str) and name]
+
+
 async def update_user_profile(
     session: AsyncSession,
     user: User,

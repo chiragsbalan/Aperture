@@ -9,9 +9,12 @@ import {
   clearOauthCookieOptions,
   exchangeCode,
   OAUTH_INTENT_COOKIE,
+  OAUTH_RETURN_COOKIE,
   OAUTH_STATE_COOKIE,
   OAUTH_VERIFIER_COOKIE,
   parseOAuthIntent,
+  parseOAuthReturnTo,
+  type GoogleOAuthReturnTo,
 } from '@/lib/google-oauth';
 import { type NextRequest, NextResponse } from 'next/server';
 
@@ -31,14 +34,17 @@ function redirectWithError(
   request: NextRequest,
   error: string,
   intent: 'sign_in' | 'link',
+  returnTo: GoogleOAuthReturnTo,
 ): NextResponse {
-  const path =
-    intent === 'link' ? `/account?error=${error}` : `/login?error=${error}`;
+  let path: string;
+  if (intent === 'link') {
+    path = `/account?error=${error}`;
+  } else {
+    const base = returnTo === 'signup' ? '/signup' : '/login';
+    path = `${base}?error=${error}`;
+  }
   const response = NextResponse.redirect(absoluteUrl(request, path));
-  const cleared = clearOauthCookieOptions();
-  response.cookies.set(OAUTH_STATE_COOKIE, '', cleared);
-  response.cookies.set(OAUTH_VERIFIER_COOKIE, '', cleared);
-  response.cookies.set(OAUTH_INTENT_COOKIE, '', cleared);
+  clearOauthCookies(response);
   return response;
 }
 
@@ -47,18 +53,22 @@ function clearOauthCookies(response: NextResponse): void {
   response.cookies.set(OAUTH_STATE_COOKIE, '', cleared);
   response.cookies.set(OAUTH_VERIFIER_COOKIE, '', cleared);
   response.cookies.set(OAUTH_INTENT_COOKIE, '', cleared);
+  response.cookies.set(OAUTH_RETURN_COOKIE, '', cleared);
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const intent = parseOAuthIntent(
     request.cookies.get(OAUTH_INTENT_COOKIE)?.value ?? null,
   );
+  const returnTo = parseOAuthReturnTo(
+    request.cookies.get(OAUTH_RETURN_COOKIE)?.value ?? null,
+  );
   const providerError = request.nextUrl.searchParams.get('error');
   if (providerError === 'access_denied') {
-    return redirectWithError(request, 'oauth_cancelled', intent);
+    return redirectWithError(request, 'oauth_cancelled', intent, returnTo);
   }
   if (providerError) {
-    return redirectWithError(request, 'oauth_failed', intent);
+    return redirectWithError(request, 'oauth_failed', intent, returnTo);
   }
 
   const code = request.nextUrl.searchParams.get('code');
@@ -67,14 +77,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const verifier = request.cookies.get(OAUTH_VERIFIER_COOKIE)?.value;
 
   if (!code || !state || !storedState || !verifier || state !== storedState) {
-    return redirectWithError(request, 'missing_state', intent);
+    return redirectWithError(request, 'missing_state', intent, returnTo);
   }
 
   let profile;
   try {
     profile = await exchangeCode(code, verifier);
   } catch {
-    return redirectWithError(request, 'oauth_failed', intent);
+    return redirectWithError(request, 'oauth_failed', intent, returnTo);
   }
 
   const headers: Record<string, string> = {
@@ -84,7 +94,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (intent === 'link') {
     const access = request.cookies.get(accessCookieName())?.value;
     if (!access) {
-      return redirectWithError(request, 'login_required', intent);
+      return redirectWithError(request, 'login_required', intent, returnTo);
     }
     headers.authorization = `Bearer ${access}`;
   }
@@ -104,7 +114,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       }),
     });
   } catch {
-    return redirectWithError(request, 'oauth_failed', intent);
+    return redirectWithError(request, 'oauth_failed', intent, returnTo);
   }
 
   const data: unknown = await upstream.json().catch(() => null);
@@ -114,12 +124,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       detail = (data as { detail: unknown }).detail;
     }
     const error = oauthErrorCode(detail, upstream.status);
-    return redirectWithError(request, error, intent);
+    return redirectWithError(request, error, intent, returnTo);
   }
 
   const tokens = parseTokenPayload(data);
   if (tokens === null) {
-    return redirectWithError(request, 'oauth_failed', intent);
+    return redirectWithError(request, 'oauth_failed', intent, returnTo);
   }
 
   const successPath = intent === 'link' ? '/account' : '/';

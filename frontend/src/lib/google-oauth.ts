@@ -12,8 +12,12 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 export const OAUTH_STATE_COOKIE = 'ap_oauth_state';
 export const OAUTH_VERIFIER_COOKIE = 'ap_oauth_verifier';
 export const OAUTH_INTENT_COOKIE = 'ap_oauth_intent';
+/** Where to send OAuth errors (login vs signup page). Not an auth mode. */
+export const OAUTH_RETURN_COOKIE = 'ap_oauth_return';
 
 export type GoogleOAuthIntent = 'sign_in' | 'link';
+/** UI surface that started Google OAuth (error redirect only). */
+export type GoogleOAuthReturnTo = 'login' | 'signup';
 
 export interface GoogleProfile {
   sub: string;
@@ -86,6 +90,15 @@ export function assertGoogleMockNotForcedInProduction(): void {
 
 export function parseOAuthIntent(raw: string | null): GoogleOAuthIntent {
   return raw === 'link' ? 'link' : 'sign_in';
+}
+
+/**
+ * Parse the UI return surface for OAuth error redirects.
+ * Login and signup both use intent=sign_in (mode-agnostic create-or-login);
+ * ``return`` only controls which guest page shows a failure message.
+ */
+export function parseOAuthReturnTo(raw: string | null): GoogleOAuthReturnTo {
+  return raw === 'signup' ? 'signup' : 'login';
 }
 
 /** RFC 7636 code_verifier (43–128 chars from unreserved set). */

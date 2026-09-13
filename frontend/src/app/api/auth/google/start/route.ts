@@ -7,10 +7,13 @@ import {
   googleAuthorizeUrl,
   isGoogleMockEnabled,
   OAUTH_INTENT_COOKIE,
+  OAUTH_RETURN_COOKIE,
   OAUTH_STATE_COOKIE,
   OAUTH_VERIFIER_COOKIE,
   oauthCookieOptions,
   parseOAuthIntent,
+  parseOAuthReturnTo,
+  type GoogleOAuthReturnTo,
 } from '@/lib/google-oauth';
 import { type NextRequest, NextResponse } from 'next/server';
 
@@ -27,12 +30,21 @@ function absoluteUrl(request: NextRequest, path: string): URL {
   return new URL(path, request.nextUrl.origin);
 }
 
+function guestErrorPath(returnTo: GoogleOAuthReturnTo, error: string): string {
+  const base = returnTo === 'signup' ? '/signup' : '/login';
+  return `${base}?error=${error}`;
+}
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const returnTo = parseOAuthReturnTo(
+    request.nextUrl.searchParams.get('return'),
+  );
+
   try {
     assertGoogleMockNotForcedInProduction();
   } catch {
     return NextResponse.redirect(
-      absoluteUrl(request, '/login?error=oauth_failed'),
+      absoluteUrl(request, guestErrorPath(returnTo, 'oauth_failed')),
     );
   }
 
@@ -42,7 +54,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const access = request.cookies.get(accessCookieName())?.value;
     if (!access) {
       return NextResponse.redirect(
-        absoluteUrl(request, '/login?error=login_required'),
+        absoluteUrl(request, guestErrorPath(returnTo, 'login_required')),
       );
     }
   }
@@ -63,7 +75,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const redirectUri = process.env.GOOGLE_REDIRECT_URI ?? '';
     if (!clientId || !redirectUri) {
       return NextResponse.redirect(
-        absoluteUrl(request, '/login?error=oauth_failed'),
+        absoluteUrl(request, guestErrorPath(returnTo, 'oauth_failed')),
       );
     }
     redirectTarget = googleAuthorizeUrl({
@@ -78,5 +90,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   response.cookies.set(OAUTH_STATE_COOKIE, state, cookieOpts);
   response.cookies.set(OAUTH_VERIFIER_COOKIE, verifier, cookieOpts);
   response.cookies.set(OAUTH_INTENT_COOKIE, intent, cookieOpts);
+  response.cookies.set(OAUTH_RETURN_COOKIE, returnTo, cookieOpts);
   return response;
 }

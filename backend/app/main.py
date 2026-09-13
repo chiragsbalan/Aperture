@@ -1,5 +1,6 @@
 """FastAPI application factory."""
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -18,6 +19,11 @@ from app.core.db import dispose_db, init_db
 from app.core.logging import configure_logging
 from app.metadata.api import router as metadata_router
 from app.search.api import router as search_router
+from app.users.bloom import init_username_bloom, shutdown_username_bloom
+from app.users.bloom_lifecycle import (
+    ensure_username_bloom_ready,
+    username_bloom_rebuild_loop,
+)
 
 
 @asynccontextmanager
@@ -26,9 +32,28 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     init_db(settings)
     init_cache(settings.redis_url)
+    init_username_bloom(
+        settings.redis_url,
+        n=settings.username_bloom_expected_n,
+        p=settings.username_bloom_false_positive_rate,
+        enabled=settings.username_bloom_enabled,
+    )
+    await ensure_username_bloom_ready(settings)
+    stop = asyncio.Event()
+    rebuild_task = asyncio.create_task(
+        username_bloom_rebuild_loop(settings, stop=stop),
+        name='username-bloom-rebuild',
+    )
     try:
         yield
     finally:
+        stop.set()
+        rebuild_task.cancel()
+        try:
+            await rebuild_task
+        except asyncio.CancelledError:
+            pass
+        await shutdown_username_bloom()
         await shutdown_cache()
         await dispose_db()
 

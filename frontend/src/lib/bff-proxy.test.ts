@@ -17,6 +17,12 @@ describe('isDeniedProxyPath', () => {
     expect(isDeniedProxyPath(['api', 'v1', 'auth', 'refresh'])).toBe(true);
   });
 
+  it('denies username availability (BFF-only probe)', () => {
+    expect(
+      isDeniedProxyPath(['api', 'v1', 'users', 'username-availability']),
+    ).toBe(true);
+  });
+
   it('denies catalog resolve paths', () => {
     expect(isDeniedProxyPath(['api', 'v1', 'movies', 'resolve'])).toBe(true);
     expect(isDeniedProxyPath(['api', 'v1', 'tv', 'resolve'])).toBe(true);

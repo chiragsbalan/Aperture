@@ -184,11 +184,11 @@ async def register(
             status_code=status.HTTP_409_CONFLICT,
             detail='Username already taken',
         )
-    taken = await users_service.get_identity_id_by_username(
+    taken = await users_service.username_is_taken(
         session,
         username=username,
     )
-    if taken is not None:
+    if taken:
         await auth_rate_limit.record_register_failure(
             session,
             settings=settings,
@@ -601,7 +601,13 @@ async def google_sign_in(
     user_agent: str | None = None,
     client_ip: str | None = None,
 ) -> IssuedTokens:
-    """Sign in or create a Google-only identity from verified BFF claims."""
+    """Sign in or create a Google-only identity from verified BFF claims.
+
+    Mode-agnostic for guest login vs signup UI: existing Google subject →
+    issue tokens; unknown subject → create identity + profile (unless the
+    email already belongs to a non-Google identity, which requires explicit
+    link).
+    """
     await auth_rate_limit.enforce_oauth_limits(
         session,
         settings=settings,

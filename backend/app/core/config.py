@@ -108,6 +108,24 @@ class Settings(BaseSettings):
     users_public_rate_limit_window_seconds: int = 60
     users_public_rate_limit_max_per_ip: int = 120
 
+    # Username live availability (ADR-0018). BFF-secret-gated; dedicated RL bucket.
+    username_availability_rate_limit_window_seconds: int = Field(
+        default=60, ge=10, le=3600
+    )
+    username_availability_rate_limit_max_per_ip: int = Field(
+        default=120, ge=1, le=10_000
+    )
+    # DIY Redis BITFIELD bloom (negative fast-path only). Feature-flaggable.
+    # TODO(ADR-0018 follow-up #1): retune n/p from real cardinality + FP metrics.
+    username_bloom_enabled: bool = True
+    username_bloom_expected_n: int = Field(default=10_000, ge=100, le=10_000_000)
+    username_bloom_false_positive_rate: float = Field(
+        default=0.01, gt=0.0, lt=1.0
+    )
+    username_bloom_rebuild_interval_seconds: int = Field(
+        default=3600, ge=60, le=86_400
+    )
+
     # Cloudflare R2 avatar storage (ADR-0014). Empty = upload endpoints return 503.
     r2_account_id: str = ''
     r2_access_key_id: str = ''

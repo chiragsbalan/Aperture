@@ -40,10 +40,15 @@ def _clear_settings_cache() -> Iterator[None]:
     from app.metadata.tmdb.client import reset_shared_tmdb_client
     from app.metadata.tv_season_hydrate import reset_tv_season_hydrate_flights
     from app.search.rate_limit import reset_search_rate_limit_fallback
-    from app.users.rate_limit import reset_users_public_rate_limit_fallback
+    from app.users.rate_limit import (
+        reset_username_availability_rate_limit_fallback,
+        reset_users_public_rate_limit_fallback,
+    )
+    from app.users.bloom import reset_username_bloom
 
     get_settings.cache_clear()
     reset_cache()
+    reset_username_bloom()
     metadata_resolve._resolve_flights.clear()
     metadata_service.reset_enrichment_flights()
     reset_stub_refresh_flights()
@@ -56,9 +61,11 @@ def _clear_settings_cache() -> Iterator[None]:
     reset_library_contains_rate_limit_fallback()
     reset_metadata_rate_limit_fallback()
     reset_users_public_rate_limit_fallback()
+    reset_username_availability_rate_limit_fallback()
     yield
     get_settings.cache_clear()
     reset_cache()
+    reset_username_bloom()
     metadata_resolve._resolve_flights.clear()
     metadata_service.reset_enrichment_flights()
     reset_stub_refresh_flights()
@@ -71,6 +78,7 @@ def _clear_settings_cache() -> Iterator[None]:
     reset_library_contains_rate_limit_fallback()
     reset_metadata_rate_limit_fallback()
     reset_users_public_rate_limit_fallback()
+    reset_username_availability_rate_limit_fallback()
 
 
 @pytest.fixture

@@ -11,6 +11,7 @@ import {
   isGoogleMockEnabled,
   mockGoogleProfile,
   parseOAuthIntent,
+  parseOAuthReturnTo,
 } from './google-oauth';
 import { oauthErrorCode, oauthErrorMessage } from './google-oauth-errors';
 
@@ -37,6 +38,13 @@ describe('google-oauth helpers', () => {
     expect(parseOAuthIntent('link')).toBe('link');
     expect(parseOAuthIntent('sign_in')).toBe('sign_in');
     expect(parseOAuthIntent(null)).toBe('sign_in');
+  });
+
+  it('parses return surface for OAuth error redirects', () => {
+    expect(parseOAuthReturnTo('signup')).toBe('signup');
+    expect(parseOAuthReturnTo('login')).toBe('login');
+    expect(parseOAuthReturnTo(null)).toBe('login');
+    expect(parseOAuthReturnTo('link')).toBe('login');
   });
 
   it('builds Google authorize URL with PKCE params', () => {
