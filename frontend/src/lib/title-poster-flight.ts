@@ -8,6 +8,7 @@
  * flight settles.
  */
 
+import { holdOutgoingTitleBackdrop } from '@/lib/title-backdrop-hold';
 import { TITLE_POSTER_MORPH_MS } from '@/lib/title-poster-morph';
 
 interface Rect {
@@ -26,8 +27,6 @@ interface ActiveFlight {
   outgoingMain: HTMLElement | null;
   outgoingMainOpacity: string;
   outgoingMainTransition: string;
-  outgoingBackdrop: HTMLElement | null;
-  outgoingBackdropOpacity: string;
   animation: Animation;
   contentId: string | null;
   targetEl: HTMLElement | null;
@@ -38,26 +37,19 @@ interface ActiveFlight {
   settlePromise: Promise<void> | null;
 }
 
-/** Fixed title atmosphere layer (outside ``main``) — see TitleAtmosphere. */
-const TITLE_BACKDROP_SELECTOR = '[data-title-backdrop]';
-
 /**
- * Hide the current title backdrop immediately.
+ * Clear the current title atmosphere immediately.
  *
- * The backdrop is a fixed sibling of ``main``, so fading ``main`` alone leaves
- * the previous title’s art under the FLIP clone (Similar → another title).
+ * Soft navigations keep the previous page mounted until the next payload
+ * arrives, so fading ``main`` alone leaves the previous show's backdrop
+ * under the FLIP clone (Similar → another title). Reduced motion still
+ * clears it; there is no clone, but the old art must not read as the next
+ * title. Restoration is the incoming ``TitleAtmosphere`` mount, not flight
+ * teardown (that restore flashed the old art back while it was still
+ * connected).
  */
-function hideOutgoingTitleBackdrop(): {
-  el: HTMLElement | null;
-  opacity: string;
-} {
-  const el = document.querySelector<HTMLElement>(TITLE_BACKDROP_SELECTOR);
-  if (el == null) {
-    return { el: null, opacity: '' };
-  }
-  const opacity = el.style.opacity;
-  el.style.opacity = '0';
-  return { el, opacity };
+function hideOutgoingTitleBackdrop(): void {
+  holdOutgoingTitleBackdrop();
 }
 
 let activeFlight: ActiveFlight | null = null;
@@ -180,9 +172,7 @@ export function startTitlePosterFlight(options: {
   removeOrphanFlightClones();
 
   // Clear old title art on click — including reduced-motion (no FLIP clone).
-  // Navigation proceeds via router.push; the outgoing page unmounts shortly.
-  const { el: outgoingBackdrop, opacity: outgoingBackdropOpacity } =
-    hideOutgoingTitleBackdrop();
+  hideOutgoingTitleBackdrop();
 
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     return;
@@ -298,8 +288,6 @@ export function startTitlePosterFlight(options: {
     outgoingMain,
     outgoingMainOpacity,
     outgoingMainTransition,
-    outgoingBackdrop,
-    outgoingBackdropOpacity,
     animation,
     contentId: options.contentId ?? null,
     targetEl: null,
@@ -517,8 +505,6 @@ export function endTitlePosterFlight(): void {
     outgoingMain,
     outgoingMainOpacity,
     outgoingMainTransition,
-    outgoingBackdrop,
-    outgoingBackdropOpacity,
     animation,
     targetEl,
     targetOpacity,
@@ -542,9 +528,9 @@ export function endTitlePosterFlight(): void {
     outgoingMain.style.transition = outgoingMainTransition;
     outgoingMain.style.pointerEvents = '';
   }
-  if (outgoingBackdrop != null && outgoingBackdrop.isConnected) {
-    outgoingBackdrop.style.opacity = outgoingBackdropOpacity;
-  }
+  // Do not restore the outgoing title backdrop. Flight teardown often runs
+  // while the previous page is still mounted; putting the art back makes
+  // Similar look like the old show during the poster flight.
   if (targetEl != null && targetEl.isConnected) {
     targetEl.style.opacity = targetOpacity;
   }

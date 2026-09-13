@@ -1,7 +1,20 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+
+import {
+  claimIncomingTitleBackdrop,
+  isTitleBackdropSuppressed,
+  subscribeTitleBackdropHold,
+  suppressTitleBackdrop,
+} from '@/lib/title-backdrop-hold';
 
 type TitleContrast = 'on-dark' | 'on-light';
 
@@ -102,15 +115,41 @@ function sampleUrlForBackdrop(backdropUrl: string): string {
  * While the document is hidden, drift uses ``animation-play-state: paused``.
  */
 export function TitleAtmosphere({
+  contentId,
   backdropUrl,
   children,
 }: {
+  contentId: string;
   backdropUrl: string | null;
   children: ReactNode;
 }) {
   const [contrast, setContrast] = useState<TitleContrast>('on-dark');
   const [driftPaused, setDriftPaused] = useState(false);
   const [pageHidden, setPageHidden] = useState(false);
+  // True only for the instance that was already mounted when a poster morph
+  // started. A later detail mount must not inherit this, or the new title
+  // would never paint its own backdrop.
+  const outgoingHoldRef = useRef(false);
+  const [outgoingHold, setOutgoingHold] = useState(false);
+
+  useLayoutEffect(() => {
+    return subscribeTitleBackdropHold(() => {
+      suppressTitleBackdrop(contentId);
+      outgoingHoldRef.current = true;
+      setOutgoingHold(true);
+    });
+  }, [contentId]);
+
+  useLayoutEffect(() => {
+    if (outgoingHoldRef.current || isTitleBackdropSuppressed(contentId)) {
+      outgoingHoldRef.current = true;
+      setOutgoingHold(true);
+      return;
+    }
+    // Incoming detail only. A remount of the title that started the morph
+    // must not paint the old art back before the next payload arrives.
+    claimIncomingTitleBackdrop(contentId);
+  }, [contentId]);
 
   useEffect(() => {
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -184,14 +223,14 @@ export function TitleAtmosphere({
       // ``svh`` (not ``dvh``): mobile URL-bar show/hide must not resize the page.
       className="relative min-h-svh text-foreground"
     >
-      {backdropUrl ? (
+      {backdropUrl && !outgoingHold ? (
         <div
           aria-hidden
           data-title-backdrop=""
           // Pin top + ``h-svh`` only — avoid ``inset-0``/``dvh``, which resize
           // when mobile browser chrome toggles on scroll (same as guest mosaic).
-          // ``data-title-backdrop``: title-poster-flight clears this on morph
-          // click so Similar→title does not leave the old art under the FLIP.
+          // ``data-title-backdrop``: poster-morph hold CSS hides this on click
+          // so Similar→title does not leave the old art under the FLIP.
           className="pointer-events-none fixed top-0 left-0 z-0 h-svh w-screen overflow-hidden"
         >
           <Image
