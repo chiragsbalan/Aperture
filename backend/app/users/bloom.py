@@ -250,21 +250,21 @@ def build_username_bloom(
     """Create a bloom store; Redis when URL set, else in-memory."""
     cleaned = redis_url.strip()
     if not cleaned:
-        store = InMemoryUsernameBloomStore(n=n, p=p)
+        memory_store = InMemoryUsernameBloomStore(n=n, p=p)
         logger.info(
             'username bloom using in-memory store (m=%s k=%s)',
-            store.m,
-            store.k,
+            memory_store.m,
+            memory_store.k,
         )
-        return store
+        return memory_store
     try:
-        store = RedisUsernameBloomStore(cleaned, n=n, p=p)
+        redis_store = RedisUsernameBloomStore(cleaned, n=n, p=p)
         logger.info(
             'username bloom using Redis BITFIELD/SETBIT (m=%s k=%s)',
-            store.m,
-            store.k,
+            redis_store.m,
+            redis_store.k,
         )
-        return store
+        return redis_store
     except Exception:
         logger.warning(
             'failed to init Redis username bloom; falling back to in-memory',
