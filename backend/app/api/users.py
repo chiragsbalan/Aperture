@@ -10,7 +10,7 @@ from app.auth.deps import CurrentIdentityDep, OptionalIdentityDep
 from app.core import r2 as r2_store
 from app.core.cache import get_cache
 from app.core.deps import DbSessionDep, SettingsDep
-from app.core.trusted_client import resolve_client_ip
+from app.core.trusted_client import require_bff_secret, resolve_client_ip
 from app.library import service as library_service
 from app.library.schemas import WatchEntriesPageResponse
 from app.lists import service as lists_service
@@ -22,6 +22,7 @@ from app.users import avatars as avatars_service
 from app.users import service as users_service
 from app.users.rate_limit import (
     enforce_avatar_write_rate_limit,
+    enforce_username_availability_rate_limit,
     enforce_users_public_rate_limit,
 )
 from app.users.schemas import (
@@ -34,8 +35,10 @@ from app.users.schemas import (
     ProfilePatchRequest,
     ProfileResponse,
     PublicProfileResponse,
+    UsernameAvailabilityResponse,
     normalize_links,
 )
+from app.users.username_availability import check_username_availability
 
 router = APIRouter(prefix='/users', tags=['users'])
 
@@ -95,6 +98,47 @@ async def _build_public_profile_response(
             following=0,
         ),
     )
+
+
+@router.get(
+    '/username-availability',
+    response_model=UsernameAvailabilityResponse,
+)
+async def username_availability(
+    request: Request,
+    session: DbSessionDep,
+    settings: SettingsDep,
+    identity: OptionalIdentityDep,
+    username: Annotated[str, Query(min_length=1, max_length=64)],
+) -> UsernameAvailabilityResponse:
+    """BFF-attested live username check (ADR-0018). Soft-deleted = taken."""
+    require_bff_secret(request, settings)
+    client_ip = resolve_client_ip(request, settings)
+    await enforce_username_availability_rate_limit(
+        get_cache(),
+        settings=settings,
+        client_ip=client_ip,
+    )
+
+    caller_user_id = None
+    caller_username = None
+    if identity is not None:
+        profile = await users_service.get_profile_for_identity(
+            session,
+            identity_id=identity.id,
+        )
+        if profile is not None:
+            caller_user_id = profile.id
+            caller_username = profile.username
+
+    status_value = await check_username_availability(
+        session,
+        username=username,
+        bloom_enabled=settings.username_bloom_enabled,
+        caller_user_id=caller_user_id,
+        caller_username=caller_username,
+    )
+    return UsernameAvailabilityResponse(status=status_value)
 
 
 @router.get('/me', response_model=ProfileResponse)

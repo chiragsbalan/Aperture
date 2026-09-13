@@ -226,3 +226,9 @@ class AvatarConfirmRequest(BaseModel):
     """Confirm a completed R2 PUT and attach it to the profile."""
 
     key: str = Field(..., min_length=8, max_length=256)
+
+
+class UsernameAvailabilityResponse(BaseModel):
+    """Live username check result (ADR-0018). Always HTTP 200 after BFF gate."""
+
+    status: Literal['available', 'taken', 'invalid']

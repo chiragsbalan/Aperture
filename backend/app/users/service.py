@@ -146,23 +146,51 @@ async def allocate_unique_username(
     *,
     base: str,
 ) -> str:
-    """Return ``base`` or ``base`` + short unique suffix when taken/reserved."""
+    """Return ``base`` or ``base`` + short unique suffix when taken/reserved.
+
+    Soft-deleted usernames count as taken (ADR-0018; reclaim deferred).
+    """
     normalized = normalize_username(base)
     if not is_valid_username(normalized):
         normalized = 'user'
     if not is_reserved_username(normalized):
-        existing = await users_repository.get_user_by_username(session, normalized)
-        if existing is None:
+        held = await users_repository.get_username_holder_id(
+            session,
+            normalized,
+            include_deleted=True,
+        )
+        if held is None:
             return normalized
     for _ in range(32):
         suffix = secrets.token_hex(3)
         candidate = username_with_unique_suffix(normalized, suffix)
         if is_reserved_username(candidate):
             continue
-        taken = await users_repository.get_user_by_username(session, candidate)
-        if taken is None:
+        held = await users_repository.get_username_holder_id(
+            session,
+            candidate,
+            include_deleted=True,
+        )
+        if held is None:
             return candidate
     raise RuntimeError('could not allocate unique username')
+
+
+async def username_is_taken(
+    session: AsyncSession,
+    *,
+    username: str,
+) -> bool:
+    """True when any users row (including soft-deleted) holds ``username``."""
+    normalized = normalize_username(username)
+    if not is_valid_username(normalized):
+        return False
+    holder = await users_repository.get_username_holder_id(
+        session,
+        normalized,
+        include_deleted=True,
+    )
+    return holder is not None
 
 
 async def create_profile_for_identity(
@@ -177,11 +205,21 @@ async def create_profile_for_identity(
         raise ValueError('invalid username')
     if is_reserved_username(normalized):
         raise ValueError('username unavailable')
+    held = await users_repository.get_username_holder_id(
+        session,
+        normalized,
+        include_deleted=True,
+    )
+    if held is not None:
+        raise ValueError('username unavailable')
     user = await users_repository.create_user(
         session,
         identity_id=identity_id,
         username=normalized,
     )
+    from app.users.username_availability import bloom_add_username
+
+    await bloom_add_username(normalized)
     return UserProfile(
         id=user.id,
         username=user.username,
@@ -207,6 +245,9 @@ async def create_profile_for_google(
         username=username,
         display_name=display_name,
     )
+    from app.users.username_availability import bloom_add_username
+
+    await bloom_add_username(username)
     return UserProfile(
         id=user.id,
         username=user.username,
@@ -319,8 +360,12 @@ async def update_owned_profile(
         now = datetime.now(UTC)
         if available_at is not None and now < available_at:
             raise UsernameRenameCooldownError(available_at)
-        taken = await users_repository.get_user_by_username(session, normalized)
-        if taken is not None and taken.id != user.id:
+        holder_id = await users_repository.get_username_holder_id(
+            session,
+            normalized,
+            include_deleted=True,
+        )
+        if holder_id is not None and holder_id != user.id:
             raise UsernameConflictError('username unavailable')
         next_username = normalized
         next_changed_at = now
@@ -350,6 +395,11 @@ async def update_owned_profile(
     except IntegrityError as exc:
         await session.rollback()
         raise UsernameConflictError('username unavailable') from exc
+
+    if next_username is not None:
+        from app.users.username_availability import bloom_add_username
+
+        await bloom_add_username(next_username)
 
     refreshed = await users_repository.get_user_by_identity_id(session, identity_id)
     if refreshed is None or refreshed.username is None:

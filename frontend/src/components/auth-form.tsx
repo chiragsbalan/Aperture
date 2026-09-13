@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/components/auth-provider';
+import { useUsernameAvailability } from '@/hooks/use-username-availability';
 import { oauthErrorMessage } from '@/lib/google-oauth-errors';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -219,6 +220,8 @@ export function AuthForm({
     isSignup && (usernameFocused || Boolean(fieldErrors.username));
   const showPasswordHint =
     isSignup && (passwordFocused || Boolean(fieldErrors.password));
+  const { status: usernameAvailability, message: availabilityMessage } =
+    useUsernameAvailability(username, { enabled: isSignup });
 
   useEffect(() => {
     if (oauthErrorMessage(initialError) && formErrorRef.current) {
@@ -246,6 +249,25 @@ export function AuthForm({
       // Focus after state flush so aria-invalid is present for AT.
       queueMicrotask(() => {
         focusFirstInvalidField(localErrors, fieldRefs);
+      });
+      return;
+    }
+    if (
+      isSignup &&
+      (usernameAvailability === 'taken' ||
+        usernameAvailability === 'invalid' ||
+        usernameAvailability === 'checking')
+    ) {
+      setFieldErrors({
+        username:
+          usernameAvailability === 'checking'
+            ? 'Wait for the username check to finish.'
+            : usernameAvailability === 'taken'
+              ? 'Username is taken.'
+              : 'Username is unavailable.',
+      });
+      queueMicrotask(() => {
+        usernameRef.current?.focus();
       });
       return;
     }
@@ -284,7 +306,7 @@ export function AuthForm({
       router.push('/');
       router.refresh();
     } catch {
-      setFormError('Network error — try again');
+      setFormError('Network error. Try again.');
     } finally {
       setPending(false);
     }
@@ -341,25 +363,50 @@ export function AuthForm({
                 onBlur={() => {
                   setUsernameFocused(false);
                 }}
-                aria-invalid={fieldErrors.username ? true : undefined}
+                aria-invalid={
+                  fieldErrors.username ||
+                  usernameAvailability === 'taken' ||
+                  usernameAvailability === 'invalid'
+                    ? true
+                    : undefined
+                }
                 aria-describedby={
-                  showUsernameHint || fieldErrors.username
+                  showUsernameHint ||
+                  fieldErrors.username ||
+                  (isSignup &&
+                    availabilityMessage &&
+                    usernameAvailability !== 'idle')
                     ? usernameHintId
                     : undefined
                 }
                 className={INPUT_CLASS}
               />
-              {showUsernameHint ? (
+              {showUsernameHint ||
+              (isSignup &&
+                availabilityMessage &&
+                usernameAvailability !== 'idle') ? (
                 <p
                   id={usernameHintId}
-                  role={fieldErrors.username ? 'alert' : undefined}
+                  role={
+                    fieldErrors.username ||
+                    usernameAvailability === 'taken' ||
+                    usernameAvailability === 'invalid'
+                      ? 'alert'
+                      : undefined
+                  }
                   className={`mt-1.5 text-sm ${
-                    fieldErrors.username
+                    fieldErrors.username ||
+                    usernameAvailability === 'taken' ||
+                    usernameAvailability === 'invalid' ||
+                    usernameAvailability === 'error'
                       ? 'text-[var(--color-danger)]'
-                      : 'text-muted'
+                      : usernameAvailability === 'available'
+                        ? 'text-foreground'
+                        : 'text-muted'
                   }`}
                 >
                   {fieldErrors.username ??
+                    availabilityMessage ??
                     '3–32 characters: letters, digits, underscore.'}
                 </p>
               ) : null}
@@ -538,8 +585,13 @@ export function AuthForm({
       </div>
 
       <div className="mt-5">
+        {/*
+          Same Google path for login and signup (intent=sign_in): API creates a
+          Google-only account or logs in an existing one. `return` only picks
+          which guest page shows OAuth errors.
+        */}
         <a
-          href="/api/auth/google/start?intent=sign_in"
+          href={`/api/auth/google/start?intent=sign_in&return=${isSignup ? 'signup' : 'login'}`}
           className="btn btn-google btn-lg btn-block gap-3"
         >
           <GoogleMark className="shrink-0" />

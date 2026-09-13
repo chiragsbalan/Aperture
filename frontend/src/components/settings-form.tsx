@@ -15,6 +15,7 @@ import {
 import { useAuth } from '@/components/auth-provider';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { FormSkeleton } from '@/components/skeleton';
+import { useUsernameAvailability } from '@/hooks/use-username-availability';
 import { invalidatePublicWatchEntries } from '@/lib/library';
 import { applyThemePreference } from '@/lib/theme';
 import Link from 'next/link';
@@ -253,7 +254,7 @@ export function SettingsForm() {
       applyProfile(profileData as OwnedProfile);
       setSuccess('Settings saved.');
     } catch {
-      setError('Network error — try again');
+      setError('Network error. Try again.');
     } finally {
       setPending(false);
       queueMicrotask(() => {
@@ -261,6 +262,25 @@ export function SettingsForm() {
       });
     }
   }
+
+  const renameLocked =
+    renameAvailableAt !== null &&
+    new Date(renameAvailableAt).getTime() > Date.now();
+  const { status: usernameAvailability, message: availabilityMessage } =
+    useUsernameAvailability(username, {
+      enabled: state.status === 'ok' && !renameLocked,
+      currentUsername: state.status === 'ok' ? state.profile.username : null,
+    });
+  const availabilityHintId = `${usernameHintId}-live`;
+  const usernameDescribedBy = [
+    usernameHintId,
+    error ? errorId : null,
+    availabilityMessage && usernameAvailability !== 'idle'
+      ? availabilityHintId
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   if (state.status === 'loading') {
     return <FormSkeleton />;
@@ -283,13 +303,6 @@ export function SettingsForm() {
       </div>
     );
   }
-
-  const renameLocked =
-    renameAvailableAt !== null &&
-    new Date(renameAvailableAt).getTime() > Date.now();
-  const usernameDescribedBy = error
-    ? `${usernameHintId} ${errorId}`
-    : usernameHintId;
 
   return (
     <>
@@ -392,7 +405,13 @@ export function SettingsForm() {
                 setUsername(event.target.value);
               }}
               readOnly={renameLocked}
-              aria-invalid={error ? true : undefined}
+              aria-invalid={
+                error ||
+                usernameAvailability === 'taken' ||
+                usernameAvailability === 'invalid'
+                  ? true
+                  : undefined
+              }
               aria-describedby={usernameDescribedBy}
               className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-2 text-foreground read-only:opacity-70"
             />
@@ -401,6 +420,31 @@ export function SettingsForm() {
                 ? `Username can change again after ${new Date(renameAvailableAt!).toLocaleString()}.`
                 : '3–32 characters: a–z, 0–9, underscore. Once every 30 days.'}
             </p>
+            {!renameLocked &&
+            availabilityMessage &&
+            usernameAvailability !== 'idle' ? (
+              <p
+                id={availabilityHintId}
+                role={
+                  usernameAvailability === 'taken' ||
+                  usernameAvailability === 'invalid' ||
+                  usernameAvailability === 'error'
+                    ? 'alert'
+                    : 'status'
+                }
+                className={`mt-1 text-xs ${
+                  usernameAvailability === 'taken' ||
+                  usernameAvailability === 'invalid' ||
+                  usernameAvailability === 'error'
+                    ? 'text-[var(--color-danger)]'
+                    : usernameAvailability === 'available'
+                      ? 'text-foreground'
+                      : 'text-muted'
+                }`}
+              >
+                {availabilityMessage}
+              </p>
+            ) : null}
           </div>
 
           <div>

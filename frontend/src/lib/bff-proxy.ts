@@ -45,6 +45,8 @@ export function normalizeUpstreamBase(raw: string): string {
  * Paths the generic BFF proxy must not forward.
  *
  * - Auth tokens: only via dedicated `/api/auth/*` routes.
+ * - Username availability: only via `/api/auth/username-availability`
+ *   (ADR-0018; BFF-secret-gated, not open proxy).
  * - Catalog resolve/ingest: server-only (dedicated `/api/catalog/resolve` or
  *   RSC → API with trusted client-IP headers).
  * - Home rails + landing posters: RSC → API only, so anonymous browsers cannot
@@ -56,6 +58,15 @@ export function isDeniedProxyPath(pathParts: string[]): boolean {
     pathParts[0] === 'api' &&
     pathParts[1] === 'v1' &&
     pathParts[2] === 'auth'
+  ) {
+    return true;
+  }
+  if (
+    pathParts.length >= 4 &&
+    pathParts[0] === 'api' &&
+    pathParts[1] === 'v1' &&
+    pathParts[2] === 'users' &&
+    pathParts[3] === 'username-availability'
   ) {
     return true;
   }
