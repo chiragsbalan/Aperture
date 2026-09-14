@@ -18,9 +18,11 @@ export function usernameAvailabilityCopy(
     case 'available':
       return 'Username is available.';
     case 'taken':
-      return 'Username is taken.';
+      return 'This username is unavailable.';
     case 'invalid':
-      return 'Username is unavailable.';
+      // Format failures keep the criteria hint in the form. Do not call
+      // a bad shape "unavailable" (that word is for an existing account).
+      return null;
     case 'error':
       return 'Could not check username.';
     default:

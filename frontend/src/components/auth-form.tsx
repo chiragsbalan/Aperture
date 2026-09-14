@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type KeyboardEvent,
   type RefObject,
 } from 'react';
 
@@ -39,12 +40,37 @@ interface FieldErrors {
   password?: string;
 }
 
-const FIELD_FOCUS_ORDER: FieldKey[] = [
-  'username',
-  'email',
-  'identifier',
-  'password',
-];
+const USERNAME_RE = /^[A-Za-z0-9_]{3,32}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USERNAME_HINT = '3–32 characters: letters, digits, underscore.';
+const EMAIL_HINT = 'Use a valid email address.';
+const INVALID_IDLE_MS = 1000;
+const PASSWORD_HINT = 'At least 8 characters.';
+const USERNAME_TAKEN = 'This username is unavailable.';
+const EMAIL_TAKEN = 'This email is unavailable.';
+
+const INPUT_INVALID_CLASS =
+  'border-[var(--color-danger)] hover:border-[var(--color-danger)] ' +
+  'focus-visible:border-[var(--color-danger)] ' +
+  'focus-visible:ring-[var(--color-danger)]';
+
+type RevealField = 'username' | 'email' | 'password' | 'identifier';
+
+/** Enter moves to the next field. The last field submits the form. */
+function onFieldEnter(
+  event: KeyboardEvent<HTMLInputElement>,
+  next: HTMLInputElement | null,
+): void {
+  if (event.key !== 'Enter' || event.nativeEvent.isComposing) {
+    return;
+  }
+  event.preventDefault();
+  if (next) {
+    next.focus();
+    return;
+  }
+  event.currentTarget.form?.requestSubmit();
+}
 
 function GoogleMark({ className }: { className?: string }) {
   return (
@@ -134,42 +160,42 @@ function fieldErrorsFromResponse(data: unknown): FieldErrors {
   return result;
 }
 
-function clientFieldErrors(
-  mode: 'login' | 'signup',
-  values: {
-    username: string;
-    email: string;
-    identifier: string;
-    password: string;
-  },
-): FieldErrors {
-  const errors: FieldErrors = {};
-  if (mode === 'signup') {
-    if (!/^[A-Za-z0-9_]{3,32}$/.test(values.username)) {
-      errors.username = 'Use 3–32 letters, digits, or underscore.';
-    }
-    if (!values.email.trim() || !values.email.includes('@')) {
-      errors.email = 'Enter a valid email.';
-    }
-  } else if (!values.identifier.trim()) {
-    errors.identifier = 'Enter your email or username.';
-  }
-  if (values.password.length < 8) {
-    errors.password = 'Password must be at least 8 characters.';
-  }
-  return errors;
+function usernameIsValid(value: string): boolean {
+  return USERNAME_RE.test(value);
 }
 
-function focusFirstInvalidField(
-  errors: FieldErrors,
-  refs: Record<FieldKey, RefObject<HTMLInputElement | null>>,
-) {
-  for (const key of FIELD_FOCUS_ORDER) {
-    if (errors[key]) {
-      refs[key].current?.focus();
-      return;
-    }
+function usernameFormatInvalid(value: string): boolean {
+  return value.length > 0 && !usernameIsValid(value);
+}
+
+function emailIsValid(value: string): boolean {
+  return EMAIL_RE.test(value.trim());
+}
+
+function emailFormatInvalid(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return false;
   }
+  return trimmed.length < 3 || !emailIsValid(trimmed);
+}
+
+function passwordIsValid(value: string): boolean {
+  return value.length >= 8;
+}
+
+function takenFieldFromDetail(data: unknown): 'username' | 'email' | null {
+  const message = errorMessage(data, '').toLowerCase();
+  if (message.includes('username') && message.includes('taken')) {
+    return 'username';
+  }
+  if (
+    message.includes('email') &&
+    (message.includes('already') || message.includes('exists'))
+  ) {
+    return 'email';
+  }
+  return null;
 }
 
 export function AuthForm({
@@ -197,13 +223,27 @@ export function AuthForm({
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [usernameFocused, setUsernameFocused] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(
     oauthErrorMessage(initialError),
   );
   const [pending, setPending] = useState(false);
+  const [jiggling, setJiggling] = useState<Record<RevealField, boolean>>({
+    username: false,
+    email: false,
+    password: false,
+    identifier: false,
+  });
+  const [emailTaken, setEmailTaken] = useState(false);
+  const [usernameTakenOverride, setUsernameTakenOverride] = useState(false);
+  const [settledInvalid, setSettledInvalid] = useState<
+    Record<RevealField, boolean>
+  >({
+    username: false,
+    email: false,
+    password: false,
+    identifier: false,
+  });
+  const invalidTimers = useRef<Partial<Record<RevealField, number>>>({});
 
   const fieldRefs: Record<FieldKey, RefObject<HTMLInputElement | null>> = {
     username: usernameRef,
@@ -216,12 +256,124 @@ export function AuthForm({
   const title = isSignup ? 'Create your account' : 'Welcome back';
   const submitLabel = isSignup ? 'Sign up' : 'Log in';
   const endpoint = isSignup ? '/api/auth/register' : '/api/auth/login';
-  const showUsernameHint =
-    isSignup && (usernameFocused || Boolean(fieldErrors.username));
-  const showPasswordHint =
-    isSignup && (passwordFocused || Boolean(fieldErrors.password));
+  // Always reserve hint lines on signup so autofocus does not pop them in
+  // after the first paint.
+  const showUsernameHint = isSignup;
+  const showPasswordHint = isSignup;
   const { status: usernameAvailability, message: availabilityMessage } =
     useUsernameAvailability(username, { enabled: isSignup });
+  const usernameTaken =
+    usernameTakenOverride ||
+    (usernameIsValid(username) && usernameAvailability === 'taken');
+  // While typing, format failures stay quiet until blur or 1s idle.
+  // A submit with nothing in a required field is invalid immediately.
+  const usernameInvalid = settledInvalid.username && !usernameIsValid(username);
+  const emailInvalid = settledInvalid.email && !emailIsValid(email);
+  const passwordInvalid = settledInvalid.password && !passwordIsValid(password);
+  const identifierInvalid = settledInvalid.identifier && !identifier.trim();
+  const wasInvalidRef = useRef({
+    username: false,
+    email: false,
+    password: false,
+    identifier: false,
+  });
+
+  function playJiggle(fields: RevealField[]) {
+    if (fields.length === 0) {
+      return;
+    }
+    setJiggling((prev) => {
+      const next = { ...prev };
+      for (const field of fields) {
+        next[field] = false;
+      }
+      return next;
+    });
+    window.requestAnimationFrame(() => {
+      setJiggling((prev) => {
+        const next = { ...prev };
+        for (const field of fields) {
+          next[field] = true;
+        }
+        return next;
+      });
+    });
+  }
+
+  function stopJiggle(field: RevealField) {
+    setJiggling((prev) => {
+      if (!prev[field]) {
+        return prev;
+      }
+      return { ...prev, [field]: false };
+    });
+  }
+
+  function clearInvalidTimer(field: RevealField) {
+    const timer = invalidTimers.current[field];
+    if (timer == null) {
+      return;
+    }
+    window.clearTimeout(timer);
+    delete invalidTimers.current[field];
+  }
+
+  function markSettled(field: RevealField, invalid: boolean) {
+    setSettledInvalid((prev) => {
+      if (prev[field] === invalid) {
+        return prev;
+      }
+      return { ...prev, [field]: invalid };
+    });
+  }
+
+  function noteFormatChange(field: RevealField, formatInvalid: boolean) {
+    if (!formatInvalid) {
+      clearInvalidTimer(field);
+      markSettled(field, false);
+      return;
+    }
+    if (settledInvalid[field]) {
+      return;
+    }
+    clearInvalidTimer(field);
+    invalidTimers.current[field] = window.setTimeout(() => {
+      delete invalidTimers.current[field];
+      markSettled(field, true);
+    }, INVALID_IDLE_MS);
+  }
+
+  function settleOnBlur(field: RevealField, formatInvalid: boolean) {
+    clearInvalidTimer(field);
+    markSettled(field, formatInvalid);
+  }
+
+  useEffect(() => {
+    const timers = invalidTimers.current;
+    return () => {
+      for (const timer of Object.values(timers)) {
+        if (timer != null) {
+          window.clearTimeout(timer);
+        }
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const current = {
+      username: usernameInvalid,
+      email: emailInvalid,
+      password: passwordInvalid,
+      identifier: identifierInvalid,
+    };
+    const started = (Object.keys(current) as RevealField[]).filter(
+      (field) => current[field] && !wasInvalidRef.current[field],
+    );
+    wasInvalidRef.current = current;
+    if (started.length > 0) {
+      playJiggle(started);
+    }
+  }, [usernameInvalid, emailInvalid, passwordInvalid, identifierInvalid]);
 
   useEffect(() => {
     if (oauthErrorMessage(initialError) && formErrorRef.current) {
@@ -237,41 +389,43 @@ export function AuthForm({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) {
+      return;
+    }
     setFormError(null);
-    const localErrors = clientFieldErrors(mode, {
-      username,
-      email,
-      identifier,
-      password,
-    });
-    if (Object.keys(localErrors).length > 0) {
-      setFieldErrors(localErrors);
-      // Focus after state flush so aria-invalid is present for AT.
-      queueMicrotask(() => {
-        focusFirstInvalidField(localErrors, fieldRefs);
-      });
+    const invalidNow: RevealField[] = [];
+    if (isSignup && !usernameIsValid(username)) {
+      invalidNow.push('username');
+    }
+    if (isSignup && !emailIsValid(email)) {
+      invalidNow.push('email');
+    }
+    if (!isSignup && !identifier.trim()) {
+      invalidNow.push('identifier');
+    }
+    if (!passwordIsValid(password)) {
+      invalidNow.push('password');
+    }
+    for (const field of invalidNow) {
+      settleOnBlur(field, true);
+    }
+    if (invalidNow.length > 0) {
+      playJiggle(invalidNow);
+      const first = invalidNow[0];
+      if (first) {
+        queueMicrotask(() => {
+          fieldRefs[first].current?.focus();
+        });
+      }
       return;
     }
-    if (
-      isSignup &&
-      (usernameAvailability === 'taken' ||
-        usernameAvailability === 'invalid' ||
-        usernameAvailability === 'checking')
-    ) {
-      setFieldErrors({
-        username:
-          usernameAvailability === 'checking'
-            ? 'Wait for the username check to finish.'
-            : usernameAvailability === 'taken'
-              ? 'Username is taken.'
-              : 'Username is unavailable.',
-      });
-      queueMicrotask(() => {
-        usernameRef.current?.focus();
-      });
+    if (isSignup && usernameAvailability === 'checking') {
+      setFormError('Wait for the username check to finish.');
       return;
     }
-    setFieldErrors({});
+    if (isSignup && (usernameTaken || emailTaken)) {
+      return;
+    }
     setPending(true);
     try {
       const body = isSignup
@@ -284,22 +438,45 @@ export function AuthForm({
       });
       const data: unknown = await res.json().catch(() => null);
       if (!res.ok) {
-        const fromApi = fieldErrorsFromResponse(data);
-        if (Object.keys(fromApi).length > 0) {
-          setFieldErrors(fromApi);
-          setFormError(null);
-          queueMicrotask(() => {
-            focusFirstInvalidField(fromApi, fieldRefs);
-          });
-        } else {
-          setFieldErrors({});
-          setFormError(
-            errorMessage(
-              data,
-              isSignup ? 'Could not create account' : 'Could not log in',
-            ),
-          );
+        const taken = takenFieldFromDetail(data);
+        if (taken === 'username') {
+          setUsernameTakenOverride(true);
+          return;
         }
+        if (taken === 'email') {
+          setEmailTaken(true);
+          return;
+        }
+        const fromApi = fieldErrorsFromResponse(data);
+        const apiInvalid: RevealField[] = [];
+        if (fromApi.username) {
+          apiInvalid.push('username');
+        }
+        if (fromApi.email) {
+          apiInvalid.push('email');
+        }
+        if (fromApi.password) {
+          apiInvalid.push('password');
+        }
+        if (fromApi.identifier) {
+          apiInvalid.push('identifier');
+        }
+        if (apiInvalid.length > 0) {
+          playJiggle(apiInvalid);
+          const first = apiInvalid[0];
+          if (first) {
+            queueMicrotask(() => {
+              fieldRefs[first].current?.focus();
+            });
+          }
+          return;
+        }
+        setFormError(
+          errorMessage(
+            data,
+            isSignup ? 'Could not create account' : 'Could not log in',
+          ),
+        );
         return;
       }
       await refreshAuth();
@@ -349,67 +526,48 @@ export function AuthForm({
                 pattern="[A-Za-z0-9_]{3,32}"
                 value={username}
                 onChange={(event) => {
-                  setUsername(event.target.value);
-                  if (fieldErrors.username) {
-                    setFieldErrors((prev) => ({
-                      ...prev,
-                      username: undefined,
-                    }));
-                  }
-                }}
-                onFocus={() => {
-                  setUsernameFocused(true);
+                  const next = event.target.value;
+                  setUsername(next);
+                  setUsernameTakenOverride(false);
+                  noteFormatChange('username', usernameFormatInvalid(next));
                 }}
                 onBlur={() => {
-                  setUsernameFocused(false);
+                  settleOnBlur('username', usernameFormatInvalid(username));
                 }}
-                aria-invalid={
-                  fieldErrors.username ||
-                  usernameAvailability === 'taken' ||
-                  usernameAvailability === 'invalid'
-                    ? true
-                    : undefined
-                }
-                aria-describedby={
-                  showUsernameHint ||
-                  fieldErrors.username ||
-                  (isSignup &&
-                    availabilityMessage &&
-                    usernameAvailability !== 'idle')
-                    ? usernameHintId
-                    : undefined
-                }
-                className={INPUT_CLASS}
+                onKeyDown={(event) => {
+                  onFieldEnter(event, emailRef.current);
+                }}
+                onAnimationEnd={() => {
+                  stopJiggle('username');
+                }}
+                aria-invalid={usernameInvalid ? true : undefined}
+                aria-describedby={usernameHintId}
+                className={`${INPUT_CLASS} ${usernameInvalid ? INPUT_INVALID_CLASS : ''} ${jiggling.username ? 'is-jiggling' : ''}`}
               />
-              {showUsernameHint ||
-              (isSignup &&
-                availabilityMessage &&
-                usernameAvailability !== 'idle') ? (
-                <p
-                  id={usernameHintId}
-                  role={
-                    fieldErrors.username ||
-                    usernameAvailability === 'taken' ||
-                    usernameAvailability === 'invalid'
-                      ? 'alert'
-                      : undefined
-                  }
-                  className={`mt-1.5 text-sm ${
-                    fieldErrors.username ||
-                    usernameAvailability === 'taken' ||
-                    usernameAvailability === 'invalid' ||
-                    usernameAvailability === 'error'
-                      ? 'text-[var(--color-danger)]'
-                      : usernameAvailability === 'available'
-                        ? 'text-foreground'
-                        : 'text-muted'
-                  }`}
-                >
-                  {fieldErrors.username ??
-                    availabilityMessage ??
-                    '3–32 characters: letters, digits, underscore.'}
-                </p>
-              ) : null}
+              <p
+                id={usernameHintId}
+                role={usernameInvalid || usernameTaken ? 'alert' : undefined}
+                className={`mt-1.5 text-sm ${
+                  usernameInvalid || usernameTaken
+                    ? 'text-[var(--color-danger)]'
+                    : usernameAvailability === 'available'
+                      ? 'text-foreground'
+                      : 'text-muted'
+                }`}
+              >
+                {usernameTaken
+                  ? USERNAME_TAKEN
+                  : usernameAvailability === 'available' &&
+                      usernameIsValid(username)
+                    ? (availabilityMessage ?? USERNAME_HINT)
+                    : usernameAvailability === 'checking' &&
+                        usernameIsValid(username)
+                      ? (availabilityMessage ?? USERNAME_HINT)
+                      : usernameAvailability === 'error' &&
+                          usernameIsValid(username)
+                        ? (availabilityMessage ?? USERNAME_HINT)
+                        : USERNAME_HINT}
+              </p>
             </div>
             <div>
               <label
@@ -427,26 +585,35 @@ export function AuthForm({
                 required
                 value={email}
                 onChange={(event) => {
-                  setEmail(event.target.value);
-                  if (fieldErrors.email) {
-                    setFieldErrors((prev) => ({ ...prev, email: undefined }));
-                  }
+                  const next = event.target.value;
+                  setEmail(next);
+                  setEmailTaken(false);
+                  noteFormatChange('email', emailFormatInvalid(next));
                 }}
-                aria-invalid={fieldErrors.email ? true : undefined}
-                aria-describedby={
-                  fieldErrors.email ? `${emailId}-error` : undefined
-                }
-                className={INPUT_CLASS}
+                onBlur={() => {
+                  settleOnBlur('email', emailFormatInvalid(email));
+                }}
+                onKeyDown={(event) => {
+                  onFieldEnter(event, passwordRef.current);
+                }}
+                onAnimationEnd={() => {
+                  stopJiggle('email');
+                }}
+                aria-invalid={emailInvalid ? true : undefined}
+                aria-describedby={`${emailId}-hint`}
+                className={`${INPUT_CLASS} ${emailInvalid ? INPUT_INVALID_CLASS : ''} ${jiggling.email ? 'is-jiggling' : ''}`}
               />
-              {fieldErrors.email ? (
-                <p
-                  id={`${emailId}-error`}
-                  role="alert"
-                  className="mt-1.5 text-sm text-[var(--color-danger)]"
-                >
-                  {fieldErrors.email}
-                </p>
-              ) : null}
+              <p
+                id={`${emailId}-hint`}
+                role={emailInvalid || emailTaken ? 'alert' : undefined}
+                className={`mt-1.5 text-sm ${
+                  emailInvalid || emailTaken
+                    ? 'text-[var(--color-danger)]'
+                    : 'text-muted'
+                }`}
+              >
+                {emailTaken ? EMAIL_TAKEN : EMAIL_HINT}
+              </p>
             </div>
           </>
         ) : (
@@ -466,27 +633,35 @@ export function AuthForm({
               required
               value={identifier}
               onChange={(event) => {
-                setIdentifier(event.target.value);
-                if (fieldErrors.identifier) {
-                  setFieldErrors((prev) => ({
-                    ...prev,
-                    identifier: undefined,
-                  }));
-                }
+                const next = event.target.value;
+                setIdentifier(next);
+                noteFormatChange('identifier', next.length > 0 && !next.trim());
               }}
-              aria-invalid={fieldErrors.identifier ? true : undefined}
+              onBlur={() => {
+                settleOnBlur(
+                  'identifier',
+                  identifier.length > 0 && !identifier.trim(),
+                );
+              }}
+              onKeyDown={(event) => {
+                onFieldEnter(event, passwordRef.current);
+              }}
+              onAnimationEnd={() => {
+                stopJiggle('identifier');
+              }}
+              aria-invalid={identifierInvalid ? true : undefined}
               aria-describedby={
-                fieldErrors.identifier ? `${identifierId}-error` : undefined
+                identifierInvalid ? `${identifierId}-error` : undefined
               }
-              className={INPUT_CLASS}
+              className={`${INPUT_CLASS} ${identifierInvalid ? INPUT_INVALID_CLASS : ''} ${jiggling.identifier ? 'is-jiggling' : ''}`}
             />
-            {fieldErrors.identifier ? (
+            {identifierInvalid ? (
               <p
                 id={`${identifierId}-error`}
                 role="alert"
                 className="mt-1.5 text-sm text-[var(--color-danger)]"
               >
-                {fieldErrors.identifier}
+                Enter your email or username.
               </p>
             ) : null}
           </div>
@@ -499,7 +674,12 @@ export function AuthForm({
           >
             Password
           </label>
-          <div className="relative">
+          <div
+            className={`relative ${jiggling.password ? 'is-jiggling' : ''}`}
+            onAnimationEnd={() => {
+              stopJiggle('password');
+            }}
+          >
             <input
               ref={passwordRef}
               id={passwordId}
@@ -510,24 +690,27 @@ export function AuthForm({
               minLength={8}
               value={password}
               onChange={(event) => {
-                setPassword(event.target.value);
-                if (fieldErrors.password) {
-                  setFieldErrors((prev) => ({ ...prev, password: undefined }));
-                }
-              }}
-              onFocus={() => {
-                setPasswordFocused(true);
+                const next = event.target.value;
+                setPassword(next);
+                noteFormatChange(
+                  'password',
+                  next.length > 0 && !passwordIsValid(next),
+                );
               }}
               onBlur={() => {
-                setPasswordFocused(false);
+                settleOnBlur(
+                  'password',
+                  password.length > 0 && !passwordIsValid(password),
+                );
               }}
-              aria-invalid={fieldErrors.password ? true : undefined}
+              onKeyDown={(event) => {
+                onFieldEnter(event, null);
+              }}
+              aria-invalid={passwordInvalid ? true : undefined}
               aria-describedby={
-                showPasswordHint || fieldErrors.password
-                  ? passwordHintId
-                  : undefined
+                showPasswordHint || passwordInvalid ? passwordHintId : undefined
               }
-              className={`${INPUT_CLASS} pr-16`}
+              className={`${INPUT_CLASS} pr-16 ${passwordInvalid ? INPUT_INVALID_CLASS : ''}`}
             />
             <button
               type="button"
@@ -542,17 +725,15 @@ export function AuthForm({
               {showPassword ? 'Hide' : 'Show'}
             </button>
           </div>
-          {showPasswordHint || fieldErrors.password ? (
+          {showPasswordHint || passwordInvalid ? (
             <p
               id={passwordHintId}
-              role={fieldErrors.password ? 'alert' : undefined}
+              role={passwordInvalid ? 'alert' : undefined}
               className={`mt-1.5 text-sm ${
-                fieldErrors.password
-                  ? 'text-[var(--color-danger)]'
-                  : 'text-muted'
+                passwordInvalid ? 'text-[var(--color-danger)]' : 'text-muted'
               }`}
             >
-              {fieldErrors.password ?? 'At least 8 characters.'}
+              {PASSWORD_HINT}
             </p>
           ) : null}
         </div>
@@ -572,9 +753,14 @@ export function AuthForm({
         <button
           type="submit"
           disabled={pending}
-          className="btn btn-solid btn-block"
+          aria-busy={pending || undefined}
+          aria-label={pending ? 'Please wait' : undefined}
+          className={`btn btn-solid btn-block relative ${pending ? 'is-pending' : ''}`}
         >
-          {pending ? 'Please wait…' : submitLabel}
+          <span className={pending ? 'invisible' : undefined}>
+            {submitLabel}
+          </span>
+          {pending ? <span className="btn-spinner" aria-hidden /> : null}
         </button>
       </form>
 

@@ -26,13 +26,14 @@ def tv_enrichment_key(content_id: uuid.UUID) -> str:
 
 
 def person_detail_key(person_id: uuid.UUID) -> str:
-    # v5: known_for is rating-bucket curated (cap 30), independent of filmography.
-    return f'meta:person:v5:{person_id}'
+    # v7: known_for ranks principal roles before guest appearances.
+    return f'meta:person:v7:{person_id}'
 
 
 def person_enrichment_key(person_id: uuid.UUID) -> str:
     """Volatile person chrome (filmography / socials / also_known_as)."""
-    return f'meta:person:enrich:v4:{person_id}'
+    # v6: known_for ranks principal roles before guest appearances.
+    return f'meta:person:enrich:v6:{person_id}'
 
 
 def person_enrich_lock_key(person_id: uuid.UUID) -> str:

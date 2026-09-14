@@ -1,5 +1,8 @@
 /**
- * Debounced live username availability for signup + settings rename (ADR-0018).
+ * Live username availability for signup + settings rename (ADR-0018).
+ *
+ * Bloom/DB runs on each change once the handle matches the 3–32 character
+ * rules. Shorter or badly shaped values stay invalid and are not probed.
  */
 
 'use client';
@@ -11,7 +14,7 @@ import {
 } from '@/lib/username-availability';
 import { useEffect, useState } from 'react';
 
-const DEBOUNCE_MS = 400;
+const USERNAME_RE = /^[A-Za-z0-9_]{3,32}$/;
 
 export interface UseUsernameAvailabilityOptions {
   enabled: boolean;
@@ -49,38 +52,37 @@ export function useUsernameAvailability(
       return;
     }
 
-    if (!/^[A-Za-z0-9_]{3,32}$/.test(trimmed)) {
+    // Fewer than 3 characters, or a bad shape, cannot be an existing handle.
+    // Skip the bloom/DB check until the candidate could actually be taken.
+    if (!USERNAME_RE.test(trimmed)) {
       setStatus('invalid');
       return;
     }
 
     const controller = new AbortController();
     setStatus('checking');
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const result = await fetchUsernameAvailability(
-            trimmed,
-            controller.signal,
-          );
-          if (!controller.signal.aborted) {
-            setStatus(result.status);
-          }
-        } catch (err) {
-          if (controller.signal.aborted) {
-            return;
-          }
-          if (err instanceof DOMException && err.name === 'AbortError') {
-            return;
-          }
-          setStatus('error');
+    void (async () => {
+      try {
+        const result = await fetchUsernameAvailability(
+          trimmed,
+          controller.signal,
+        );
+        if (!controller.signal.aborted) {
+          setStatus(result.status);
         }
-      })();
-    }, DEBOUNCE_MS);
+      } catch (err) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          return;
+        }
+        setStatus('error');
+      }
+    })();
 
     return () => {
       controller.abort();
-      window.clearTimeout(timer);
     };
   }, [username, enabled, currentUsername]);
 

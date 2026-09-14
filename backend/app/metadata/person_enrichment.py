@@ -3,8 +3,10 @@
 Builds allowlisted socials and capped known-for / filmography cards from TMDb
 combined_credits (+ external_ids) or from Postgres ``content_credits`` fallback.
 
-Known for is a separate rating-bucket pass (cap ``MAX_KNOWN_FOR``) over the full
-parsed credit set; filmography remains a popularity-capped multi-dept list.
+Known for is a separate pass (cap ``MAX_KNOWN_FOR``) over the full parsed
+credit set. Principal roles in the person's department come first (popularity
+descending). Guest appearances fill leftover slots and never outrank those
+roles. Filmography remains a popularity-capped multi-dept list.
 """
 
 from __future__ import annotations
@@ -407,15 +409,111 @@ def _known_for_title_key(card: PersonTitleCard) -> tuple[str, str, str | int] | 
     return None
 
 
+# News, Reality, Talk. Appearance formats, not scripted series.
+_APPEARANCE_TV_GENRES = frozenset({10763, 10764, 10767})
+# Hosts billed as Self cross this. A contestant season does not.
+_SERIES_REGULAR_EPISODES = 40
+# TV crew below this are short stints, not series staff.
+_CREW_STAFF_EPISODES = 8
+
+
+def _parse_genre_ids(row: dict[str, Any]) -> list[int]:
+    raw = row.get('genre_ids')
+    if not isinstance(raw, list):
+        return []
+    out: list[int] = []
+    for item in raw:
+        try:
+            out.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _parse_episode_count(row: dict[str, Any]) -> int | None:
+    raw = row.get('episode_count')
+    if raw is None or isinstance(raw, bool):
+        return None
+    try:
+        count = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if count < 0:
+        return None
+    return count
+
+
+def _is_self_credit(character: str | None) -> bool:
+    if not isinstance(character, str):
+        return False
+    text = character.strip().lower()
+    return (
+        text == 'self'
+        or text.startswith('self ')
+        or text.startswith('self-')
+        or text.startswith('self—')
+        or text.startswith('self–')
+    )
+
+
+def _self_is_series_regular(character: str, episode_count: int | None) -> bool:
+    """Host or regular billed as Self, not a cameo or contestant."""
+    if episode_count is None or episode_count < _SERIES_REGULAR_EPISODES:
+        return False
+    lower = character.lower()
+    blocked = (
+        'guest',
+        'cameo',
+        'uncredited',
+        'archive',
+        'contestant',
+        'nominee',
+    )
+    return not any(word in lower for word in blocked)
+
+
+def _job_is_guest(job: str | None) -> bool:
+    if not isinstance(job, str):
+        return False
+    return 'guest' in job.lower()
+
+
+def _is_guest_appearance(card: PersonTitleCard) -> bool:
+    """One-off or billed-as-Self appearance, not a principal role.
+
+    A talk-show host or staff producer with a long episode count is not a
+    guest. A Self credit, a one-episode acting spot, or a short crew stint is.
+    """
+    episodes = card.episode_count
+    if _job_is_guest(card.job):
+        return True
+    if card.credit_kind == 'cast' or (card.department or '') == 'Acting':
+        if _is_self_credit(card.character):
+            return not _self_is_series_regular(
+                card.character or '',
+                episodes,
+            )
+        if card.type == 'tv' and episodes == 1:
+            return True
+        genres = set(card.genre_ids)
+        if (
+            card.type == 'tv'
+            and genres & _APPEARANCE_TV_GENRES
+            and (episodes is None or episodes < _SERIES_REGULAR_EPISODES)
+        ):
+            return True
+        return False
+    if card.type == 'tv' and episodes is not None and episodes < _CREW_STAFF_EPISODES:
+        return True
+    return False
+
+
 def _within_known_for_bucket_key(
     card: PersonTitleCard,
-) -> tuple[int, float, float, str]:
-    """Rating desc; null rating → popularity desc; then title A–Z."""
+) -> tuple[float, str]:
+    """Popularity desc; missing popularity sorts last; then title A–Z."""
     title = (card.title or '').lower()
-    pop = -(card.popularity or 0.0)
-    if card.rating is not None:
-        return (0, -float(card.rating.value), pop, title)
-    return (1, 0.0, pop, title)
+    return (-(card.popularity or 0.0), title)
 
 
 def _ordered_known_for_departments(
@@ -437,17 +535,38 @@ def _ordered_known_for_departments(
     return ordered
 
 
+def _take_known_for(
+    selected: list[PersonTitleCard],
+    seen_titles: set[tuple[str, str, str | int]],
+    cards: list[PersonTitleCard],
+    *,
+    guests: bool,
+) -> bool:
+    """Append matching cards. Return True when the cap is full."""
+    pool = [card for card in cards if _is_guest_appearance(card) is guests]
+    for card in sorted(pool, key=_within_known_for_bucket_key):
+        key = _known_for_title_key(card)
+        if key is None or key in seen_titles:
+            continue
+        seen_titles.add(key)
+        selected.append(card)
+        if len(selected) >= MAX_KNOWN_FOR:
+            return True
+    return False
+
+
 def select_known_for(
     parsed_cards: list[PersonTitleCard],
     known_for_department: str | None = None,
 ) -> list[PersonTitleCard]:
     """Pick ≤``MAX_KNOWN_FOR`` cards from the full parsed credit set.
 
-    Buckets by department (primary ``known_for_department`` first, then
-    ``DEPARTMENT_PRECEDENCE``, then unknown A–Z). Within a bucket: rating
-    descending, null rating → popularity descending, then title A–Z. One card
-    per title; walking primary first prefers the primary-dept card for
-    multi-credit titles. Stops at ``MAX_KNOWN_FOR`` (primary alone can fill).
+    Primary ``known_for_department`` is filled with principal roles first
+    (popularity descending, then title A–Z). Guest appearances only fill
+    leftover slots. Acting stays inside Acting (roles, then appearances)
+    before any other department. Other professions take principal work in
+    department order, then appearances. One card per title; walking the
+    primary department first keeps that credit when a title repeats.
     """
     primary = (
         known_for_department.strip() if isinstance(known_for_department, str) else ''
@@ -459,15 +578,52 @@ def select_known_for(
 
     selected: list[PersonTitleCard] = []
     seen_titles: set[tuple[str, str, str | int]] = set()
-    for dept in _ordered_known_for_departments(set(buckets), primary=primary):
-        for card in sorted(buckets[dept], key=_within_known_for_bucket_key):
-            key = _known_for_title_key(card)
-            if key is None or key in seen_titles:
+    dept_order = _ordered_known_for_departments(set(buckets), primary=primary)
+
+    if primary == 'Acting':
+        acting = buckets.get('Acting', [])
+        if _take_known_for(selected, seen_titles, acting, guests=False):
+            return selected
+        if _take_known_for(selected, seen_titles, acting, guests=True):
+            return selected
+        for dept in dept_order:
+            if dept == 'Acting':
                 continue
-            seen_titles.add(key)
-            selected.append(card)
-            if len(selected) >= MAX_KNOWN_FOR:
+            if _take_known_for(
+                selected,
+                seen_titles,
+                buckets.get(dept, []),
+                guests=False,
+            ):
                 return selected
+        for dept in dept_order:
+            if dept == 'Acting':
+                continue
+            if _take_known_for(
+                selected,
+                seen_titles,
+                buckets.get(dept, []),
+                guests=True,
+            ):
+                return selected
+        return selected
+
+    for dept in dept_order:
+        if _take_known_for(
+            selected,
+            seen_titles,
+            buckets.get(dept, []),
+            guests=False,
+        ):
+            return selected
+    for dept in dept_order:
+        if _take_known_for(
+            selected,
+            seen_titles,
+            buckets.get(dept, []),
+            guests=True,
+        ):
+            return selected
     return selected
 
 
@@ -567,6 +723,8 @@ def _parse_credit_row(
         release_date=release_date,
         runtime_minutes=_runtime_from_row(row),
         rating=_rating_from_tmdb_row(row),
+        genre_ids=_parse_genre_ids(row),
+        episode_count=_parse_episode_count(row),
     )
 
 

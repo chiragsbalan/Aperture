@@ -12,6 +12,11 @@ type SlideDirection = 'up' | 'down';
 interface GuestLandingHeroProps {
   panel: GuestLandingPanel;
   onPanelChange: (panel: GuestLandingPanel) => void;
+  /** Landing hero keeps its back control. Auth routes leave it off. */
+  showBack?: boolean;
+  initialError?: string | null;
+  /** When false, Log in / Sign up links change the route instead of the panel. */
+  switchModeInPlace?: boolean;
 }
 
 function MarketingPanel({ onGetStarted }: { onGetStarted: () => void }) {
@@ -43,28 +48,41 @@ function AuthPanel({
   onBack,
   onSwitchMode,
   autoFocusFirstField,
+  showBack,
+  initialError,
 }: {
   mode: 'login' | 'signup';
   onBack: () => void;
-  onSwitchMode: (mode: 'login' | 'signup') => void;
+  onSwitchMode: ((mode: 'login' | 'signup') => void) | undefined;
   autoFocusFirstField: boolean;
+  showBack: boolean;
+  initialError?: string | null;
 }) {
   return (
     <div className="mx-auto w-full max-w-md text-left">
-      <button
-        type="button"
-        onClick={onBack}
-        className="mb-4 text-sm text-muted transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
-      >
-        ← Back
-      </button>
+      {showBack ? (
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-4 text-sm text-muted transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+        >
+          ← Back
+        </button>
+      ) : null}
       <AuthForm
         mode={mode}
         onSwitchMode={onSwitchMode}
         autoFocusFirstField={autoFocusFirstField}
+        initialError={initialError}
       />
     </div>
   );
+}
+
+interface PanelOptions {
+  showBack: boolean;
+  initialError?: string | null;
+  switchModeInPlace: boolean;
 }
 
 function panelNode(
@@ -75,6 +93,7 @@ function panelNode(
     onSwitchMode: (mode: 'login' | 'signup') => void;
   },
   autoFocusFirstField: boolean,
+  options: PanelOptions,
 ): ReactNode {
   if (panel === 'marketing') {
     return <MarketingPanel onGetStarted={handlers.onGetStarted} />;
@@ -83,8 +102,12 @@ function panelNode(
     <AuthPanel
       mode={panel}
       onBack={handlers.onBack}
-      onSwitchMode={handlers.onSwitchMode}
+      onSwitchMode={
+        options.switchModeInPlace ? handlers.onSwitchMode : undefined
+      }
       autoFocusFirstField={autoFocusFirstField}
+      showBack={options.showBack}
+      initialError={options.initialError}
     />
   );
 }
@@ -108,6 +131,9 @@ function slideDirection(
 export function GuestLandingHero({
   panel,
   onPanelChange,
+  showBack = true,
+  initialError = null,
+  switchModeInPlace = true,
 }: GuestLandingHeroProps) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef(panel);
@@ -155,7 +181,11 @@ export function GuestLandingHero({
     const previous = panelRef.current;
     const direction = slideDirection(previous, panel);
     // Outgoing panels never auto-focus fields.
-    const previousNode = panelNode(previous, inertHandlers, false);
+    const previousNode = panelNode(previous, inertHandlers, false, {
+      showBack,
+      initialError,
+      switchModeInPlace,
+    });
 
     panelRef.current = panel;
     setSlide(direction);
@@ -211,7 +241,7 @@ export function GuestLandingHero({
       window.cancelAnimationFrame(measureFrame);
       window.clearTimeout(settleTimer);
     };
-  }, [panel, reduceMotion]);
+  }, [panel, reduceMotion, showBack, initialError, switchModeInPlace]);
 
   const isCrossfading = outgoing != null;
   // Focus first field only after the slide settles (or immediately when
@@ -222,6 +252,7 @@ export function GuestLandingHero({
     visiblePanel,
     liveHandlers,
     autoFocusFirstField,
+    { showBack, initialError, switchModeInPlace },
   );
 
   return (

@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, type MouseEvent } from 'react';
 
 import { AccountMenu } from '@/components/account-menu';
 import { useAuth } from '@/components/auth-provider';
 import { SearchPageForm } from '@/components/search-page-form';
 import { SiteSearch } from '@/components/site-search';
+import { requestReturnToMarketing } from '@/lib/guest-landing-return';
 
 function HeaderSearch() {
   const pathname = usePathname();
@@ -35,12 +36,31 @@ function HeaderSearch() {
  * Guests use landing CTAs for auth (no header Sign in / Create account).
  * Search and account share one right-aligned cluster (same gap on every page).
  */
+function onBrandClick(event: MouseEvent<HTMLAnchorElement>) {
+  if (
+    event.button !== 0 ||
+    event.metaKey ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.shiftKey
+  ) {
+    return;
+  }
+  if (requestReturnToMarketing()) {
+    event.preventDefault();
+  }
+}
+
 export function SiteHeader() {
   const { status, me } = useAuth();
 
   return (
     <header className="absolute inset-x-0 top-0 z-[var(--z-header)] flex items-center gap-3 px-5 py-5 sm:gap-4 sm:px-8 sm:py-6">
-      <Link href="/" className="type-page shrink-0 text-foreground">
+      <Link
+        href="/"
+        onClick={onBrandClick}
+        className="type-page shrink-0 text-foreground"
+      >
         Aperture
       </Link>
       <nav
