@@ -176,7 +176,7 @@ function TitleDetailShell({
 }) {
   const seasonList = seasons ?? [];
   return (
-    <TitleAtmosphere backdropUrl={backdropUrl}>
+    <TitleAtmosphere contentId={contentId} backdropUrl={backdropUrl}>
       <RecordTitlePosterHero
         contentId={contentId}
         posterUrl={posterUrl}

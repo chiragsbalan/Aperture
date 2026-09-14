@@ -1135,6 +1135,17 @@
     }
   }
 
+  /*
+   * Poster morph (Similar → another title): hide the previous title's
+   * fixed backdrop immediately. Soft nav keeps that page mounted, and
+   * flight teardown must not paint the old art back. Cleared when the
+   * incoming TitleAtmosphere mounts.
+   */
+  html[data-title-backdrop-hold] [data-title-backdrop] {
+    visibility: hidden;
+    opacity: 0;
+  }
+
   /* Soft wash so a full-page TMDB backdrop keeps text readable. */
   .catalog-backdrop-veil {
     background:
