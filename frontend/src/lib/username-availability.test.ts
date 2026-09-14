@@ -8,10 +8,10 @@ describe('usernameAvailabilityCopy', () => {
     expect(usernameAvailabilityCopy('available')).toBe(
       'Username is available.',
     );
-    expect(usernameAvailabilityCopy('taken')).toBe('Username is taken.');
-    expect(usernameAvailabilityCopy('invalid')).toBe(
-      'Username is unavailable.',
+    expect(usernameAvailabilityCopy('taken')).toBe(
+      'This username is unavailable.',
     );
+    expect(usernameAvailabilityCopy('invalid')).toBeNull();
     expect(usernameAvailabilityCopy('idle')).toBeNull();
   });
 });
