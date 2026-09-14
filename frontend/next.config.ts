@@ -72,6 +72,10 @@ const nextConfig: NextConfig = {
   // makes startTransition navigations (Similar → detail) run a document VT
   // that fights the FLIP as detail text commits.
   images: {
+    // Vercel image optimization returns 402 once the quota is spent, and
+    // next/image then fails closed as "No image". Load TMDb / YouTube / R2
+    // URLs directly. Those hosts are already on img-src.
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
