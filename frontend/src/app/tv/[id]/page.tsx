@@ -12,6 +12,9 @@ interface TvPageProps {
   params: Promise<{ id: string }>;
 }
 
+/** Catalog HTML is the same for every visitor. Reuse it for 5 minutes. */
+export const revalidate = 300;
+
 export async function generateMetadata({
   params,
 }: TvPageProps): Promise<Metadata> {

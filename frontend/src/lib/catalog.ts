@@ -327,14 +327,23 @@ export interface NowInTheatresResponse {
 
 const TMDB_POSTER_URL_RE = /^https:\/\/image\.tmdb\.org\/t\/p\//;
 
-/** Accept + trusted BFF client-IP headers for SSR → API catalog fetches. */
-async function catalogUpstreamHeaders(
-  extra?: Record<string, string>,
-): Promise<Headers> {
-  const requestHeaders = new Headers({
+function catalogAcceptHeaders(extra?: Record<string, string>): Headers {
+  return new Headers({
     Accept: 'application/json',
     ...extra,
   });
+}
+
+/**
+ * Accept + trusted client-IP headers.
+ *
+ * Calling ``headers()`` opts the route into dynamic rendering. Public pages
+ * that should be cached must use ``catalogAcceptHeaders`` instead.
+ */
+async function catalogUpstreamHeaders(
+  extra?: Record<string, string>,
+): Promise<Headers> {
+  const requestHeaders = catalogAcceptHeaders(extra);
   const incoming = await headers();
   applyTrustedClientIpHeaders(
     requestHeaders,
@@ -359,7 +368,8 @@ export async function fetchLandingPosterUrls(): Promise<string[]> {
       ...(process.env.NODE_ENV === 'development'
         ? { cache: 'no-store' as const }
         : { next: { revalidate: 60 } }),
-      headers: await catalogUpstreamHeaders(),
+      // No client IP: this fetch is shared across anonymous visitors.
+      headers: catalogAcceptHeaders(),
       signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
@@ -535,6 +545,7 @@ export interface HomeRailsResult {
  */
 export async function fetchHomeCatalogRails(
   limit = 12,
+  options?: { forwardClientIp?: boolean },
 ): Promise<HomeRailsResult> {
   let base: string;
   try {
@@ -551,7 +562,9 @@ export async function fetchHomeCatalogRails(
         ...(process.env.NODE_ENV === 'development'
           ? { cache: 'no-store' as const }
           : { next: { revalidate: 60 } }),
-        headers: await catalogUpstreamHeaders(),
+        headers: options?.forwardClientIp
+          ? await catalogUpstreamHeaders()
+          : catalogAcceptHeaders(),
         signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS),
       },
     );

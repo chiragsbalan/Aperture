@@ -2,9 +2,9 @@
 
 import { useAuth } from '@/components/auth-provider';
 import { useUsernameAvailability } from '@/hooks/use-username-availability';
+import { assignHomeDocument } from '@/lib/assign-home';
 import { oauthErrorMessage } from '@/lib/google-oauth-errors';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   useEffect,
   useId,
@@ -204,7 +204,6 @@ export function AuthForm({
   onSwitchMode,
   autoFocusFirstField = false,
 }: AuthFormProps) {
-  const router = useRouter();
   const { refreshAuth } = useAuth();
   const emailId = useId();
   const usernameId = useId();
@@ -480,8 +479,7 @@ export function AuthForm({
         return;
       }
       await refreshAuth();
-      router.push('/');
-      router.refresh();
+      assignHomeDocument();
     } catch {
       setFormError('Network error. Try again.');
     } finally {

@@ -1,13 +1,7 @@
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
 
-import { GuestLanding } from '@/components/guest-landing';
-import { HomeCatalogRails } from '@/components/home-catalog-rails';
-import { SiteHeader } from '@/components/site-header';
-import { refreshCookieName } from '@/lib/auth-cookies';
+import { GuestHomeShell } from '@/components/home-shell-views';
 import { fetchHomeCatalogRails, fetchLandingPosterUrls } from '@/lib/catalog';
-import { shouldPrefetchHomeRails } from '@/lib/home-shell';
-import { shouldShowSignedInHome } from '@/lib/home-shell.server';
 
 export const metadata: Metadata = {
   title: 'Aperture',
@@ -15,71 +9,26 @@ export const metadata: Metadata = {
 };
 
 /**
- * Access-only session probe for the home shell (see `decideSignedInHomeShell`).
+ * Anonymous home only. A session cookie is rewritten to the signed-in shell
+ * before this page runs, so this document can be reused for about a minute.
  *
- * Never calls refresh from RSC (Next cannot persist rotated cookies here).
- * SiteHeader refreshes via shared AuthProvider → `/api/auth/me`.
- *
- * Matrix:
- * - no cookies → guest
- * - refresh-only → signed-in (intentional RSC optimism; SiteHeader recovers)
- * - access + /auth/me ok → signed-in
- * - access + 401 / 429 / 5xx / timeout / network / config → signed-in iff
- *   refresh (access-only demotes to guest; SiteHeader recovers via refresh)
- *
- * Prefetch is separate: refresh-gated only (`shouldPrefetchHomeRails`).
+ * Do not read cookies or request headers here. That opts the route out of
+ * the public cache.
  */
+export const revalidate = 60;
+
 export default async function HomePage() {
-  const jar = await cookies();
-  const hasRefreshCookie = Boolean(jar.get(refreshCookieName())?.value);
-
-  // Prefetch rails only when refresh is present. Access-only must never start
-  // rail fetches — /me may 401 and demote to guest (guest path fetches rails).
-  const railsPromise = shouldPrefetchHomeRails(hasRefreshCookie)
-    ? fetchHomeCatalogRails()
-    : null;
-
-  // Always resolve the session probe before choosing the shell.
-  if (await shouldShowSignedInHome()) {
-    const rails = await (railsPromise ?? fetchHomeCatalogRails());
-    return (
-      <div className="layout-shell shell-atmosphere relative flex min-h-dvh flex-col items-center">
-        <a href="#main-content" className="skip-link">
-          Skip to main content
-        </a>
-        <SiteHeader />
-        <main id="main-content" className="relative z-[1] w-full">
-          <HomeCatalogRails
-            inTheatres={rails.inTheatres}
-            movies={rails.movies}
-            shows={rails.shows}
-          />
-        </main>
-      </div>
-    );
-  }
-
   const [posters, rails] = await Promise.all([
     fetchLandingPosterUrls(),
     fetchHomeCatalogRails(),
   ]);
 
   return (
-    // Theme, not a charcoal plate. Poster morph fades ``main`` to 0 and
-    // reveals this wrapper; a solid ``--color-bg`` here reads as a black flash.
-    <div className="shell-atmosphere relative flex min-h-svh flex-col">
-      <a href="#main-content" className="skip-link">
-        Skip to main content
-      </a>
-      <SiteHeader />
-      <main id="main-content" className="relative flex flex-1 flex-col">
-        <GuestLanding
-          posters={posters}
-          inTheatres={rails.inTheatres}
-          movies={rails.movies}
-          shows={rails.shows}
-        />
-      </main>
-    </div>
+    <GuestHomeShell
+      posters={posters}
+      inTheatres={rails.inTheatres}
+      movies={rails.movies}
+      shows={rails.shows}
+    />
   );
 }

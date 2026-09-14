@@ -4,9 +4,10 @@ import { useAuth, type MeResponse } from '@/components/auth-provider';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { FormSkeleton } from '@/components/skeleton';
 import { oauthErrorMessage } from '@/lib/google-oauth-errors';
+import { assignHomeDocument } from '@/lib/assign-home';
 import { invalidatePublicWatchEntries } from '@/lib/library';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 type LoadState =
@@ -19,7 +20,6 @@ function providerLabel(provider: 'password' | 'google'): string {
 }
 
 export function AccountPanel() {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryError = oauthErrorMessage(searchParams.get('error'));
@@ -39,8 +39,7 @@ export function AccountPanel() {
       }
       clearAuth();
       invalidatePublicWatchEntries();
-      router.push('/');
-      router.refresh();
+      assignHomeDocument();
     } catch {
       setLogoutError('Could not log out. Please try again.');
     } finally {

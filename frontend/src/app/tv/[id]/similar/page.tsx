@@ -8,6 +8,9 @@ interface TvSimilarPageProps {
   params: Promise<{ id: string }>;
 }
 
+/** Same public catalog payload as the title page. */
+export const revalidate = 300;
+
 export async function generateMetadata({
   params,
 }: TvSimilarPageProps): Promise<Metadata> {

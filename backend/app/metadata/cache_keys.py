@@ -6,13 +6,13 @@ import uuid
 
 
 def movie_detail_key(content_id: uuid.UUID) -> str:
-    # v2: hybrid title ``rating`` (TMDB / Aperture) on the detail DTO.
-    return f'meta:movie:v2:{content_id}'
+    # v3: backdrop URL is TMDb ``w1280``, not ``original``.
+    return f'meta:movie:v3:{content_id}'
 
 
 def tv_detail_key(content_id: uuid.UUID) -> str:
-    # v4: hybrid title ``rating`` on the detail DTO (was v3 season embed).
-    return f'meta:tv:v4:{content_id}'
+    # v5: backdrop URL is TMDb ``w1280``, not ``original``.
+    return f'meta:tv:v5:{content_id}'
 
 
 def movie_enrichment_key(content_id: uuid.UUID) -> str:

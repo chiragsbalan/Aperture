@@ -96,8 +96,13 @@ function contrastFromImageElement(img: HTMLImageElement): TitleContrast {
   return average >= LIGHT_BACKDROP_THRESHOLD ? 'on-light' : 'on-dark';
 }
 
-function sampleUrlForBackdrop(backdropUrl: string): string {
-  // Same-origin Next optimizer URL so canvas sampling is not blocked by CDN CORS.
+function sampleUrlForBackdrop(backdropUrl: string): string | null {
+  // Local optimizer is same-origin, so canvas sampling is not tainted.
+  // Production /_next/image returns 402 once the quota is spent, so do not
+  // request it. Contrast stays on-dark rather than downloading a second file.
+  if (process.env.NODE_ENV === 'production') {
+    return null;
+  }
   const params = new URLSearchParams({
     url: backdropUrl,
     w: '640',
@@ -222,6 +227,12 @@ export function TitleAtmosphere({
       return;
     }
 
+    const sampleUrl = sampleUrlForBackdrop(backdropUrl);
+    if (sampleUrl == null) {
+      setContrast('on-dark');
+      return;
+    }
+
     let cancelled = false;
     const img = new window.Image();
     img.decoding = 'async';
@@ -240,7 +251,7 @@ export function TitleAtmosphere({
         setContrast('on-dark');
       }
     };
-    img.src = sampleUrlForBackdrop(backdropUrl);
+    img.src = sampleUrl;
 
     return () => {
       cancelled = true;
