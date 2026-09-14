@@ -44,6 +44,11 @@ describe('title backdrop hold', () => {
     expect(root.removeAttribute).toHaveBeenCalledWith(TITLE_BACKDROP_HOLD_ATTR);
     expect(isTitleBackdropSuppressed('title-a')).toBe(false);
 
+    root.removeAttribute.mockClear();
+    holdOutgoingTitleBackdrop();
+    claimIncomingTitleBackdrop('from-home');
+    expect(root.removeAttribute).toHaveBeenCalledWith(TITLE_BACKDROP_HOLD_ATTR);
+
     vi.unstubAllGlobals();
   });
 });

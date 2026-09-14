@@ -42,13 +42,15 @@ export function isTitleBackdropSuppressed(contentId: string): boolean {
 }
 
 /**
- * Let a different title paint.
+ * Let the destination title paint.
  *
  * A remount of the suppressed id must not clear the hold, or the old art
  * flashes back while soft navigation still has that page mounted.
+ * A hold with no suppressed id (landing, home, search) must clear, or the
+ * destination backdrop stays hidden until a later title claims it.
  */
 export function claimIncomingTitleBackdrop(contentId: string): void {
-  if (suppressedContentId == null || suppressedContentId === contentId) {
+  if (suppressedContentId != null && suppressedContentId === contentId) {
     return;
   }
   suppressedContentId = null;

@@ -126,6 +126,11 @@ export function TitleAtmosphere({
   const [contrast, setContrast] = useState<TitleContrast>('on-dark');
   const [driftPaused, setDriftPaused] = useState(false);
   const [pageHidden, setPageHidden] = useState(false);
+  // URL whose backdrop image has decoded. Compared to backdropUrl so a new
+  // title starts hidden without waiting for an effect.
+  const [revealedUrl, setRevealedUrl] = useState<string | null>(null);
+  const revealFrameRef = useRef(0);
+  const backdropRef = useRef<HTMLDivElement>(null);
   // True only for the instance that was already mounted when a poster morph
   // started. A later detail mount must not inherit this, or the new title
   // would never paint its own backdrop.
@@ -185,6 +190,33 @@ export function TitleAtmosphere({
   }, []);
 
   useEffect(() => {
+    return () => {
+      window.cancelAnimationFrame(revealFrameRef.current);
+    };
+  }, [backdropUrl]);
+
+  function revealBackdrop(url: string) {
+    window.cancelAnimationFrame(revealFrameRef.current);
+    // Two frames so a cached file still paints at opacity 0 before the fade.
+    // next/image onLoad can miss a cache hit once images are unoptimized.
+    revealFrameRef.current = window.requestAnimationFrame(() => {
+      revealFrameRef.current = window.requestAnimationFrame(() => {
+        setRevealedUrl(url);
+      });
+    });
+  }
+
+  useLayoutEffect(() => {
+    if (!backdropUrl || outgoingHold) {
+      return;
+    }
+    const img = backdropRef.current?.querySelector('img');
+    if (img != null && img.complete && img.naturalWidth > 0) {
+      revealBackdrop(backdropUrl);
+    }
+  }, [backdropUrl, outgoingHold]);
+
+  useEffect(() => {
     if (!backdropUrl) {
       setContrast('on-dark');
       return;
@@ -221,7 +253,9 @@ export function TitleAtmosphere({
       // Re-bind ``color`` to the local token so inheritance does not keep the
       // app-theme computed color from ``body`` (light fg stays black otherwise).
       // ``svh`` (not ``dvh``): mobile URL-bar show/hide must not resize the page.
-      className="relative min-h-svh text-foreground"
+      // Keep the purple wash under the poster. Without it the title page is
+      // just ``#0c0b09`` until the backdrop finishes loading.
+      className="shell-atmosphere relative min-h-svh text-foreground"
     >
       {backdropUrl && !outgoingHold ? (
         <div
@@ -231,15 +265,22 @@ export function TitleAtmosphere({
           // when mobile browser chrome toggles on scroll (same as guest mosaic).
           // ``data-title-backdrop``: poster-morph hold CSS hides this on click
           // so Similar→title does not leave the old art under the FLIP.
-          className="pointer-events-none fixed top-0 left-0 z-0 h-svh w-screen overflow-hidden"
+          ref={backdropRef}
+          className={`catalog-backdrop pointer-events-none fixed top-0 left-0 z-0 h-svh w-screen overflow-hidden${
+            revealedUrl === backdropUrl ? ' is-ready' : ''
+          }`}
         >
           <Image
+            key={backdropUrl}
             src={backdropUrl}
             alt=""
             fill
             priority
             className="object-cover object-center opacity-[0.48]"
             sizes="100vw"
+            onLoad={() => {
+              revealBackdrop(backdropUrl);
+            }}
           />
           <div className="catalog-backdrop-veil absolute inset-0" />
           {driftPaused ? null : (

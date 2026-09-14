@@ -204,62 +204,63 @@ export function GuestLanding({
 
   return (
     <>
-      <section className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-5 py-24 sm:px-6 sm:py-28">
+      <section className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-[var(--color-bg)] px-5 py-24 sm:px-6 sm:py-28">
         <PosterMosaic posters={posters} />
         <div className="guest-landing-hero-entrance motion-fade-rise relative z-[1] w-full max-w-xl">
           <GuestLandingHero panel={panel} onPanelChange={setPanel} />
         </div>
-        {/* Seam fade only — keeps mosaic full-bleed to the viewport bottom. */}
+      </section>
+
+      <div className="relative">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-24 bg-gradient-to-b from-transparent to-[var(--color-bg)] sm:h-32"
+          className="guest-theme-fade shell-atmosphere pointer-events-none absolute inset-x-0 bottom-0"
         />
-      </section>
+        <section
+          aria-labelledby="aperture-lets-you-heading"
+          className="relative z-[1] py-14 motion-fade-in sm:py-20"
+        >
+          <div className="layout-content">
+            <h2
+              id="aperture-lets-you-heading"
+              className="type-rail text-center text-foreground"
+            >
+              Aperture lets you…
+            </h2>
+            <ul className="mt-8 grid gap-4 sm:mt-10 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+              {CAPABILITIES.map((item) => (
+                <li key={item.title}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPanel('signup');
+                    }}
+                    className="block h-full w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)]/60 px-5 py-5 text-left transition hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+                  >
+                    <CapabilityIcon>{item.icon}</CapabilityIcon>
+                    <p className="font-display text-base font-medium text-foreground">
+                      {item.title}
+                    </p>
+                    <p className="mt-2 text-sm text-muted">{item.body}</p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
 
-      <section
-        aria-labelledby="aperture-lets-you-heading"
-        className="relative z-[1] bg-[var(--color-bg)] py-14 motion-fade-in sm:py-20"
-      >
-        <div className="layout-content">
-          <h2
-            id="aperture-lets-you-heading"
-            className="type-rail text-center text-foreground"
-          >
-            Aperture lets you…
-          </h2>
-          <ul className="mt-8 grid gap-4 sm:mt-10 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-            {CAPABILITIES.map((item) => (
-              <li key={item.title}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPanel('signup');
-                  }}
-                  className="block h-full w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)]/60 px-5 py-5 text-left transition hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
-                >
-                  <CapabilityIcon>{item.icon}</CapabilityIcon>
-                  <p className="font-display text-base font-medium text-foreground">
-                    {item.title}
-                  </p>
-                  <p className="mt-2 text-sm text-muted">{item.body}</p>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      <section
-        aria-label="Discover titles"
-        className="relative z-[1] bg-[var(--color-bg)] py-12 sm:py-16"
-      >
-        <HomeCatalogRails
-          inTheatres={inTheatres}
-          movies={movies}
-          shows={shows}
-          firstHeadingLevel="h2"
-        />
-      </section>
+        <section
+          aria-label="Discover titles"
+          className="relative z-[1] py-12 sm:py-16"
+        >
+          <HomeCatalogRails
+            inTheatres={inTheatres}
+            movies={movies}
+            shows={shows}
+            firstHeadingLevel="h2"
+          />
+        </section>
+      </div>
     </>
   );
 }

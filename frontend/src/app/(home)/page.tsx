@@ -65,7 +65,9 @@ export default async function HomePage() {
   ]);
 
   return (
-    <div className="relative flex min-h-svh flex-col bg-[var(--color-bg)]">
+    // Theme, not a charcoal plate. Poster morph fades ``main`` to 0 and
+    // reveals this wrapper; a solid ``--color-bg`` here reads as a black flash.
+    <div className="shell-atmosphere relative flex min-h-svh flex-col">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
