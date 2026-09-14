@@ -3,7 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-08-08
 - **Related:** [ADR-0008](ADR-0008-personal-library-lists.md) (diary half-stars); [ADR-0013](ADR-0013-lean-catalog-option-b.md) (enrichment vs lean stub); PLAN.md P4
-- **Implements in:** `feature/p4.1-title-ratings`
+- **Implements in:** P4.1 — merged on `main`
+- **Amended:** 2026-09-15 — title Activity **Ratings** tab lists latest-per-user diary ratings (see [ADR-0019](ADR-0019-watch-log-as-review.md))
 
 ## Context
 
@@ -46,6 +47,6 @@ Diary entries already store optional personal half-star ratings (`watch_entries.
 
 ## Future evolution
 
-- Ratings histogram / Ratings tab from Aperture votes only (TMDB has no API breakdown).
+- Ratings **histogram** from Aperture votes only (TMDB has no API breakdown). Per-user latest ratings on title Activity **Ratings** tab shipped in P4.2 (ADR-0019); not a histogram.
 - Optional separate rate-without-log product.
-- Profile / activity surfaces for rated titles (PLAN P4).
+- Profile-level “titles I rated” shelf (distinct from title Activity Ratings tab).
