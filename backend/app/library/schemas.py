@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from datetime import date, datetime
-from typing import Callable, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_serializer
 
