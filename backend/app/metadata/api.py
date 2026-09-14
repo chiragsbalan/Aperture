@@ -55,9 +55,7 @@ _LANDING_EMPTY_CACHE_CONTROL = 'public, max-age=60'
 _HOME_RAIL_CACHE_CONTROL = 'private, no-store'
 # Public rails are the same for every visitor. A short shared cache lets
 # Vercel reuse one fill instead of calling Render on every page view.
-_PUBLIC_RAIL_CACHE_CONTROL = (
-    'public, s-maxage=60, stale-while-revalidate=300'
-)
+_PUBLIC_RAIL_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300'
 _TMDB_POSTER_URL_PREFIX = 'https://image.tmdb.org/t/p/'
 
 # Single-flight fill so concurrent cold misses share one TMDb fetch.

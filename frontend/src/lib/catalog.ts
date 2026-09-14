@@ -543,10 +543,10 @@ export interface HomeRailsResult {
  * Batched home rails (one upstream RTT). Prefer this over three separate
  * rail fetches on `/`.
  */
-export async function fetchHomeCatalogRails(
-  limit = 12,
-  options?: { forwardClientIp?: boolean },
-): Promise<HomeRailsResult> {
+export async function fetchHomeCatalogRails(options?: {
+  limit?: number;
+  forwardClientIp?: boolean;
+}): Promise<HomeRailsResult> {
   let base: string;
   try {
     base = upstreamApiBaseUrl();
@@ -554,6 +554,7 @@ export async function fetchHomeCatalogRails(
     return { inTheatres: [], movies: [], shows: [] };
   }
 
+  const limit = options?.limit ?? 12;
   const capped = Math.min(HOME_RAIL_MAX_PUBLIC_LIMIT, Math.max(1, limit));
   try {
     const res = await fetch(
