@@ -557,9 +557,7 @@ def _review_response(
     dislike_count = int(entry.dislike_count)
     rating = float(entry.rating) if entry.rating is not None else 0.0
     vote: VoteValue | None = (
-        _normalize_viewer_vote(viewer_vote)
-        if viewer.user_id is not None
-        else None
+        _normalize_viewer_vote(viewer_vote) if viewer.user_id is not None else None
     )
     return ReviewResponse(
         id=entry.id,
