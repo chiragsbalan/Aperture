@@ -54,6 +54,9 @@
   /* Soft charcoal sheet over the glow lobes — darkens without washing out hue */
   --bg-glow-sheet: rgba(12, 11, 9, 0.55);
   --bg-vignette: rgba(0, 0, 0, 0.56);
+  /* Guest mosaic → theme handoff. Theme starts only in this bottom band. */
+  --guest-theme-fade-size: 12rem;
+  --guest-theme-fade-size-sm: 16rem;
   /*
    * Overlay / popup chrome (``.overlay-surface``, header rule, open fields) —
    * same purple + blue language as the page atmosphere.

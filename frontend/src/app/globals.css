@@ -1076,6 +1076,40 @@
     --bg-glow-blue: rgba(56, 128, 210, 0.14);
   }
 
+  /*
+   * Guest home: theme layer covers the scroll body and overlaps the mosaic
+   * only in a bottom fade, so the posters stay unwashed.
+   */
+  .guest-theme-fade {
+    top: calc(-1 * var(--guest-theme-fade-size));
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--guest-theme-fade-size)
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--guest-theme-fade-size)
+    );
+  }
+
+  @media (min-width: 640px) {
+    .guest-theme-fade {
+      top: calc(-1 * var(--guest-theme-fade-size-sm));
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        #000 var(--guest-theme-fade-size-sm)
+      );
+      mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        #000 var(--guest-theme-fade-size-sm)
+      );
+    }
+  }
+
   /* Dense small-poster mosaic — pack rows tight; parent clips overflow. */
   .poster-mosaic-layer {
     display: grid;
@@ -1194,6 +1228,22 @@
   html[data-title-backdrop-hold] [data-title-backdrop] {
     visibility: hidden;
     opacity: 0;
+    /* Hide on click must be instant. The load fade lives on .catalog-backdrop. */
+    transition: none;
+  }
+
+  /*
+   * Fade the photo in only after it has decoded, not when the URL arrives.
+   * No opaque fill: a charcoal sheet here reads as a black flash before the
+   * art is visible. The shell wash stays underneath until the photo fades in.
+   */
+  .catalog-backdrop {
+    opacity: 0;
+    transition: opacity var(--duration-med) var(--ease-out);
+  }
+
+  .catalog-backdrop.is-ready {
+    opacity: 1;
   }
 
   /* Soft wash so a full-page TMDB backdrop keeps text readable. */
@@ -2024,6 +2074,7 @@
   .motion-fade-rise-delay,
   .motion-fade-in,
   .catalog-backdrop-drift,
+  .catalog-backdrop,
   .is-jiggling,
   .btn-spinner,
   .search-overlay-backdrop,
@@ -2054,6 +2105,7 @@
   .title-tab-panel-stage,
   .title-tab-panel,
   .motion-size,
+  .catalog-backdrop,
   .library-action-icon-glyph {
     transition: none !important;
   }
