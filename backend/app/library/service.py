@@ -28,6 +28,7 @@ from app.library.schemas import (
     SpoilerFilter,
     TitleRatingItem,
     TitleRatingsPageResponse,
+    VoteValue,
     WatchEntriesContainsResponse,
     WatchEntriesPageResponse,
     WatchEntriesRatingsResponse,
@@ -507,6 +508,14 @@ def _resolved_spoiler_filter(
     return 'all' if viewer.spoilers == 'show' else 'no_spoilers'
 
 
+def _normalize_viewer_vote(vote: int | None) -> VoteValue | None:
+    if vote == 1:
+        return 1
+    if vote == -1:
+        return -1
+    return None
+
+
 def _content_summary(
     entry: WatchEntry,
     summary: metadata_service.ContentSummaryDTO | None,
@@ -547,7 +556,11 @@ def _review_response(
     like_count = int(entry.like_count)
     dislike_count = int(entry.dislike_count)
     rating = float(entry.rating) if entry.rating is not None else 0.0
-    vote: int | None = viewer_vote if viewer.user_id is not None else None
+    vote: VoteValue | None = (
+        _normalize_viewer_vote(viewer_vote)
+        if viewer.user_id is not None
+        else None
+    )
     return ReviewResponse(
         id=entry.id,
         rating=rating,
@@ -561,7 +574,7 @@ def _review_response(
             display_name=author.display_name,
             avatar_url=author.avatar_url,
         ),
-        viewer_vote=vote if vote in (1, -1) else None,
+        viewer_vote=vote,
         content=_content_summary(entry, summary),
         note=note,
         include_note=include_note,
@@ -855,7 +868,7 @@ async def put_review_vote(
         entry,
         owner,
         viewer=viewer,
-        viewer_vote=vote if vote in (1, -1) else None,
+        viewer_vote=_normalize_viewer_vote(vote),
         summary=summaries[0] if summaries else None,
         include_note_ids=set(),
     )

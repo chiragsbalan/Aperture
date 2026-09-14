@@ -161,7 +161,15 @@ function ActivityReviewsPanel({
     return () => {
       cancelled = true;
     };
-  }, [kind, contentId, sessionStatus, sort, spoilerFilter, ratingFilter, onTotal]);
+  }, [
+    kind,
+    contentId,
+    sessionStatus,
+    sort,
+    spoilerFilter,
+    ratingFilter,
+    onTotal,
+  ]);
 
   async function handleReveal(id: string) {
     const result = await fetchTitleReview(kind, contentId, id);
@@ -221,7 +229,10 @@ function ActivityReviewsPanel({
     <div>
       <div className="grid gap-3 sm:grid-cols-3">
         <div>
-          <p id="activity-review-sort-label" className="mb-1 text-sm text-muted">
+          <p
+            id="activity-review-sort-label"
+            className="mb-1 text-sm text-muted"
+          >
             Sort
           </p>
           <FormSelect
@@ -233,7 +244,10 @@ function ActivityReviewsPanel({
           />
         </div>
         <div>
-          <p id="activity-review-spoiler-label" className="mb-1 text-sm text-muted">
+          <p
+            id="activity-review-spoiler-label"
+            className="mb-1 text-sm text-muted"
+          >
             Spoilers
           </p>
           <FormSelect
@@ -245,7 +259,10 @@ function ActivityReviewsPanel({
           />
         </div>
         <div>
-          <p id="activity-review-rating-label" className="mb-1 text-sm text-muted">
+          <p
+            id="activity-review-rating-label"
+            className="mb-1 text-sm text-muted"
+          >
             Rating
           </p>
           <FormSelect

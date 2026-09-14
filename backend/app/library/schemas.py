@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Literal
+from typing import Callable, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_serializer
 
@@ -141,9 +141,9 @@ class ReviewResponse(BaseModel):
     @model_serializer(mode='wrap')
     def _omit_hidden_note(
         self,
-        serializer: object,
+        serializer: Callable[[ReviewResponse], dict[str, object]],
     ) -> dict[str, object]:
-        data = serializer(self)  # type: ignore[operator]
+        data = serializer(self)
         if not self.include_note:
             data.pop('note', None)
         return data

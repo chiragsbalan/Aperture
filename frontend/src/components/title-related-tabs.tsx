@@ -157,13 +157,7 @@ export function TitleRelatedTabs({
       observer.disconnect();
       window.removeEventListener('resize', syncIndicator);
     };
-  }, [
-    tab,
-    reviewsTotal,
-    ratingsTotal,
-    listsTotal,
-    similarCount,
-  ]);
+  }, [tab, reviewsTotal, ratingsTotal, listsTotal, similarCount]);
 
   useEffect(() => {
     if (skipPanelAnimRef.current) {

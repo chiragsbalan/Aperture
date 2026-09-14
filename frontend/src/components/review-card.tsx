@@ -117,8 +117,7 @@ export function ReviewCard({
   const watchedLabel = formatIsoMonthYear(review.watched_at);
   const displayName =
     review.author.display_name?.trim() || `@${review.author.username}`;
-  const spoilerGated =
-    review.contains_spoilers && !isAuthor && !revealed;
+  const spoilerGated = review.contains_spoilers && !isAuthor && !revealed;
   const bodyText = spoilerGated ? '' : (review.note ?? '');
   const liked = review.viewer_vote === 1;
   const disliked = review.viewer_vote === -1;
