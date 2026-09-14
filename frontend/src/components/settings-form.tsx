@@ -16,10 +16,10 @@ import { useAuth } from '@/components/auth-provider';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { FormSkeleton } from '@/components/skeleton';
 import { useUsernameAvailability } from '@/hooks/use-username-availability';
+import { assignHomeDocument } from '@/lib/assign-home';
 import { invalidatePublicWatchEntries } from '@/lib/library';
 import { applyThemePreference } from '@/lib/theme';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   useEffect,
   useId,
@@ -37,7 +37,6 @@ type LoadState =
 const MAX_LINKS = 3;
 
 export function SettingsForm() {
-  const router = useRouter();
   const { clearAuth, refreshAuth } = useAuth();
   const usernameId = useId();
   const usernameHintId = useId();
@@ -87,8 +86,7 @@ export function SettingsForm() {
       }
       clearAuth();
       invalidatePublicWatchEntries();
-      router.push('/');
-      router.refresh();
+      assignHomeDocument();
     } catch {
       setLogoutError('Could not log out. Please try again.');
     } finally {

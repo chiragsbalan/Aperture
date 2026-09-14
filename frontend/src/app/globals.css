@@ -7,11 +7,18 @@
 @layer base {
   html {
     background: var(--color-bg);
-    /* Keep the content column steady when a short loading shell grows into a
-       scrollable title page (avoids a horizontal poster nudge). */
-    scrollbar-gutter: stable;
+    /* Viewport scrollbar only. Nested scrollers (sheets, tab strips) keep
+       their own. Wheel, touch, and keys still move the page. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     /* iOS / Android default tap flash outlines every link & button. */
     -webkit-tap-highlight-color: transparent;
+  }
+
+  html::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 
   body {

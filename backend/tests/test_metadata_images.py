@@ -40,5 +40,9 @@ def test_tmdb_image_url_builds_cdn() -> None:
         == 'https://image.tmdb.org/t/p/w500/9cqNxx0GxF0bflZmeSMuL5tnGzr.jpg'
     )
     assert tmdb_image_url(None) is None
+    assert (
+        tmdb_image_url('/x.jpg', size='w1280')
+        == 'https://image.tmdb.org/t/p/w1280/x.jpg'
+    )
     with pytest.raises(InvalidImagePathError):
         tmdb_image_url('/x.jpg', size='w999')

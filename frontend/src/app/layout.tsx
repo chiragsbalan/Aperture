@@ -28,6 +28,12 @@ export const metadata: Metadata = {
   description: 'A cinematic window into film and television.',
 };
 
+/**
+ * Vercel function region. Singapore sits next to the Render API.
+ * ``frontend/vercel.json`` sets the same region for route handlers.
+ */
+export const preferredRegion = 'sin1';
+
 export default function RootLayout({
   children,
 }: Readonly<{

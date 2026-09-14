@@ -8,6 +8,9 @@ interface MovieSimilarPageProps {
   params: Promise<{ id: string }>;
 }
 
+/** Same public catalog payload as the title page. */
+export const revalidate = 300;
+
 export async function generateMetadata({
   params,
 }: MovieSimilarPageProps): Promise<Metadata> {

@@ -617,7 +617,9 @@ def test_home_rails_batches_three_pools(
     assert len(body['movies']) == 5
     assert len(body['shows']) == 5
     assert len(body['in_theatres']) == 5
-    assert res.headers.get('cache-control') == 'private, no-store'
+    assert res.headers.get('cache-control') == (
+        'public, s-maxage=60, stale-while-revalidate=300'
+    )
 
 
 def test_public_rail_display_limit_clamps() -> None:

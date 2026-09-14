@@ -14,6 +14,9 @@ _ALLOWED_SIZES = frozenset(
         'w342',
         'w500',
         'w780',
+        # Backdrop hero width. ``original`` is 1–2.5 MB and is downloaded
+        # as-is because the Vercel image optimizer is off.
+        'w1280',
         'original',
         'h632',
     }

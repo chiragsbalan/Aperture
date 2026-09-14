@@ -28,6 +28,22 @@ export function refreshCookieName(): string {
   return hostPrefixEnabled() ? REFRESH_TOKEN_COOKIE : DEV_REFRESH_TOKEN_COOKIE;
 }
 
+const SESSION_COOKIE_NAMES = [
+  ACCESS_TOKEN_COOKIE,
+  REFRESH_TOKEN_COOKIE,
+  DEV_ACCESS_TOKEN_COOKIE,
+  DEV_REFRESH_TOKEN_COOKIE,
+] as const;
+
+/**
+ * True when the request has a session cookie, in either environment.
+ *
+ * Middleware uses this to keep signed-in ``/`` off the public page cache.
+ */
+export function hasAuthSessionCookie(has: (name: string) => boolean): boolean {
+  return SESSION_COOKIE_NAMES.some((name) => has(name));
+}
+
 /** Cookie attributes shared by access and refresh tokens. */
 export function authCookieBaseOptions(maxAgeSeconds: number): {
   httpOnly: true;
