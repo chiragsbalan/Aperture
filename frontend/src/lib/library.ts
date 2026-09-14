@@ -87,6 +87,7 @@ export interface WatchEntry {
   note: string | null;
   /** Optional 0.5–5.0 half-star rating. */
   rating: number | null;
+  contains_spoilers: boolean;
   created_at: string;
   updated_at: string;
   content: LibraryContentSummary;
@@ -769,6 +770,7 @@ export async function createWatchEntry(input: {
   watched_at?: string;
   note?: string | null;
   rating?: number | null;
+  contains_spoilers?: boolean;
 }): Promise<{ ok: true; entry: WatchEntry } | ApiError> {
   const res = await fetch('/api/proxy/api/v1/me/watch-entries', {
     method: 'POST',
@@ -779,6 +781,7 @@ export async function createWatchEntry(input: {
       watched_at: input.watched_at ?? null,
       note: input.note ?? null,
       rating: input.rating ?? null,
+      contains_spoilers: input.contains_spoilers ?? false,
     }),
   });
   if (!res.ok) {
@@ -799,6 +802,7 @@ export async function patchWatchEntry(
     watched_at?: string;
     note?: string | null;
     rating?: number | null;
+    contains_spoilers?: boolean;
   },
 ): Promise<{ ok: true; entry: WatchEntry } | ApiError> {
   const res = await fetch(`/api/proxy/api/v1/me/watch-entries/${entryId}`, {
@@ -814,6 +818,7 @@ export async function patchWatchEntry(
     };
   }
   invalidatePublicWatchEntries();
+  notifyDiaryLoggedChanged();
   return { ok: true, entry: (await res.json()) as WatchEntry };
 }
 

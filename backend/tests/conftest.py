@@ -30,6 +30,7 @@ def _clear_settings_cache() -> Iterator[None]:
     from app.core.config import get_settings
     from app.library.rate_limit import (
         reset_library_contains_rate_limit_fallback,
+        reset_library_vote_rate_limit_fallback,
     )
     from app.lists.rate_limit import reset_lists_rate_limit_fallback
     from app.metadata import api as metadata_api
@@ -59,6 +60,7 @@ def _clear_settings_cache() -> Iterator[None]:
     reset_search_rate_limit_fallback()
     reset_lists_rate_limit_fallback()
     reset_library_contains_rate_limit_fallback()
+    reset_library_vote_rate_limit_fallback()
     reset_metadata_rate_limit_fallback()
     reset_users_public_rate_limit_fallback()
     reset_username_availability_rate_limit_fallback()
@@ -76,6 +78,7 @@ def _clear_settings_cache() -> Iterator[None]:
     reset_search_rate_limit_fallback()
     reset_lists_rate_limit_fallback()
     reset_library_contains_rate_limit_fallback()
+    reset_library_vote_rate_limit_fallback()
     reset_metadata_rate_limit_fallback()
     reset_users_public_rate_limit_fallback()
     reset_username_availability_rate_limit_fallback()

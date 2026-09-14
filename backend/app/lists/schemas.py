@@ -151,6 +151,33 @@ class CustomListMembershipResponse(BaseModel):
     )
 
 
+class TitleListOwner(BaseModel):
+    """Public owner chip for a list that contains a catalog title."""
+
+    username: str
+    display_name: str | None = None
+    avatar_url: str | None = None
+
+
+class TitlePublicListItem(BaseModel):
+    """One public custom list that contains a title."""
+
+    id: uuid.UUID
+    title: str
+    visibility: Literal['public'] = 'public'
+    updated_at: datetime
+    owner: TitleListOwner
+
+
+class TitlePublicListsPageResponse(BaseModel):
+    """Paginated public custom lists containing a title."""
+
+    page: int
+    limit: int
+    total: int
+    items: list[TitlePublicListItem]
+
+
 class TitleLibraryStatusResponse(BaseModel):
     """Combined title-page membership for watchlist / favorites / diary / lists."""
 

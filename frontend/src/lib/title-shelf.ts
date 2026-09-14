@@ -2,7 +2,7 @@
  * @fileoverview Helpers for product-wide title shelf pages.
  */
 
-import type { SimilarTitle, TopMovie } from '@/lib/catalog';
+import type { TopMovie } from '@/lib/catalog';
 import type { LibraryListItem } from '@/lib/library';
 
 /** Browse cell for product-wide title shelf pages. */
@@ -87,26 +87,6 @@ export function shelfItemsFromTopMovies(
     year: item.year,
     posterUrl: item.poster_url,
   }));
-}
-
-export function shelfItemsFromSimilar(
-  items: SimilarTitle[],
-  fallbackKind: 'movie' | 'tv',
-): TitleShelfItem[] {
-  return items.map((item) => {
-    const resolvedType = item.content_type ?? fallbackKind;
-    const kind: 'movie' | 'tv' =
-      resolvedType === 'tv_show' || resolvedType === 'tv' ? 'tv' : 'movie';
-    return {
-      key: `${kind}:${item.tmdb_id}-${item.title}`,
-      contentId: item.content_id,
-      tmdbId: item.tmdb_id,
-      kind,
-      title: item.title,
-      year: item.year,
-      posterUrl: item.poster_url,
-    };
-  });
 }
 
 export function shelfItemsFromLibraryList(

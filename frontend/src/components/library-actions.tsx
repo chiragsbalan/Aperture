@@ -29,6 +29,13 @@ import {
   type CustomListSummary,
   type LibraryContentType,
 } from '@/lib/library';
+import {
+  clearLogWatchDraft,
+  consumeLogWatchDraftRestore,
+  markLogWatchDraftForRestore,
+  readLogWatchDraft,
+  writeLogWatchDraft,
+} from '@/lib/reviews';
 
 const LibraryAddToListSheet = dynamic(
   () =>
@@ -154,6 +161,7 @@ function ActionIconButton({
   expanded,
   disabled,
   busy,
+  href,
   onClick,
   onIntent,
   children,
@@ -166,11 +174,32 @@ function ActionIconButton({
   expanded?: boolean;
   disabled?: boolean;
   busy?: boolean;
-  onClick: () => void;
+  href?: string;
+  onClick?: () => void;
   /** Prefetch heavy dialog chunks on hover/focus. */
   onIntent?: () => void;
   children: ReactNode;
 }) {
+  const className = `library-action-icon ${ACTION_TONE_CLASS[tone]} inline-flex h-11 w-11 items-center justify-center disabled:opacity-50 sm:h-12 sm:w-12 ${
+    active ? 'is-active' : ''
+  }`;
+  const glyph = (
+    <span className="library-action-icon-glyph inline-flex">{children}</span>
+  );
+  if (href != null) {
+    return (
+      <Link
+        href={href}
+        aria-label={label}
+        title={label}
+        className={className}
+        onPointerEnter={onIntent}
+        onFocus={onIntent}
+      >
+        {glyph}
+      </Link>
+    );
+  }
   return (
     <button
       type="button"
@@ -184,11 +213,9 @@ function ActionIconButton({
       onClick={onClick}
       onPointerEnter={onIntent}
       onFocus={onIntent}
-      className={`library-action-icon ${ACTION_TONE_CLASS[tone]} inline-flex h-11 w-11 items-center justify-center disabled:opacity-50 sm:h-12 sm:w-12 ${
-        active ? 'is-active' : ''
-      }`}
+      className={className}
     >
-      <span className="library-action-icon-glyph inline-flex">{children}</span>
+      {glyph}
     </button>
   );
 }
@@ -228,6 +255,7 @@ export function LibraryActions({
   const [watchedAt, setWatchedAt] = useState(localTodayIsoDate);
   const [note, setNote] = useState('');
   const [rating, setRating] = useState<number | null>(null);
+  const [containsSpoilers, setContainsSpoilers] = useState(false);
   const [hasLogged, setHasLogged] = useState(false);
   const [diaryMessage, setDiaryMessage] = useState<string | null>(null);
   const loadGeneration = useRef(0);
@@ -329,19 +357,29 @@ export function LibraryActions({
     };
   }, [contentId, libraryType, sessionStatus]);
 
+  useEffect(() => {
+    if (libraryType == null || sessionStatus !== 'signed_in') {
+      return;
+    }
+    if (!consumeLogWatchDraftRestore(libraryType, contentId)) {
+      return;
+    }
+    const draft = readLogWatchDraft(libraryType, contentId);
+    if (draft == null) {
+      return;
+    }
+    setWatchedAt(draft.watchedAt);
+    setNote(draft.note);
+    setRating(draft.rating);
+    setContainsSpoilers(draft.containsSpoilers);
+    setError(null);
+    setDiaryMessage(null);
+    setLogSheetMounted(true);
+    setLogDialogOpen(true);
+  }, [contentId, libraryType, sessionStatus]);
+
   if (libraryType == null) {
     return null;
-  }
-
-  if (authState === 'signed_out') {
-    return (
-      <p className="mt-4 text-xs text-muted sm:mt-5 sm:text-sm">
-        <Link href="/login" className="text-foreground underline">
-          Log in
-        </Link>{' '}
-        to save titles to your library.
-      </p>
-    );
   }
 
   async function toggle(
@@ -388,8 +426,39 @@ export function LibraryActions({
     setListsDialogOpen(true);
   }
 
+  function persistLogDraft(next?: {
+    watchedAt?: string;
+    note?: string;
+    rating?: number | null;
+    containsSpoilers?: boolean;
+  }) {
+    if (libraryType == null) {
+      return;
+    }
+    writeLogWatchDraft(libraryType, contentId, {
+      watchedAt: next?.watchedAt ?? watchedAt,
+      note: next?.note ?? note,
+      rating: next?.rating !== undefined ? next.rating : rating,
+      containsSpoilers: next?.containsSpoilers ?? containsSpoilers,
+    });
+  }
+
   function openLogWatch() {
-    setWatchedAt(localTodayIsoDate());
+    if (libraryType == null) {
+      return;
+    }
+    const draft = readLogWatchDraft(libraryType, contentId);
+    if (draft != null) {
+      setWatchedAt(draft.watchedAt);
+      setNote(draft.note);
+      setRating(draft.rating);
+      setContainsSpoilers(draft.containsSpoilers);
+    } else {
+      setWatchedAt(localTodayIsoDate());
+      setNote('');
+      setRating(null);
+      setContainsSpoilers(false);
+    }
     setDiaryMessage(null);
     setError(null);
     setLogSheetMounted(true);
@@ -475,6 +544,12 @@ export function LibraryActions({
     if (libraryType == null || pending != null) {
       return;
     }
+    persistLogDraft();
+    if (authState !== 'signed_in') {
+      markLogWatchDraftForRestore(libraryType, contentId);
+      setError('Log in to save this watch.');
+      return;
+    }
     setPending('diary');
     setError(null);
     setDiaryMessage(null);
@@ -485,16 +560,19 @@ export function LibraryActions({
         watched_at: watchedAt,
         note: note.trim() || null,
         rating,
+        contains_spoilers: containsSpoilers,
       });
       if (!result.ok) {
         setError(result.error);
         return;
       }
+      clearLogWatchDraft(libraryType, contentId);
       setInWatchlist(false);
       setHasLogged(true);
       setDiaryMessage('Watch logged.');
       setNote('');
       setRating(null);
+      setContainsSpoilers(false);
       setLogDialogOpen(false);
     } catch {
       setError('Could not log watch.');
@@ -503,12 +581,24 @@ export function LibraryActions({
     }
   }
 
-  const membershipLoading = membershipState === 'loading';
-  const controlsDisabled = membershipState !== 'ready' || pending != null;
+  const signedOut = authState === 'signed_out';
+  const membershipLoading = !signedOut && membershipState === 'loading';
+  const controlsDisabled = signedOut
+    ? false
+    : membershipState !== 'ready' || pending != null;
   const watchLogged = hasLogged;
+  const loginHref = '/login';
 
   return (
     <div className="mt-4 space-y-2 sm:mt-5 sm:space-y-3">
+      {signedOut ? (
+        <p className="text-xs text-muted sm:text-sm">
+          <Link href={loginHref} className="text-foreground underline">
+            Log in
+          </Link>{' '}
+          to save titles to your library.
+        </p>
+      ) : null}
       <div
         className="flex w-full items-center justify-evenly sm:justify-evenly"
         aria-busy={membershipLoading || undefined}
@@ -517,42 +607,75 @@ export function LibraryActions({
           <span className="sr-only">Loading library actions…</span>
         ) : null}
         <ActionIconButton
-          label={inWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
+          label={
+            signedOut
+              ? 'Log in to add to watchlist'
+              : inWatchlist
+                ? 'Remove from watchlist'
+                : 'Add to watchlist'
+          }
           tone="watchlist"
           active={inWatchlist}
-          pressed={inWatchlist}
+          pressed={signedOut ? false : inWatchlist}
           busy={membershipLoading || pending === 'watchlist'}
-          disabled={controlsDisabled}
-          onClick={() => {
-            void toggle('watchlist', inWatchlist, setInWatchlist);
-          }}
+          disabled={signedOut ? false : controlsDisabled}
+          href={signedOut ? loginHref : undefined}
+          onClick={
+            signedOut
+              ? undefined
+              : () => {
+                  void toggle('watchlist', inWatchlist, setInWatchlist);
+                }
+          }
         >
           <BookmarkIcon filled={inWatchlist} />
         </ActionIconButton>
         <ActionIconButton
-          label={inFavorites ? 'Remove from favorites' : 'Add to favorites'}
+          label={
+            signedOut
+              ? 'Log in to add to favorites'
+              : inFavorites
+                ? 'Remove from favorites'
+                : 'Add to favorites'
+          }
           tone="favorites"
           active={inFavorites}
-          pressed={inFavorites}
+          pressed={signedOut ? false : inFavorites}
           busy={membershipLoading || pending === 'favorites'}
-          disabled={controlsDisabled}
-          onClick={() => {
-            void toggle('favorites', inFavorites, setInFavorites);
-          }}
+          disabled={signedOut ? false : controlsDisabled}
+          href={signedOut ? loginHref : undefined}
+          onClick={
+            signedOut
+              ? undefined
+              : () => {
+                  void toggle('favorites', inFavorites, setInFavorites);
+                }
+          }
         >
           <HeartIcon filled={inFavorites} />
         </ActionIconButton>
         <ActionIconButton
-          label={inAnyList ? 'Manage lists' : 'Add to list'}
+          label={
+            signedOut
+              ? 'Log in to add to a list'
+              : inAnyList
+                ? 'Manage lists'
+                : 'Add to list'
+          }
           tone="lists"
           active={inAnyList}
-          hasPopup="dialog"
-          expanded={listsDialogOpen}
+          hasPopup={signedOut ? undefined : 'dialog'}
+          expanded={signedOut ? undefined : listsDialogOpen}
           busy={membershipLoading || pending === 'lists'}
-          disabled={controlsDisabled}
-          onClick={() => {
-            void openAddToList();
-          }}
+          disabled={signedOut ? false : controlsDisabled}
+          href={signedOut ? loginHref : undefined}
+          onClick={
+            signedOut
+              ? undefined
+              : () => {
+                  void openAddToList();
+                }
+          }
           onIntent={prefetchLibrarySheets}
         >
           <ListIcon filled={inAnyList} />
@@ -617,11 +740,25 @@ export function LibraryActions({
           }}
           formId={formId}
           watchedAt={watchedAt}
-          onWatchedAtChange={setWatchedAt}
+          onWatchedAtChange={(value) => {
+            setWatchedAt(value);
+            persistLogDraft({ watchedAt: value });
+          }}
           note={note}
-          onNoteChange={setNote}
+          onNoteChange={(value) => {
+            setNote(value);
+            persistLogDraft({ note: value });
+          }}
           rating={rating}
-          onRatingChange={setRating}
+          onRatingChange={(value) => {
+            setRating(value);
+            persistLogDraft({ rating: value });
+          }}
+          containsSpoilers={containsSpoilers}
+          onContainsSpoilersChange={(value) => {
+            setContainsSpoilers(value);
+            persistLogDraft({ containsSpoilers: value });
+          }}
           error={error}
           pending={pending === 'diary'}
           onSubmit={(event) => {

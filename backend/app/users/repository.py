@@ -62,6 +62,15 @@ async def get_user_by_username(
     return result.scalar_one_or_none()
 
 
+async def get_user_by_id(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+) -> User | None:
+    """Return a user by primary key (includes soft-deleted rows)."""
+    result = await session.execute(select(User).where(User.id == user_id))
+    return result.scalar_one_or_none()
+
+
 async def get_username_holder_id(
     session: AsyncSession,
     username: str,

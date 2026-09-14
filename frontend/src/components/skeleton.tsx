@@ -235,6 +235,54 @@ export function ListRowsSkeleton({
   );
 }
 
+export function ReviewsListSkeleton({
+  count = 5,
+}: {
+  count?: number;
+} = {}) {
+  return (
+    <ul className="space-y-6" aria-hidden>
+      {Array.from({ length: count }, (_, index) => (
+        <li key={index} className="space-y-3">
+          <div className="flex items-center gap-3">
+            <SkeletonBlock className="h-8 w-8 shrink-0 rounded-full" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <SkeletonBlock className="h-4 w-32 max-w-[50%] rounded-sm" />
+              <SkeletonBlock className="h-3 w-20 rounded-sm" />
+            </div>
+          </div>
+          <SkeletonBlock className="h-12 w-full rounded-sm" />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Title activity page: heading, tab strip, review rows. */
+export function ActivityPageSkeleton() {
+  return (
+    <div
+      className="layout-content motion-fade-in pb-16 text-left sm:pb-24"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span className="sr-only">Loading…</span>
+      <SkeletonBlock className="h-8 w-56 max-w-full rounded-sm sm:h-9 sm:w-80" />
+      <SkeletonBlock className="mt-2 h-3 w-16 rounded-sm" />
+      <div className="mt-8 flex gap-6 border-b border-[var(--color-border)] pb-2 sm:mt-10">
+        <SkeletonBlock className="h-4 w-20 rounded-sm" />
+        <SkeletonBlock className="h-4 w-20 rounded-sm" />
+        <SkeletonBlock className="h-4 w-16 rounded-sm" />
+        <SkeletonBlock className="h-4 w-16 rounded-sm" />
+      </div>
+      <div className="mt-5">
+        <ReviewsListSkeleton />
+      </div>
+    </div>
+  );
+}
+
 export function DiaryCardsSkeleton({
   count = 6,
   className = 'mt-6',
