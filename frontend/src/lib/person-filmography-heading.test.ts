@@ -1,6 +1,6 @@
-import {describe, expect, it} from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import {filmographyHeading} from './person-filmography-heading';
+import { filmographyHeading } from './person-filmography-heading';
 
 describe('filmographyHeading', () => {
   it('uses a verb phrase for each catalog department', () => {

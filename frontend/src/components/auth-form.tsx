@@ -267,12 +267,10 @@ export function AuthForm({
     (usernameIsValid(username) && usernameAvailability === 'taken');
   // While typing, format failures stay quiet until blur or 1s idle.
   // A submit with nothing in a required field is invalid immediately.
-  const usernameInvalid =
-    settledInvalid.username && !usernameIsValid(username);
+  const usernameInvalid = settledInvalid.username && !usernameIsValid(username);
   const emailInvalid = settledInvalid.email && !emailIsValid(email);
   const passwordInvalid = settledInvalid.password && !passwordIsValid(password);
-  const identifierInvalid =
-    settledInvalid.identifier && !identifier.trim();
+  const identifierInvalid = settledInvalid.identifier && !identifier.trim();
   const wasInvalidRef = useRef({
     username: false,
     email: false,
