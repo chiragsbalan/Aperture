@@ -329,6 +329,9 @@ class PersonTitleCard(BaseModel):
     release_date: str | None = None
     runtime_minutes: int | None = None
     rating: TitleRating | None = None
+    # Curation-only. Not part of the public person payload.
+    genre_ids: list[int] = Field(default_factory=list, exclude=True)
+    episode_count: int | None = Field(default=None, exclude=True)
 
 
 class PersonSocialLink(BaseModel):

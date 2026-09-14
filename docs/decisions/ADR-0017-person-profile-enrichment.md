@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-09
+- **Amended:** 2026-09-14 — Known for ranks principal roles before guest appearances (popularity within each tier). Acting fills from acted titles first. Cache keys `meta:person:v7` and `meta:person:enrich:v6`.
 - **Related:** [ADR-0004](ADR-0004-content-identity.md); [ADR-0006](ADR-0006-redis-search-staging.md); [ADR-0011](ADR-0011-title-poster-morph.md); [ADR-0013](ADR-0013-lean-catalog-option-b.md); PLAN.md P2
 - **Implements in:** `feature/person-profile-pages`
 - **Extends:** ADR-0013 Option B hybrid pattern to `/people/{uuid}` (no Alembic in Slice A)
@@ -55,16 +56,16 @@ Drop `adult` rows and episode-level credits (keep movie/TV show-level only). Ded
 
 **Known for ordering** (within the ≤30 cap):
 
-1. Primary bucket: titles whose department matches `known_for_department` (when set).
-2. Secondary buckets: remaining titles grouped by `DEPARTMENT_PRECEDENCE` — Acting → Directing → Writing → Production → Editing → Camera → Sound → Art → Costume & Make-Up → Visual Effects → Lighting → Creator → Crew → unknown A–Z.
-3. Within each bucket: **rating desc** (`PersonTitleCard.rating.value`); null rating → **popularity desc**; then title A–Z.
+1. Principal roles in the primary department, popularity descending (missing popularity last), then title A–Z.
+2. Acting only: guest appearances in Acting next, before any other department. Other professions: principal roles in the remaining departments (`DEPARTMENT_PRECEDENCE`, then unknown A–Z), then guest appearances from every department.
+3. A guest appearance is a Self credit (unless a long-running host), a one-episode acting spot, a Talk / Reality / News appearance, a job whose name contains Guest, or a TV crew credit under 8 episodes. Full-time staff (high `episode_count`, including talk-show producers and hosts) stay in the principal tier. Rating does not affect which titles are chosen or their order.
 
 ### Cache keys and TTLs
 
 | Key | Purpose | TTL |
 |---|---|---|
-| `meta:person:v5:{uuid}` | Assembled PersonDetail | `metadata_cache_ttl_seconds` (default 600s) |
-| `meta:person:enrich:v4:{uuid}` | Enrich section JSON | `metadata_enrichment_cache_ttl_seconds` (default 6h) |
+| `meta:person:v7:{uuid}` | Assembled PersonDetail | `metadata_cache_ttl_seconds` (default 600s) |
+| `meta:person:enrich:v6:{uuid}` | Enrich section JSON | `metadata_enrichment_cache_ttl_seconds` (default 6h) |
 | Same enrich key + `{"_neg": true}` | Skip live TMDb retry | `metadata_enrichment_negative_cache_ttl_seconds` (default 60s) |
 | `meta:person:enrich:lock:{uuid}` | Distributed enrich lock | Short (seconds); leader deletes on completion |
 
@@ -72,7 +73,7 @@ Drop `adult` rows and episode-level credits (keep movie/TV show-level only). Ded
 
 ### Live TMDb path
 
-1. Detail HIT (`meta:person:v5`) → return.
+1. Detail HIT (`meta:person:v7`) → return.
 2. Else acquire Redis enrich lock + enter global inflight semaphore (max **16**).
 3. Load PG shell + capped credits (fallback material).
 4. Enrich section HIT → merge (enrich filmography preferred).

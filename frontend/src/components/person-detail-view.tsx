@@ -13,6 +13,7 @@ import { TitleOverview } from '@/components/title-overview';
 import type { PersonDetail } from '@/lib/catalog';
 import { formatIsoMonthYear } from '@/lib/iso_date';
 import { fetchWatchEntryRatings, membershipKey } from '@/lib/library';
+import { filmographyHeading } from '@/lib/person-filmography-heading';
 import {
   buildPersonFilmographyTimeline,
   groupFilmographyByYear,
@@ -23,16 +24,6 @@ import {
 import { TITLE_SHELF_PAGE_SIZE } from '@/lib/title-shelf';
 
 const FALLBACK_DEPARTMENTS = ['Acting'];
-
-function filmographyHeading(personName: string, department: string): string {
-  if (department === 'Acting') {
-    return `Titles starring ${personName}`;
-  }
-  if (department === 'Directing' || department === 'Director') {
-    return `Titles directed by ${personName}`;
-  }
-  return `Titles with ${personName} as ${department}`;
-}
 
 function isYourRatingSort(sort: PersonFilmographySort): boolean {
   return sort === 'your_rating_high' || sort === 'your_rating_low';

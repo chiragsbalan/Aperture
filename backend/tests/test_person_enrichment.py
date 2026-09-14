@@ -215,8 +215,8 @@ def test_curate_keeps_directing_and_acting_for_same_title() -> None:
     assert known_for[0].job == 'Director'
 
 
-def test_known_for_independent_of_filmography_popularity_order() -> None:
-    """High-rated low-pop primary credit beats high-pop low-rated for Known for."""
+def test_known_for_orders_by_popularity_not_rating() -> None:
+    """Within a department, popularity beats a higher rating."""
     cast = [
         _cast_row(
             tmdb_id=1,
@@ -238,8 +238,164 @@ def test_known_for_independent_of_filmography_popularity_order() -> None:
         known_for_department='Acting',
     )
     assert filmography[0].title == 'Famous Flop'
-    assert known_for[0].title == 'Quiet Gem'
-    assert known_for[1].title == 'Famous Flop'
+    assert [c.title for c in known_for] == ['Famous Flop', 'Quiet Gem']
+
+
+def test_acting_known_for_puts_guest_appearances_after_roles() -> None:
+    """Talk-show Self credits fill only after acted titles, by popularity."""
+    cast = [
+        {
+            'id': 1,
+            'media_type': 'tv',
+            'name': 'The Tonight Show',
+            'popularity': 900.0,
+            'first_air_date': '2014-02-17',
+            'character': 'Self - Guest',
+            'genre_ids': [35, 10767],
+            'episode_count': 2,
+        },
+        {
+            'id': 2,
+            'media_type': 'movie',
+            'title': 'Euphoria Film',
+            'popularity': 12.0,
+            'release_date': '2022-01-01',
+            'character': 'Rue',
+            'genre_ids': [18],
+        },
+    ]
+    known_for, _filmography = curate_combined_credits(
+        {'cast': cast, 'crew': []},
+        known_for_department='Acting',
+    )
+    assert [c.title for c in known_for] == [
+        'Euphoria Film',
+        'The Tonight Show',
+    ]
+
+
+def test_acting_known_for_does_not_drop_guests_when_roles_are_short() -> None:
+    cast = [
+        _cast_row(tmdb_id=1, title='Real Role', popularity=10.0),
+        {
+            'id': 2,
+            'media_type': 'tv',
+            'name': 'Talk Show',
+            'popularity': 400.0,
+            'character': 'Self - Guest',
+            'genre_ids': [10767],
+            'episode_count': 1,
+        },
+    ]
+    known_for, _filmography = curate_combined_credits(
+        {'cast': cast, 'crew': []},
+        known_for_department='Acting',
+    )
+    assert [c.title for c in known_for] == ['Real Role', 'Talk Show']
+
+
+def test_acting_known_for_skips_other_departments_until_acting_is_spent() -> None:
+    cast = [
+        _cast_row(tmdb_id=i + 1, title=f'Role {i}', popularity=float(i))
+        for i in range(MAX_KNOWN_FOR)
+    ]
+    cast.append(
+        {
+            'id': 900,
+            'media_type': 'tv',
+            'name': 'Tonight Show',
+            'popularity': 999.0,
+            'character': 'Self - Guest',
+            'genre_ids': [10767],
+            'episode_count': 2,
+        }
+    )
+    crew = [
+        _crew_row(
+            tmdb_id=901,
+            title='Directed Hit',
+            popularity=1000.0,
+            department='Directing',
+            job='Director',
+        )
+    ]
+    known_for, _filmography = curate_combined_credits(
+        {'cast': cast, 'crew': crew},
+        known_for_department='Acting',
+    )
+    assert len(known_for) == MAX_KNOWN_FOR
+    assert all(c.department == 'Acting' for c in known_for)
+    assert all(c.title != 'Tonight Show' for c in known_for)
+    assert all(c.title != 'Directed Hit' for c in known_for)
+
+
+def test_host_with_long_run_is_a_principal_role() -> None:
+    cards = [
+        PersonTitleCard(
+            type='tv',
+            tmdb_id=1,
+            title='Late Night',
+            department='Acting',
+            credit_kind='cast',
+            character='Self - Host',
+            popularity=80.0,
+            episode_count=400,
+            genre_ids=[10767],
+        ),
+        PersonTitleCard(
+            type='movie',
+            tmdb_id=2,
+            title='Small Film',
+            department='Acting',
+            credit_kind='cast',
+            character='Lead',
+            popularity=5.0,
+        ),
+    ]
+    picked = select_known_for(cards, known_for_department='Acting')
+    assert [c.title for c in picked] == ['Late Night', 'Small Film']
+
+
+def test_production_full_time_show_beats_guest_cameo() -> None:
+    cards = [
+        PersonTitleCard(
+            type='tv',
+            tmdb_id=1,
+            title='The Kardashians',
+            department='Acting',
+            credit_kind='cast',
+            character='Self',
+            popularity=500.0,
+            episode_count=1,
+            genre_ids=[10764],
+        ),
+        PersonTitleCard(
+            type='tv',
+            tmdb_id=2,
+            title='The Tonight Show',
+            department='Production',
+            credit_kind='crew',
+            job='Executive Producer',
+            popularity=40.0,
+            episode_count=2413,
+            genre_ids=[10767, 35],
+        ),
+        PersonTitleCard(
+            type='movie',
+            tmdb_id=3,
+            title='Produced Film',
+            department='Production',
+            credit_kind='crew',
+            job='Producer',
+            popularity=10.0,
+        ),
+    ]
+    picked = select_known_for(cards, known_for_department='Production')
+    assert [c.title for c in picked] == [
+        'The Tonight Show',
+        'Produced Film',
+        'The Kardashians',
+    ]
 
 
 def test_known_for_primary_fill_blocks_other_departments() -> None:
@@ -273,7 +429,7 @@ def test_known_for_primary_fill_blocks_other_departments() -> None:
     assert all(c.title != 'Directed Hit' for c in known_for)
 
 
-def test_select_known_for_null_rating_falls_back_to_popularity() -> None:
+def test_select_known_for_ignores_rating_and_uses_popularity() -> None:
     cards = [
         PersonTitleCard(
             type='movie',
@@ -302,9 +458,9 @@ def test_select_known_for_null_rating_falls_back_to_popularity() -> None:
     ]
     picked = select_known_for(cards, known_for_department='Acting')
     assert [c.title for c in picked] == [
-        'Rated Mid',
         'Unrated Popular',
         'Unrated Niche',
+        'Rated Mid',
     ]
 
 
