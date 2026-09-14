@@ -6,23 +6,25 @@ import uuid
 
 
 def movie_detail_key(content_id: uuid.UUID) -> str:
-    # v3: backdrop URL is TMDb ``w1280``, not ``original``.
-    return f'meta:movie:v3:{content_id}'
+    # v4: similar list cap is 30 (activity Similar tab).
+    return f'meta:movie:v4:{content_id}'
 
 
 def tv_detail_key(content_id: uuid.UUID) -> str:
-    # v5: backdrop URL is TMDb ``w1280``, not ``original``.
-    return f'meta:tv:v5:{content_id}'
+    # v6: similar list cap is 30 (activity Similar tab).
+    return f'meta:tv:v6:{content_id}'
 
 
 def movie_enrichment_key(content_id: uuid.UUID) -> str:
     """Volatile title chrome (providers / similar / meta tabs / TMDB votes)."""
-    return f'meta:movie:enrich:v2:{content_id}'
+    # v3: similar list cap is 30 (activity Similar tab).
+    return f'meta:movie:enrich:v3:{content_id}'
 
 
 def tv_enrichment_key(content_id: uuid.UUID) -> str:
     """Volatile title chrome (providers / similar / meta tabs / TMDB votes)."""
-    return f'meta:tv:enrich:v2:{content_id}'
+    # v3: similar list cap is 30 (activity Similar tab).
+    return f'meta:tv:enrich:v3:{content_id}'
 
 
 def person_detail_key(person_id: uuid.UUID) -> str:

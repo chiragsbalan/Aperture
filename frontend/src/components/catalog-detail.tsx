@@ -2,7 +2,6 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { LibraryActions } from '@/components/library-actions';
-import { MoreLikeThis } from '@/components/more-like-this';
 import { RecordTitlePosterHero } from '@/components/record-title-poster-hero';
 import { SharedTitlePoster } from '@/components/shared-title-poster';
 import { DetailHeroSkeleton } from '@/components/skeleton';
@@ -12,6 +11,7 @@ import { TitleAtmosphere } from '@/components/title-atmosphere';
 import { TitleMetaRow, TitleMetaStack } from '@/components/title-meta-stack';
 import { TitleMetaTabs } from '@/components/title-meta-tabs';
 import { TitleOverview } from '@/components/title-overview';
+import { TitleRelatedTabs } from '@/components/title-related-tabs';
 import { TitleScore } from '@/components/title-score';
 import { TitleSeasons } from '@/components/title-seasons';
 import { WhereToWatch } from '@/components/where-to-watch';
@@ -266,10 +266,11 @@ function TitleDetailShell({
                   title={title}
                 />
               </div>
-              <MoreLikeThis
+              <TitleRelatedTabs
                 items={extras.similar ?? []}
                 kind={contentType === 'tv_show' ? 'tv_show' : 'movie'}
                 contentId={contentId}
+                contentType={contentType}
               />
             </div>
           </div>

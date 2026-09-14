@@ -1,10 +1,10 @@
 import { PageLoadingShell } from '@/components/page-loading-shell';
-import { ShelfPageSkeleton } from '@/components/skeleton';
+import { ActivityPageSkeleton } from '@/components/skeleton';
 
 export default function SimilarMoviesLoading() {
   return (
     <PageLoadingShell>
-      <ShelfPageSkeleton showDescription={false} />
+      <ActivityPageSkeleton />
     </PageLoadingShell>
   );
 }

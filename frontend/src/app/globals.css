@@ -1321,6 +1321,7 @@
     --color-action-favorites: #e07a8a;
     --color-action-lists: #6a9ec9;
     --color-action-log: #6fbf73;
+    --color-action-vote: #a8a2b5;
   }
 
   [data-title-contrast='on-dark'] .catalog-backdrop-veil {
@@ -1352,6 +1353,7 @@
     --color-action-favorites: #c45c6a;
     --color-action-lists: #3d6f94;
     --color-action-log: #2f8f45;
+    --color-action-vote: #6e6878;
   }
 
   [data-title-contrast='on-light'] .catalog-backdrop-veil {
@@ -1669,6 +1671,33 @@
 
   .library-action-log {
     --library-action-color: var(--color-action-log);
+  }
+
+  .library-action-vote {
+    --library-action-color: var(--color-action-vote);
+  }
+
+  .review-spoiler-gate {
+    display: block;
+    width: 100%;
+    border: 1px solid color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+    border-radius: var(--radius-sm);
+    background: var(--color-accent-soft);
+    padding: 0.75rem 1rem;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      background-color var(--duration-fast) var(--ease-out);
+  }
+
+  .review-spoiler-gate:hover {
+    border-color: var(--color-accent);
+  }
+
+  .review-spoiler-gate:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
   }
 
   .library-action-icon.is-active,

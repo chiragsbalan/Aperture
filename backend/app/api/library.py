@@ -14,10 +14,15 @@ from app.core.deps import DbSessionDep, SettingsDep
 from app.core.trusted_client import resolve_client_ip
 from app.library import rating_stats as rating_stats_service
 from app.library import service as library_service
-from app.library.rate_limit import enforce_watch_entries_contains_rate_limit
+from app.library.rate_limit import (
+    enforce_review_vote_rate_limit,
+    enforce_watch_entries_contains_rate_limit,
+)
 from app.library.schemas import (
     CreateWatchEntryBody,
     PatchWatchEntryBody,
+    PutReviewVoteBody,
+    ReviewResponse,
     WatchEntriesContainsResponse,
     WatchEntriesPageResponse,
     WatchEntriesRatingsResponse,
@@ -49,6 +54,14 @@ def _map_library_error(exc: Exception) -> HTTPException | None:
         return HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail='Watch entry not found',
+        )
+    if isinstance(exc, library_service.SelfVoteError):
+        return HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                'code': 'self_vote_forbidden',
+                'message': 'You cannot vote on your own review.',
+            },
         )
     return None
 
@@ -218,6 +231,7 @@ async def create_watch_entry(
             watched_at=body.watched_at,
             note=body.note,
             rating=body.rating,
+            contains_spoilers=body.contains_spoilers,
             commit=False,
         )
         owner_user_id = await lists_service.remove_system_list_item(
@@ -280,6 +294,8 @@ async def patch_watch_entry(
             note_set='note' in body.model_fields_set,
             rating=body.rating,
             rating_set='rating' in body.model_fields_set,
+            contains_spoilers=body.contains_spoilers,
+            contains_spoilers_set='contains_spoilers' in body.model_fields_set,
         )
     except Exception as exc:
         mapped = _map_library_error(exc)
@@ -319,3 +335,34 @@ async def delete_watch_entry(
             raise mapped from exc
         raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put(
+    '/me/watch-entries/{entry_id}/vote',
+    response_model=ReviewResponse,
+)
+async def put_watch_entry_vote(
+    entry_id: uuid.UUID,
+    body: PutReviewVoteBody,
+    identity: CurrentIdentityDep,
+    session: DbSessionDep,
+    settings: SettingsDep,
+) -> ReviewResponse:
+    """Like, dislike, or clear a vote on an eligible public review."""
+    await enforce_review_vote_rate_limit(
+        get_cache(),
+        settings=settings,
+        identity_id=identity.id,
+    )
+    try:
+        return await library_service.put_review_vote(
+            session,
+            identity_id=identity.id,
+            entry_id=entry_id,
+            vote=body.vote,
+        )
+    except Exception as exc:
+        mapped = _map_library_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise

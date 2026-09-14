@@ -1,53 +1,18 @@
-import { SimilarTitlesPage } from '@/components/similar-titles-page';
-import { fetchMovie } from '@/lib/catalog';
 import { parseTmdbIdParam } from '@/lib/content_ids';
-import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 
-interface MovieSimilarPageProps {
+interface MovieSimilarRedirectProps {
   params: Promise<{ id: string }>;
 }
 
-/** Same public catalog payload as the title page. */
-export const revalidate = 300;
-
-export async function generateMetadata({
+/** Dedicated similar shelf → Activity Similar tab. */
+export default async function MovieSimilarRedirect({
   params,
-}: MovieSimilarPageProps): Promise<Metadata> {
-  const { id } = await params;
-  const result = await fetchMovie(id);
-  if (!result.ok) {
-    return { title: 'Similar · Aperture' };
-  }
-  return {
-    title: `Similar to ${result.data.title} · Aperture`,
-    description: `Titles similar to ${result.data.title} on Aperture.`,
-  };
-}
-
-export default async function MovieSimilarPage({
-  params,
-}: MovieSimilarPageProps) {
+}: MovieSimilarRedirectProps) {
   const { id } = await params;
   const tmdbId = parseTmdbIdParam(id);
   if (tmdbId != null) {
     redirect(`/movies/tmdb/${tmdbId}`);
   }
-  const result = await fetchMovie(id);
-  if (!result.ok) {
-    if (result.status === 404) {
-      notFound();
-    }
-    return (
-      <SimilarTitlesPage sourceTitle="this movie" kind="movie" similar={[]} />
-    );
-  }
-
-  return (
-    <SimilarTitlesPage
-      sourceTitle={result.data.title}
-      kind="movie"
-      similar={result.data.extras.similar}
-    />
-  );
+  redirect(`/movies/${encodeURIComponent(id)}/activity?tab=similar`);
 }

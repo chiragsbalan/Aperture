@@ -887,3 +887,470 @@ def test_public_list_get_rate_limit_trusted_ip_returns_429(
     limited = api_client.get(f'/api/v1/lists/{list_id}', headers=rl_headers)
     assert limited.status_code == 429
     assert limited.json()['detail'] == ('Too many profile requests. Try again later.')
+
+
+def _rating_stats_row(
+    *,
+    content_type: str,
+    content_id: uuid.UUID,
+) -> tuple[int, str] | None:
+    """Return (rating_count, rating_sum) or None when no stats row."""
+    async_url = os.environ.get(
+        'DATABASE_URL',
+        'postgresql+asyncpg://aperture:aperture@localhost:5432/aperture',
+    )
+    dsn = async_url.replace('postgresql+asyncpg://', 'postgresql://', 1)
+
+    async def _fetch() -> tuple[int, str] | None:
+        conn = await asyncpg.connect(dsn)
+        try:
+            row = await conn.fetchrow(
+                """
+                SELECT rating_count, rating_sum
+                FROM content_rating_stats
+                WHERE content_type = $1 AND content_id = $2
+                """,
+                content_type,
+                content_id,
+            )
+        finally:
+            await conn.close()
+        if row is None:
+            return None
+        return int(row['rating_count']), str(row['rating_sum'])
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: asyncio.run(_fetch())).result()
+
+
+def _soft_delete_username(username: str) -> None:
+    from datetime import UTC, datetime
+
+    async_url = os.environ.get(
+        'DATABASE_URL',
+        'postgresql+asyncpg://aperture:aperture@localhost:5432/aperture',
+    )
+    dsn = async_url.replace('postgresql+asyncpg://', 'postgresql://', 1)
+
+    async def _update() -> None:
+        conn = await asyncpg.connect(dsn)
+        try:
+            await conn.execute(
+                """
+                UPDATE users
+                SET deleted_at = $1
+                WHERE username = $2
+                """,
+                datetime.now(UTC),
+                username,
+            )
+        finally:
+            await conn.close()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        pool.submit(lambda: asyncio.run(_update())).result()
+
+
+@pytest.mark.integration
+def test_title_reviews_eligibility_rewatch_spoilers_and_votes(
+    api_client: TestClient,
+    seeded_ids: dict[str, uuid.UUID],
+) -> None:
+    movie_id = str(seeded_ids['movie'])
+    tv_id = str(seeded_ids['tv'])
+    owner_token, owner_name = _register_with_username(api_client, prefix='revown')
+    voter_token, _voter_name = _register_with_username(api_client, prefix='revvote')
+    hide_token, _hide_name = _register_with_username(api_client, prefix='revhide')
+    owner_headers = {'Authorization': f'Bearer {owner_token}'}
+    voter_headers = {'Authorization': f'Bearer {voter_token}'}
+    hide_headers = {'Authorization': f'Bearer {hide_token}'}
+
+    hide_prefs = api_client.patch(
+        '/api/v1/users/me/preferences',
+        headers=hide_headers,
+        json={'spoilers': 'hide'},
+    )
+    assert hide_prefs.status_code == 200, hide_prefs.text
+
+    note_only = api_client.post(
+        '/api/v1/me/watch-entries',
+        headers=owner_headers,
+        json={
+            'type': 'movie',
+            'id': movie_id,
+            'watched_at': '2026-01-01',
+            'note': 'Notes only, no stars.',
+        },
+    )
+    assert note_only.status_code == 201, note_only.text
+    note_only_id = note_only.json()['id']
+    assert note_only.json()['contains_spoilers'] is False
+
+    rating_only = api_client.post(
+        '/api/v1/me/watch-entries',
+        headers=owner_headers,
+        json={
+            'type': 'movie',
+            'id': movie_id,
+            'watched_at': '2026-01-02',
+            'rating': 4.0,
+        },
+    )
+    assert rating_only.status_code == 201, rating_only.text
+    rating_only_id = rating_only.json()['id']
+
+    first = api_client.post(
+        '/api/v1/me/watch-entries',
+        headers=owner_headers,
+        json={
+            'type': 'movie',
+            'id': movie_id,
+            'watched_at': '2026-01-03',
+            'note': 'First qualifying watch.',
+            'rating': 5.0,
+        },
+    )
+    assert first.status_code == 201, first.text
+    first_id = first.json()['id']
+    assert first.json()['contains_spoilers'] is False
+
+    rewatch = api_client.post(
+        '/api/v1/me/watch-entries',
+        headers=owner_headers,
+        json={
+            'type': 'movie',
+            'id': movie_id,
+            'watched_at': '2026-02-03',
+            'note': 'Rewatch with a rating.',
+            'rating': 4.5,
+            'contains_spoilers': True,
+        },
+    )
+    assert rewatch.status_code == 201, rewatch.text
+    rewatch_id = rewatch.json()['id']
+    assert rewatch.json()['contains_spoilers'] is True
+
+    tv_review = api_client.post(
+        '/api/v1/me/watch-entries',
+        headers=owner_headers,
+        json={
+            'type': 'tv',
+            'id': tv_id,
+            'watched_at': '2026-03-01',
+            'note': 'TV qualifying review.',
+            'rating': 3.5,
+        },
+    )
+    assert tv_review.status_code == 201, tv_review.text
+
+    stats_before = _rating_stats_row(
+        content_type='movie',
+        content_id=seeded_ids['movie'],
+    )
+    assert stats_before is not None
+
+    guest = api_client.get(
+        f'/api/v1/movies/{movie_id}/reviews',
+        params={'spoiler_filter': 'all', 'sort': 'recent'},
+    )
+    assert guest.status_code == 200, guest.text
+    guest_body = guest.json()
+    guest_ids = [row['id'] for row in guest_body['items']]
+    assert first_id in guest_ids
+    assert rewatch_id in guest_ids
+    assert note_only_id not in guest_ids
+    assert rating_only_id not in guest_ids
+    guest_by_id = {row['id']: row for row in guest_body['items']}
+    assert 'note' not in guest_by_id[rewatch_id]
+    assert guest_by_id[rewatch_id]['contains_spoilers'] is True
+    assert guest_by_id[first_id]['note'] == 'First qualifying watch.'
+    assert guest_by_id[first_id]['viewer_vote'] is None
+    assert guest_by_id[first_id]['score'] == 0
+
+    guest_default = api_client.get(f'/api/v1/movies/{movie_id}/reviews')
+    assert guest_default.status_code == 200
+    default_ids = [row['id'] for row in guest_default.json()['items']]
+    assert rewatch_id not in default_ids
+    assert first_id in default_ids
+
+    revealed = api_client.get(
+        f'/api/v1/movies/{movie_id}/reviews',
+        params={
+            'spoiler_filter': 'all',
+            'sort': 'recent',
+            'include_note_ids': rewatch_id,
+        },
+    )
+    assert revealed.status_code == 200
+    revealed_row = next(
+        row for row in revealed.json()['items'] if row['id'] == rewatch_id
+    )
+    assert revealed_row['note'] == 'Rewatch with a rating.'
+
+    owner_list = api_client.get(
+        f'/api/v1/movies/{movie_id}/reviews',
+        headers=owner_headers,
+        params={'spoiler_filter': 'all', 'sort': 'recent'},
+    )
+    assert owner_list.status_code == 200
+    owner_rewatch = next(
+        row for row in owner_list.json()['items'] if row['id'] == rewatch_id
+    )
+    assert owner_rewatch['note'] == 'Rewatch with a rating.'
+
+    hide_list = api_client.get(
+        f'/api/v1/movies/{movie_id}/reviews',
+        headers=hide_headers,
+        params={'spoiler_filter': 'all', 'sort': 'recent'},
+    )
+    assert hide_list.status_code == 200
+    hide_rewatch = next(
+        row for row in hide_list.json()['items'] if row['id'] == rewatch_id
+    )
+    assert 'note' not in hide_rewatch
+
+    guest_reveal = api_client.get(
+        f'/api/v1/movies/{movie_id}/reviews/{rewatch_id}',
+    )
+    assert guest_reveal.status_code == 200, guest_reveal.text
+    assert guest_reveal.json()['note'] == 'Rewatch with a rating.'
+    assert guest_reveal.json()['contains_spoilers'] is True
+
+    show_list = api_client.get(
+        f'/api/v1/movies/{movie_id}/reviews',
+        headers=voter_headers,
+        params={'spoiler_filter': 'all', 'sort': 'recent'},
+    )
+    assert show_list.status_code == 200
+    show_rewatch = next(
+        row for row in show_list.json()['items'] if row['id'] == rewatch_id
+    )
+    assert 'note' not in show_rewatch
+
+    missing_reveal = api_client.get(
+        f'/api/v1/movies/{movie_id}/reviews/{uuid.uuid4()}',
+    )
+    assert missing_reveal.status_code == 404
+
+    tv_list = api_client.get(f'/api/v1/tv/{tv_id}/reviews')
+    assert tv_list.status_code == 200
+    assert tv_list.json()['total'] >= 1
+    assert tv_list.json()['items'][0]['note'] == 'TV qualifying review.'
+
+    profile = api_client.get(f'/api/v1/users/{owner_name}/reviews')
+    assert profile.status_code == 200
+    profile_ids = [row['id'] for row in profile.json()['items']]
+    assert first_id in profile_ids or rewatch_id in profile_ids
+    assert note_only_id not in profile_ids
+
+    self_vote = api_client.put(
+        f'/api/v1/me/watch-entries/{first_id}/vote',
+        headers=owner_headers,
+        json={'vote': 1},
+    )
+    assert self_vote.status_code == 403, self_vote.text
+    assert self_vote.json()['detail']['code'] == 'self_vote_forbidden'
+
+    missing_vote = api_client.put(
+        f'/api/v1/me/watch-entries/{uuid.uuid4()}/vote',
+        headers=voter_headers,
+        json={'vote': 1},
+    )
+    assert missing_vote.status_code == 404
+
+    ineligible_vote = api_client.put(
+        f'/api/v1/me/watch-entries/{note_only_id}/vote',
+        headers=voter_headers,
+        json={'vote': 1},
+    )
+    assert ineligible_vote.status_code == 404
+
+    liked = api_client.put(
+        f'/api/v1/me/watch-entries/{first_id}/vote',
+        headers=voter_headers,
+        json={'vote': 1},
+    )
+    assert liked.status_code == 200, liked.text
+    assert liked.json()['like_count'] == 1
+    assert liked.json()['dislike_count'] == 0
+    assert liked.json()['score'] == 1
+    assert liked.json()['viewer_vote'] == 1
+
+    flipped = api_client.put(
+        f'/api/v1/me/watch-entries/{first_id}/vote',
+        headers=voter_headers,
+        json={'vote': -1},
+    )
+    assert flipped.status_code == 200, flipped.text
+    assert flipped.json()['like_count'] == 0
+    assert flipped.json()['dislike_count'] == 1
+    assert flipped.json()['score'] == -1
+    assert flipped.json()['viewer_vote'] == -1
+
+    cleared = api_client.put(
+        f'/api/v1/me/watch-entries/{first_id}/vote',
+        headers=voter_headers,
+        json={'vote': None},
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()['like_count'] == 0
+    assert cleared.json()['dislike_count'] == 0
+    assert cleared.json()['score'] == 0
+    assert cleared.json()['viewer_vote'] is None
+
+    stats_after = _rating_stats_row(
+        content_type='movie',
+        content_id=seeded_ids['movie'],
+    )
+    assert stats_after == stats_before
+
+    guest_vote = api_client.put(
+        f'/api/v1/me/watch-entries/{first_id}/vote',
+        json={'vote': 1},
+    )
+    assert guest_vote.status_code == 401
+
+    _soft_delete_username(owner_name)
+    hidden = api_client.get(
+        f'/api/v1/movies/{movie_id}/reviews',
+        params={'spoiler_filter': 'all'},
+    )
+    assert hidden.status_code == 200
+    hidden_ids = [row['id'] for row in hidden.json()['items']]
+    assert first_id not in hidden_ids
+    assert rewatch_id not in hidden_ids
+    assert api_client.get(f'/api/v1/users/{owner_name}/reviews').status_code == 404
+    deleted_vote = api_client.put(
+        f'/api/v1/me/watch-entries/{first_id}/vote',
+        headers=voter_headers,
+        json={'vote': 1},
+    )
+    assert deleted_vote.status_code == 404
+
+
+@pytest.mark.integration
+def test_title_activity_ratings_lists_and_missing_title(
+    api_client: TestClient,
+    seeded_ids: dict[str, uuid.UUID],
+) -> None:
+    movie_id = str(seeded_ids['movie'])
+    missing_id = str(uuid.uuid4())
+    rater_token, rater_name = _register_with_username(
+        api_client,
+        prefix='actrate',
+    )
+    lister_token, lister_name = _register_with_username(
+        api_client,
+        prefix='actlist',
+    )
+    rater_headers = {'Authorization': f'Bearer {rater_token}'}
+    lister_headers = {'Authorization': f'Bearer {lister_token}'}
+
+    first_rating = api_client.post(
+        '/api/v1/me/watch-entries',
+        headers=rater_headers,
+        json={
+            'type': 'movie',
+            'id': movie_id,
+            'watched_at': '2026-01-01',
+            'rating': 2.0,
+        },
+    )
+    assert first_rating.status_code == 201, first_rating.text
+
+    later_rating = api_client.post(
+        '/api/v1/me/watch-entries',
+        headers=rater_headers,
+        json={
+            'type': 'movie',
+            'id': movie_id,
+            'watched_at': '2026-02-01',
+            'rating': 4.5,
+        },
+    )
+    assert later_rating.status_code == 201, later_rating.text
+
+    unrated_rewatch = api_client.post(
+        '/api/v1/me/watch-entries',
+        headers=rater_headers,
+        json={
+            'type': 'movie',
+            'id': movie_id,
+            'watched_at': '2026-03-01',
+            'note': 'Rewatch with no stars.',
+        },
+    )
+    assert unrated_rewatch.status_code == 201, unrated_rewatch.text
+
+    public_list = api_client.post(
+        '/api/v1/me/lists',
+        headers=lister_headers,
+        json={'title': 'Public shelf', 'visibility': 'public'},
+    )
+    assert public_list.status_code == 201, public_list.text
+    public_id = public_list.json()['id']
+    added_public = api_client.post(
+        f'/api/v1/lists/{public_id}/items',
+        headers=lister_headers,
+        json={'type': 'movie', 'id': movie_id},
+    )
+    assert added_public.status_code == 200, added_public.text
+
+    private_list = api_client.post(
+        '/api/v1/me/lists',
+        headers=lister_headers,
+        json={'title': 'Secret shelf', 'visibility': 'private'},
+    )
+    assert private_list.status_code == 201, private_list.text
+    private_id = private_list.json()['id']
+    added_private = api_client.post(
+        f'/api/v1/lists/{private_id}/items',
+        headers=lister_headers,
+        json={'type': 'movie', 'id': movie_id},
+    )
+    assert added_private.status_code == 200, added_private.text
+
+    added_watchlist = api_client.post(
+        '/api/v1/me/watchlist/items',
+        headers=lister_headers,
+        json={'type': 'movie', 'id': movie_id},
+    )
+    assert added_watchlist.status_code == 200, added_watchlist.text
+
+    ratings = api_client.get(
+        f'/api/v1/movies/{movie_id}/ratings',
+        params={'sort': 'recent'},
+    )
+    assert ratings.status_code == 200, ratings.text
+    rating_body = ratings.json()
+    rater_rows = [
+        row for row in rating_body['items'] if row['author']['username'] == rater_name
+    ]
+    assert len(rater_rows) == 1
+    assert rater_rows[0]['rating'] == 4.5
+    assert rater_rows[0]['watched_at'] == '2026-02-01'
+    assert 'note' not in rater_rows[0]
+
+    lists = api_client.get(f'/api/v1/movies/{movie_id}/lists')
+    assert lists.status_code == 200, lists.text
+    list_ids = [row['id'] for row in lists.json()['items']]
+    assert public_id in list_ids
+    assert private_id not in list_ids
+    public_row = next(row for row in lists.json()['items'] if row['id'] == public_id)
+    assert public_row['visibility'] == 'public'
+    assert public_row['owner']['username'] == lister_name
+
+    tv_lists = api_client.get(f'/api/v1/tv/{seeded_ids["tv"]}/lists')
+    assert tv_lists.status_code == 200
+    assert public_id not in [row['id'] for row in tv_lists.json()['items']]
+
+    missing_reviews = api_client.get(f'/api/v1/movies/{missing_id}/reviews')
+    assert missing_reviews.status_code == 404
+    missing_ratings = api_client.get(f'/api/v1/movies/{missing_id}/ratings')
+    assert missing_ratings.status_code == 404
+    missing_lists = api_client.get(f'/api/v1/movies/{missing_id}/lists')
+    assert missing_lists.status_code == 404
+    missing_reveal = api_client.get(
+        f'/api/v1/movies/{missing_id}/reviews/{uuid.uuid4()}',
+    )
+    assert missing_reveal.status_code == 404

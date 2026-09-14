@@ -47,6 +47,7 @@ export function DiaryEntrySheet({
   const [editDate, setEditDate] = useState('');
   const [editNote, setEditNote] = useState('');
   const [editRating, setEditRating] = useState<number | null>(null);
+  const [editContainsSpoilers, setEditContainsSpoilers] = useState(false);
   const [activeEntry, setActiveEntry] = useState<WatchEntry | null>(entry);
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export function DiaryEntrySheet({
     setEditDate(entry.watched_at);
     setEditNote(entry.note ?? '');
     setEditRating(entry.rating);
+    setEditContainsSpoilers(entry.contains_spoilers === true);
   }, [open, entry]);
 
   const title = mode === 'delete' ? 'Delete this diary entry?' : 'Edit log';
@@ -76,6 +78,7 @@ export function DiaryEntrySheet({
         watched_at: editDate,
         note: editNote.trim() || null,
         rating: editRating,
+        contains_spoilers: editContainsSpoilers,
       });
       if (!result.ok) {
         setError(result.error);
@@ -132,6 +135,7 @@ export function DiaryEntrySheet({
                 setEditDate(activeEntry.watched_at);
                 setEditNote(activeEntry.note ?? '');
                 setEditRating(activeEntry.rating);
+                setEditContainsSpoilers(activeEntry.contains_spoilers === true);
                 setError(null);
                 setMode('edit');
               }}
@@ -233,6 +237,23 @@ export function DiaryEntrySheet({
                 onChange={setEditRating}
               />
             </div>
+          </div>
+          <div>
+            <label
+              htmlFor={`${formId}-spoilers`}
+              className="flex cursor-pointer items-start gap-2 text-sm text-muted"
+            >
+              <input
+                id={`${formId}-spoilers`}
+                type="checkbox"
+                checked={editContainsSpoilers}
+                onChange={(event) => {
+                  setEditContainsSpoilers(event.target.checked);
+                }}
+                className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
+              />
+              Contains spoilers
+            </label>
           </div>
           {error != null ? (
             <p className="text-sm text-[var(--color-danger)]" role="alert">

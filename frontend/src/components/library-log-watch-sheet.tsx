@@ -19,6 +19,8 @@ interface LibraryLogWatchSheetProps {
   onNoteChange: (value: string) => void;
   rating: number | null;
   onRatingChange: (value: number | null) => void;
+  containsSpoilers: boolean;
+  onContainsSpoilersChange: (value: boolean) => void;
   error: string | null;
   pending: boolean;
   onSubmit: (event: FormEvent) => void;
@@ -36,6 +38,8 @@ export function LibraryLogWatchSheet({
   onNoteChange,
   rating,
   onRatingChange,
+  containsSpoilers,
+  onContainsSpoilersChange,
   error,
   pending,
   onSubmit,
@@ -95,6 +99,23 @@ export function LibraryLogWatchSheet({
               onChange={onRatingChange}
             />
           </div>
+        </div>
+        <div>
+          <label
+            htmlFor={`${formId}-spoilers`}
+            className="flex cursor-pointer items-start gap-2 text-sm text-muted"
+          >
+            <input
+              id={`${formId}-spoilers`}
+              type="checkbox"
+              checked={containsSpoilers}
+              onChange={(event) => {
+                onContainsSpoilersChange(event.target.checked);
+              }}
+              className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
+            />
+            Contains spoilers
+          </label>
         </div>
         {error ? (
           <p className="text-sm text-[var(--color-danger)]" role="alert">

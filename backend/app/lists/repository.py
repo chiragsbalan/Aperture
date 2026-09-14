@@ -395,3 +395,71 @@ async def custom_list_membership_for_content(
     item_ids = {row[0]: row[1] for row in present_result.all()}
     membership = {list_id: list_id in item_ids for list_id in list_ids}
     return membership, item_ids
+
+
+def _public_lists_for_title_filters(
+    *,
+    content_type: str,
+    content_id: uuid.UUID,
+) -> list[Any]:
+    return [
+        ListItem.content_type == content_type,
+        ListItem.content_id == content_id,
+        List.kind == 'custom',
+        List.visibility == 'public',
+        User.deleted_at.is_(None),
+        User.username.is_not(None),
+    ]
+
+
+async def count_public_lists_for_title(
+    session: AsyncSession,
+    *,
+    content_type: str,
+    content_id: uuid.UUID,
+) -> int:
+    """Count public custom lists that contain a title (live owners only)."""
+    stmt = (
+        select(func.count())
+        .select_from(List)
+        .join(ListItem, ListItem.list_id == List.id)
+        .join(User, User.id == List.owner_user_id)
+        .where(
+            *_public_lists_for_title_filters(
+                content_type=content_type,
+                content_id=content_id,
+            )
+        )
+    )
+    result = await session.execute(stmt)
+    return int(result.scalar_one())
+
+
+async def list_public_lists_for_title_page(
+    session: AsyncSession,
+    *,
+    content_type: str,
+    content_id: uuid.UUID,
+    offset: int,
+    limit: int,
+) -> list[tuple[List, User]]:
+    """Return public custom lists containing a title, newest updated first."""
+    stmt = (
+        select(List, User)
+        .join(ListItem, ListItem.list_id == List.id)
+        .join(User, User.id == List.owner_user_id)
+        .where(
+            *_public_lists_for_title_filters(
+                content_type=content_type,
+                content_id=content_id,
+            )
+        )
+        .order_by(List.updated_at.desc(), List.created_at.desc(), List.id.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    rows: list[tuple[List, User]] = []
+    for list_row, owner in result.all():
+        rows.append((list_row, owner))
+    return rows

@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_serializer
 
 PublicContentType = Literal['movie', 'tv']
 
@@ -34,6 +34,13 @@ class ContentSummary(BaseModel):
     poster_url: str | None = None
 
 
+ReviewSort = Literal['popular', 'recent']
+SpoilerFilter = Literal['all', 'no_spoilers']
+RatingFilter = Literal['any', '5', '4_plus', '3_plus', 'below_3']
+RatingSort = Literal['highest', 'lowest', 'recent']
+VoteValue = Literal[1, -1]
+
+
 class CreateWatchEntryBody(BaseModel):
     """Log a watch event. Duplicate content refs are allowed (rewatch)."""
 
@@ -54,6 +61,10 @@ class CreateWatchEntryBody(BaseModel):
         default=None,
         description='Optional rating 0.5–5.0 in half-star steps.',
     )
+    contains_spoilers: bool = Field(
+        default=False,
+        description='Author flag: this review text contains spoilers.',
+    )
 
     @field_validator('rating')
     @classmethod
@@ -70,11 +81,24 @@ class PatchWatchEntryBody(BaseModel):
         default=None,
         description='Optional rating 0.5–5.0; null clears when sent.',
     )
+    contains_spoilers: bool | None = Field(
+        default=None,
+        description='Author flag: this review text contains spoilers.',
+    )
 
     @field_validator('rating')
     @classmethod
     def rating_half_stars(cls, value: float | None) -> float | None:
         return _validate_rating(value)
+
+
+class PutReviewVoteBody(BaseModel):
+    """Set, switch, or clear the caller's vote on a review."""
+
+    vote: VoteValue | None = Field(
+        default=None,
+        description='1 like, -1 dislike, or null to clear.',
+    )
 
 
 class WatchEntryResponse(BaseModel):
@@ -84,9 +108,71 @@ class WatchEntryResponse(BaseModel):
     watched_at: date
     note: str | None = None
     rating: float | None = None
+    contains_spoilers: bool = False
     created_at: datetime
     updated_at: datetime
     content: ContentSummary
+
+
+class ReviewAuthor(BaseModel):
+    """Public author chip for a title-page or profile review."""
+
+    username: str
+    display_name: str | None = None
+    avatar_url: str | None = None
+
+
+class ReviewResponse(BaseModel):
+    """One qualifying watch log shown as a public review (ADR-0019)."""
+
+    id: uuid.UUID
+    rating: float
+    contains_spoilers: bool
+    watched_at: date
+    like_count: int
+    dislike_count: int
+    score: int
+    author: ReviewAuthor
+    viewer_vote: VoteValue | None = None
+    content: ContentSummary | None = None
+    note: str | None = None
+    include_note: bool = Field(default=True, exclude=True)
+
+    @model_serializer(mode='wrap')
+    def _omit_hidden_note(
+        self,
+        serializer: object,
+    ) -> dict[str, object]:
+        data = serializer(self)  # type: ignore[operator]
+        if not self.include_note:
+            data.pop('note', None)
+        return data
+
+
+class ReviewsPageResponse(BaseModel):
+    """Paginated public reviews for a title or profile."""
+
+    page: int
+    limit: int
+    total: int
+    items: list[ReviewResponse]
+
+
+class TitleRatingItem(BaseModel):
+    """One viewer's current diary rating for a title (ADR-0015 latest)."""
+
+    rating: float
+    watched_at: date
+    author: ReviewAuthor
+
+
+class TitleRatingsPageResponse(BaseModel):
+    """Paginated people who have rated a title."""
+
+    page: int
+    limit: int
+    total: int
+    items: list[TitleRatingItem]
 
 
 class WatchEntriesPageResponse(BaseModel):

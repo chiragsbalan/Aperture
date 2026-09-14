@@ -26,6 +26,9 @@ from app.lists.schemas import (
     ListItemResponse,
     ProfileListIndexEntry,
     SystemListResponse,
+    TitleListOwner,
+    TitlePublicListItem,
+    TitlePublicListsPageResponse,
 )
 from app.metadata import service as metadata_service
 from app.users import service as users_service
@@ -938,3 +941,49 @@ async def custom_lists_membership_for_content(
     membership = {str(list_id): present for list_id, present in membership_raw.items()}
     item_ids = {str(list_id): item_id for list_id, item_id in item_ids_raw.items()}
     return membership, item_ids
+
+
+async def list_public_lists_for_title(
+    session: AsyncSession,
+    *,
+    content_type: str,
+    content_id: uuid.UUID,
+    page: int,
+    limit: int,
+) -> TitlePublicListsPageResponse:
+    """Public custom lists that contain a catalog title (private never shown)."""
+    ref = _parse_ref(content_type=content_type, content_id=content_id)
+    await _validate_content_exists(session, ref=ref)
+    total = await lists_repository.count_public_lists_for_title(
+        session,
+        content_type=ref.db_type,
+        content_id=ref.content_id,
+    )
+    offset = (page - 1) * limit
+    rows = await lists_repository.list_public_lists_for_title_page(
+        session,
+        content_type=ref.db_type,
+        content_id=ref.content_id,
+        offset=offset,
+        limit=limit,
+    )
+    items = [
+        TitlePublicListItem(
+            id=list_row.id,
+            title=list_row.title,
+            visibility='public',
+            updated_at=list_row.updated_at,
+            owner=TitleListOwner(
+                username=owner.username or '',
+                display_name=owner.display_name,
+                avatar_url=owner.avatar_url,
+            ),
+        )
+        for list_row, owner in rows
+    ]
+    return TitlePublicListsPageResponse(
+        page=page,
+        limit=limit,
+        total=total,
+        items=items,
+    )

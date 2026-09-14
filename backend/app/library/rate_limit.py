@@ -24,6 +24,7 @@ from app.core.security import hash_rate_limit_subject
 logger = logging.getLogger(__name__)
 
 _local_rl_fallback = InMemoryCacheBackend()
+_local_vote_rl_fallback = InMemoryCacheBackend()
 
 
 def _contains_rl_key(*, identity_id: uuid.UUID) -> str:
@@ -60,4 +61,41 @@ async def enforce_watch_entries_contains_rate_limit(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail='Too many library lookups. Try again later.',
+        )
+
+
+def _vote_rl_key(*, identity_id: uuid.UUID) -> str:
+    return f'library:rl:vote:{hash_rate_limit_subject(str(identity_id))}'
+
+
+def reset_library_vote_rate_limit_fallback() -> None:
+    """Clear process-local vote RL fallback (tests)."""
+    run_coro_sync(_local_vote_rl_fallback.clear())
+
+
+async def enforce_review_vote_rate_limit(
+    cache: CacheBackend,
+    *,
+    settings: Settings,
+    identity_id: uuid.UUID,
+) -> None:
+    """Raise 429 when an identity exceeds the review-vote window.
+
+    Keys are ``library:rl:vote:{sha256(identity)}`` — independent of diary
+    write and contains buckets.
+    """
+    key = _vote_rl_key(identity_id=identity_id)
+    window = settings.lists_rate_limit_window_seconds
+    max_requests = settings.lists_rate_limit_max_writes
+    try:
+        count = await cache.incr(key, ttl_seconds=window)
+    except CacheBackendError:
+        logger.warning(
+            'library vote rate limit falling back to process-local counter',
+        )
+        count = await _local_vote_rl_fallback.incr(key, ttl_seconds=window)
+    if count > max_requests:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail='Too many review votes. Try again later.',
         )

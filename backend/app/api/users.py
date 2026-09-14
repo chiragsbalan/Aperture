@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
 from app.auth.deps import CurrentIdentityDep, OptionalIdentityDep
 from app.core import r2 as r2_store
@@ -12,7 +13,13 @@ from app.core.cache import get_cache
 from app.core.deps import DbSessionDep, SettingsDep
 from app.core.trusted_client import require_bff_secret, resolve_client_ip
 from app.library import service as library_service
-from app.library.schemas import WatchEntriesPageResponse
+from app.library.schemas import (
+    RatingFilter,
+    ReviewSort,
+    ReviewsPageResponse,
+    SpoilerFilter,
+    WatchEntriesPageResponse,
+)
 from app.lists import service as lists_service
 from app.lists.schemas import (
     ProfileListsPageResponse,
@@ -466,6 +473,54 @@ async def get_public_watchlist(
             owner_user_id=profile.id,
             page=page,
             limit=limit,
+        )
+    except users_service.ProfileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='Profile not found',
+        ) from exc
+
+
+@router.get(
+    '/{username}/reviews',
+    response_model=ReviewsPageResponse,
+)
+async def list_public_reviews(
+    request: Request,
+    username: str,
+    session: DbSessionDep,
+    settings: SettingsDep,
+    identity: OptionalIdentityDep,
+    response: Response,
+    page: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(ge=1, le=100)] = 24,
+    sort: Annotated[ReviewSort, Query()] = 'recent',
+    spoiler_filter: Annotated[SpoilerFilter | None, Query()] = None,
+    rating_filter: Annotated[RatingFilter, Query()] = 'any',
+    include_note_ids: Annotated[list[uuid.UUID] | None, Query()] = None,
+) -> ReviewsPageResponse:
+    """Return a member's qualifying public reviews (soft-deleted → 404)."""
+    await enforce_users_public_rate_limit(
+        get_cache(),
+        settings=settings,
+        client_ip=resolve_client_ip(request, settings),
+    )
+    response.headers['Cache-Control'] = 'private, no-store'
+    try:
+        profile = await users_service.get_public_profile(
+            session,
+            username=username,
+        )
+        return await library_service.list_user_reviews(
+            session,
+            owner_user_id=profile.id,
+            identity_id=identity.id if identity is not None else None,
+            page=page,
+            limit=limit,
+            sort=sort,
+            spoiler_filter=spoiler_filter,
+            rating_filter=rating_filter,
+            include_note_ids=include_note_ids,
         )
     except users_service.ProfileNotFoundError as exc:
         raise HTTPException(

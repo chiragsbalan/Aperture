@@ -7,7 +7,8 @@
  * Prefer {@link MOTION_DURATION_MED_MS} / `--duration-med` for tab panels,
  * popups, overlays, and expand/collapse. Tablists must also use the sliding
  * `.title-tab-indicator` + panel crossfade pattern (see aperture-ui rule and
- * `title-meta-tabs.tsx` / `profile-nav.tsx` + `profile-tab-stage.tsx`).
+ * `title-meta-tabs.tsx` / `title-related-tabs.tsx` / `profile-nav.tsx` +
+ * `profile-tab-stage.tsx`).
  *
  * Size easing (height/width when those are explicitly set): use `.motion-size`
  * from `globals.css`. Overflow hints (no scrollbar): `.scroll-fade-*-host`

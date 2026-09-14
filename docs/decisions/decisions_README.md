@@ -48,6 +48,7 @@ ADR-0015-title-ratings.md
 ADR-0016-interim-search-recall.md
 ADR-0017-person-profile-enrichment.md
 ADR-0018-username-availability-check.md
+ADR-0019-watch-log-as-review.md
 ```
 
 Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
@@ -71,6 +72,7 @@ Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
 | [ADR-0016](ADR-0016-interim-search-recall.md) | Interim hybrid search recall (TMDb External + Related) before OpenSearch P6 |
 | [ADR-0017](ADR-0017-person-profile-enrichment.md) | Person profile hybrid enrich (Known for poster grid ≤30, text filmography timeline, Redis/TMDb + capped PG fallback) |
 | [ADR-0018](ADR-0018-username-availability-check.md) | Protected BFF username live-availability: exact Postgres + optional DIY bloom same slice; reclaim soft-deleted later |
+| [ADR-0019](ADR-0019-watch-log-as-review.md) | Watch-log-as-review (eligibility, `review_votes`, spoilers; ADR-0015 title score unchanged) |
 
 Reserved / not yet written: **ADR-0007** — OpenSearch hosting (due at P5 exit per PLAN).
 ## Template
