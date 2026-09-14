@@ -1,4 +1,4 @@
-import { AuthForm } from '@/components/auth-form';
+import { GuestAuthRoute } from '@/components/guest-auth-route';
 
 export default async function LoginPage({
   searchParams,
@@ -7,9 +7,5 @@ export default async function LoginPage({
 }) {
   const params = await searchParams;
 
-  return (
-    <div className="motion-fade-rise w-full max-w-md">
-      <AuthForm mode="login" initialError={params.error ?? null} />
-    </div>
-  );
+  return <GuestAuthRoute mode="login" initialError={params.error ?? null} />;
 }

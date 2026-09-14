@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import {
   GuestLandingHero,
@@ -9,6 +9,8 @@ import {
 } from '@/components/guest-landing-hero';
 import { HomeCatalogRails } from '@/components/home-catalog-rails';
 import type { TopMovie } from '@/lib/catalog';
+import { registerReturnToMarketing } from '@/lib/guest-landing-return';
+import { MOTION_DURATION_SLOW_MS } from '@/lib/motion';
 
 const PosterMosaic = dynamic(
   () => import('@/components/poster-mosaic').then((mod) => mod.PosterMosaic),
@@ -167,12 +169,44 @@ export function GuestLanding({
   shows,
 }: GuestLandingProps) {
   const [panel, setPanel] = useState<GuestLandingPanel>('marketing');
+  const panelRef = useRef(panel);
+  panelRef.current = panel;
+  const returningRef = useRef(false);
+
+  useEffect(() => {
+    return registerReturnToMarketing(() => {
+      if (panelRef.current === 'marketing') {
+        return returningRef.current;
+      }
+      returningRef.current = true;
+      setPanel('marketing');
+      window.setTimeout(() => {
+        returningRef.current = false;
+      }, MOTION_DURATION_SLOW_MS);
+      return true;
+    });
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const skip = root.dataset.skipLandingEntrance === '1';
+    return () => {
+      if (!skip) {
+        return;
+      }
+      window.setTimeout(() => {
+        if (!document.querySelector('.guest-landing-hero-entrance')) {
+          delete root.dataset.skipLandingEntrance;
+        }
+      }, 0);
+    };
+  }, []);
 
   return (
     <>
       <section className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-5 py-24 sm:px-6 sm:py-28">
         <PosterMosaic posters={posters} />
-        <div className="motion-fade-rise relative z-[1] w-full max-w-xl">
+        <div className="guest-landing-hero-entrance motion-fade-rise relative z-[1] w-full max-w-xl">
           <GuestLandingHero panel={panel} onPanelChange={setPanel} />
         </div>
         {/* Seam fade only — keeps mosaic full-bleed to the viewport bottom. */}
