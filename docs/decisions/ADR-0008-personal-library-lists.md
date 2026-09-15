@@ -5,6 +5,7 @@
 - **Related:** Lists LLD; Database Design (lists domain); [ADR-0004](ADR-0004-content-identity.md) (content refs + home rails); [ADR-0005](ADR-0005-auth.md) (AuthZ); [ADR-0009](ADR-0009-public-profiles.md) (public shelves); PLAN.md P3; profile-complete `pc.2`
 - **Implements in:** P3.1 (watchlist), P3.2 (favorites), P3.3 (custom lists), P3.4 (diary / `watch_entries`) — shipped as `v0.4.0`
 - **Amended:** 2026-08-05 (pc.2) — fixed system-list visibility; binary custom visibility; newest-added-first order (no reorder); optional diary half-star `rating`; `GET /me/watch-entries/contains`; username-scoped public shelf APIs
+- **Amended:** 2026-09-15 (P4.2) — title-scoped public list discovery (`GET /movies|tv/{id}/lists`; see [ADR-0019](ADR-0019-watch-log-as-review.md))
 
 ## Context
 
@@ -72,6 +73,8 @@ pc.2 makes watchlist always public on the profile, favorites always private, and
 | GET | `/api/v1/users/{username}/lists` | optional Bearer | Custom lists only; owners see all; visitors see `public` only |
 
 These username routes share the **`users_public`** IP rate-limit bucket with profile/diary GETs. Public by-id custom list GETs (`/lists/{id}`, `/items`) use the **same** bucket.
+
+**Title-scoped list discovery (P4.2):** `GET /api/v1/movies/{id}/lists` and `GET /api/v1/tv/{id}/lists` return **public** custom lists containing that title (paginated; `updated_at DESC`). Private lists never appear. Orchestrated in `catalog.py` → lists service; same **`users_public`** bucket as other profile/catalog activity reads.
 
 **Diary (P3.4 / pc.2)** — authenticated `/api/v1/me/watch-entries` (GET/POST/PATCH/DELETE). Logging a watch **always** removes that title from the owner’s watchlist (API-layer orchestration: flush-only diary create + watchlist remove, then **one** `session.commit()`; never remove-before-create).
 

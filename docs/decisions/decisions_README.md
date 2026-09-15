@@ -62,17 +62,17 @@ Zero-padded four-digit ids match PLAN.md. Accepted ADRs:
 | [ADR-0005](ADR-0005-auth.md) | Auth / sessions (BFF cookies, JWT, Argon2id, email-or-username login, OAuth link rules) |
 | [ADR-0006](ADR-0006-redis-search-staging.md) | Redis at P2; PG FTS → OpenSearch staging |
 | [ADR-0008](ADR-0008-personal-library-lists.md) | Personal library (system + custom lists, newest-first order, diary / ratings / contains) |
-| [ADR-0009](ADR-0009-public-profiles.md) | Public profiles (always-public shell, pc.2 Watchlist/Lists, counters in API layer) |
+| [ADR-0009](ADR-0009-public-profiles.md) | Public profiles (always-public shell, pc.2 Watchlist/Lists, P4.2 Reviews tab; Activity stub) |
 | [ADR-0010](ADR-0010-guest-landing-home-shell.md) | Guest landing on `/` + signed-in home shell (in-place auth, session matrix) |
 | [ADR-0011](ADR-0011-title-poster-morph.md) | Title poster shared-element morph (`TitleNavPoster` / FLIP) |
 | [ADR-0012](ADR-0012-brand-shell-atmosphere.md) | Purple brand + shell atmosphere (guest mosaic excluded) |
 | [ADR-0013](ADR-0013-lean-catalog-option-b.md) | Lean Postgres stubs + Redis/TMDb enrichment (Option B) |
 | [ADR-0014](ADR-0014-avatar-r2-cdn.md) | Profile avatars via Cloudflare R2 + custom-domain CDN |
-| [ADR-0015](ADR-0015-title-ratings.md) | Hybrid title ratings (TMDB → Aperture @ 100) |
+| [ADR-0015](ADR-0015-title-ratings.md) | Hybrid title ratings (TMDB → Aperture @ 100; P4.2 Activity Ratings tab) |
 | [ADR-0016](ADR-0016-interim-search-recall.md) | Interim hybrid search recall (TMDb External + Related) before OpenSearch P6 |
 | [ADR-0017](ADR-0017-person-profile-enrichment.md) | Person profile hybrid enrich (Known for poster grid ≤30, text filmography timeline, Redis/TMDb + capped PG fallback) |
 | [ADR-0018](ADR-0018-username-availability-check.md) | Protected BFF username live-availability: exact Postgres + optional DIY bloom same slice; reclaim soft-deleted later |
-| [ADR-0019](ADR-0019-watch-log-as-review.md) | Watch-log-as-review (eligibility, `review_votes`, spoilers; ADR-0015 title score unchanged) |
+| [ADR-0019](ADR-0019-watch-log-as-review.md) | Watch-log-as-review + title Activity (Similar/Reviews/Ratings/Lists tabs, APIs, profile Reviews; ADR-0015 title score unchanged) |
 
 Reserved / not yet written: **ADR-0007** — OpenSearch hosting (due at P5 exit per PLAN).
 ## Template

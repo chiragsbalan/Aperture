@@ -5,6 +5,7 @@
 - **Related:** [ADR-0005](ADR-0005-auth.md) (Users profile ownership); [ADR-0008](ADR-0008-personal-library-lists.md) (list visibility + diary AuthZ); profile-complete track `pc.1`–`pc.8`
 - **Implements in:** `pc.1` Profile shell + public diary wall; `pc.2` public Watchlist + Lists tabs; later slices add reviews/follows/activity/stats under `/u/{username}/…`
 - **Amended:** 2026-08-05 (pc.2) — Watchlist/Lists nav; fixed system visibility; diary ratings cross-ref; shared public IP rate-limit bucket
+- **Amended:** 2026-09-15 (P4.2) — profile **Reviews** tab ships; Activity tab still stub; title Activity APIs join public IP bucket
 
 ## Context
 
@@ -27,13 +28,14 @@ P1.4 shipped a minimal public profile (`GET /users/{username}` → username / di
 - `GET /api/v1/users/{username}/watch-entries` — **always public** diary page (includes optional `rating` / `note`). Soft-deleted / missing username → **404**. Owner mutate/list remains on `/api/v1/me/watch-entries` (see [ADR-0008](ADR-0008-personal-library-lists.md)).
 - `GET /api/v1/users/{username}/watchlist` — always-public watchlist page; empty when no system row exists (**no** lazy-create on public read).
 - `GET /api/v1/users/{username}/lists` — custom-list index only (owners see all; visitors see `public`).
-- **Public IP rate-limit bucket** (`users_public_rate_limit_*`, CacheBackend / Redis when available) covers: profile shell, public diary, public watchlist, public lists index, **and** public by-id custom list GETs (`GET /lists/{id}`, `/items`). Trusted client IP — same pattern as search.
+- **Public IP rate-limit bucket** (`users_public_rate_limit_*`, CacheBackend / Redis when available) covers: profile shell, public diary, public watchlist, public lists index, public by-id custom list GETs (`GET /lists/{id}`, `/items`), **and** title Activity GETs (`GET /movies|tv/{id}/reviews`, `/reviews/{entry_id}`, `/ratings`, `/lists`) plus `GET /users/{username}/reviews`. Trusted client IP — same pattern as search.
 
 ### Frontend
 
 - Routes under `/u/[username]` with layout shell + ProfileNav tabs: **Diary** (index / wall), **Watchlist**, **Lists**, **Activity**, **Reviews**.
 - **pc.1** owns the public diary wall (`ProfileDiary` on the profile index): paginated entries with client page + accumulated-view caches (`PUBLIC_DIARY_TTL_MS`), clear-all invalidation on diary mutations and on logout. Owner edit/delete uses shell `is_owner` context (no duplicate profile GET).
-- **pc.2** adds always-public **Watchlist** tab (`/u/{username}/watchlist`) and **Lists** tab (`/u/{username}/lists`). Favorites are never on the public profile (owner-only `/library/favorites`). Activity/Reviews remain stubs until later slices.
+- **pc.2** adds always-public **Watchlist** tab (`/u/{username}/watchlist`) and **Lists** tab (`/u/{username}/lists`). Favorites are never on the public profile (owner-only `/library/favorites`).
+- **P4.2** ([ADR-0019](ADR-0019-watch-log-as-review.md)) ships the **Reviews** tab (`/u/{username}/reviews`): paginated qualifying watch logs (note + rating), same eligibility and spoiler/vote behavior as title reviews. **Activity** tab remains a stub (“No activity yet.”) until a later slice emits feed events.
 - Standalone Movies / Shows collection pages (`/u/{username}/movies|shows`) derive unique titles from the **public** diary for every viewer. Followers/following counters show API zeros until pc.6; sheets stay empty (no demo fixtures).
 - Account menu: header opens `/u/{username}`; nav is Library + Settings only. Owner Library (`/library/*`) is private workspace only.
 - Owner “Edit profile” → `/settings` (avatar/website/links). Avatar upload/CDN is **[ADR-0014](ADR-0014-avatar-r2-cdn.md)** (R2 + custom domain); until R2 is configured, upload returns 503 and UI stays initials-only.
@@ -49,7 +51,8 @@ P1.4 shipped a minimal public profile (`GET /users/{username}` → username / di
 ## Consequences
 
 - **pc.1** ships the public diary wall and public Movies/Shows shelves derived from it.
-- **pc.2** ships public Lists + always-public watchlist; favorites stay private; Activity verbs are reserved for pc.7 (no emit in pc.2).
+- **pc.2** ships public Lists + always-public watchlist; favorites stay private.
+- **P4.2** ships profile Reviews; Activity feed verbs are still reserved (no emit; tab stub).
 - Client diary caches are best-effort: TTL expiry plus clear-all on mutate/logout; logout-only clear is not a hard security boundary for previously viewed public pages.
 - Aggressive diary/list pagination shares the public IP budget — tune `USERS_PUBLIC_RATE_LIMIT_MAX_PER_IP` if legitimate browsing hits 429.
 - Diary half-star ratings on public walls are **[ADR-0008](ADR-0008-personal-library-lists.md) / pc.2** (optional `watch_entries.rating`), not a separate ratings ADR.

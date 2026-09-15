@@ -3,7 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-09-14
 - **Related:** [ADR-0008](ADR-0008-personal-library-lists.md) (diary / `watch_entries`); [ADR-0015](ADR-0015-title-ratings.md) (community title score); [ADR-0009](ADR-0009-public-profiles.md) (public profile tabs)
-- **Implements in:** `feature/p4.2-title-reviews`
+- **Implements in:** P4.2 — merged on `main` (PR #60)
+- **Amended:** 2026-09-15 — title Activity surface, related tabs, ratings/lists APIs, profile Reviews tab, spoiler tap-to-reveal
 - **Does not consume:** ADR-0007 (OpenSearch; still reserved)
 
 ## Context
@@ -47,20 +48,51 @@ Votes are **not** the community star average. ADR-0015 (`content_rating_stats` /
 
 Author boolean `contains_spoilers` on the log (default false), set on create and diary edit. Viewer preference `show|hide` (default show). **Guests are hide.** Authors always see their own body.
 
-Public list APIs **omit `note`** when the viewer must not see the spoiler. `include_note_ids` (repeatable UUIDs) reveals one card’s body without a new resource. Blur/hide applies on title-page cards and the profile Reviews tab only.
+Public list APIs **omit `note`** on spoiler-marked cards for every non-author viewer, even when the viewer’s spoiler preference is **show**. Preference only drives the default **`spoiler_filter`** (`all` vs `no_spoilers`) on list queries; it does **not** auto-include bodies in list responses.
 
-Do **not** bake personalized vote pressed-state or spoiler bodies into cached title HTML. Title reviews are fetched by a client island (same idea as `LibraryActions`).
+Per-card reveal uses either:
+
+- `include_note_ids` (repeatable UUIDs) on a list GET, or
+- `GET …/reviews/{entry_id}` (single review; always includes the body for eligible rows)
+
+The UI shows a **tap-to-reveal** gate on any spoiler card whose `note` is absent, including for signed-in **show** viewers. Blur/hide applies on title-detail related tabs, title Activity, and the profile Reviews tab. Diary notes are never spoiler-gated.
+
+Do **not** bake personalized vote pressed-state or spoiler bodies into cached title HTML. Title reviews are fetched by client islands (same idea as `LibraryActions`).
 
 ### API
 
-- `GET /api/v1/movies/{id}/reviews` and `GET /api/v1/tv/{id}/reviews` (public; default sort `popular`)
+- `GET /api/v1/movies/{id}/reviews` and `GET /api/v1/tv/{id}/reviews` (public; default sort `popular`; query `spoiler_filter`, `rating_filter`, `include_note_ids`)
+- `GET /api/v1/movies/{id}/reviews/{entry_id}` and `GET /api/v1/tv/{id}/reviews/{entry_id}` (public single-card reveal; includes spoiler body)
+- `GET /api/v1/movies/{id}/ratings` and `GET /api/v1/tv/{id}/ratings` (public; latest non-null diary rating per live user — same aggregation rule as [ADR-0015](ADR-0015-title-ratings.md); default sort `highest`)
+- `GET /api/v1/movies/{id}/lists` and `GET /api/v1/tv/{id}/lists` (public custom lists that contain the title; `public` visibility only; ordered by list `updated_at` DESC)
 - `GET /api/v1/users/{username}/reviews` (public; default sort `recent`; soft-deleted username → 404)
 - `PUT /api/v1/me/watch-entries/{id}/vote` body `{ vote: 1 | -1 | null }`
 - `contains_spoilers` on watch-entry create/patch
 
-Public types stay `movie|tv`. List queries live in the library service; title HTTP routes stay in the API layer (`catalog.py`) so metadata does not import library (import-linter).
+Public types stay `movie|tv`. Review/rating list queries live in the library service; public-lists-for-title in the lists service; title HTTP routes stay in the API layer (`catalog.py`) so metadata does not import library (import-linter). Title activity GETs share the **`users_public`** IP rate-limit bucket ([ADR-0009](ADR-0009-public-profiles.md)).
 
 Client may keep an in-progress log draft in `sessionStorage` keyed by content ref. After same-tab login, restore the draft and **do not** auto-submit.
+
+### Title Activity and related tabs (P4.2 amendment)
+
+**Title detail** embeds a second in-page tab strip (`TitleRelatedTabs`): **Similar → Reviews → Ratings → Lists**. Default selected tab is **Similar**. Each non-Similar panel shows an inline preview (limit **5** rows/cards). **See all** on the active tab links to the full Activity page for that tab.
+
+**Title Activity** is a dedicated route per kind:
+
+- `/movies/{id}/activity` and `/tv/{id}/activity`
+- Same four tabs and order; URL `?tab=similar|ratings|lists` selects the tab (**Reviews** is the default when `tab` is absent)
+- Paginated panels (page size **24**); Similar shows up to **30** posters on Activity (detail Similar grid shows **6**)
+- Title metadata may stay in cached RSC (`revalidate=300`); tab bodies are client-fetched (`Cache-Control: private, no-store` on activity APIs)
+
+**Redirects:** legacy `/movies|tv/{id}/similar` → `/…/activity?tab=similar`. Legacy `/fans` → `/activity` (preserves `?tab=` when present).
+
+**Profile Reviews** (`/u/{username}/reviews`) is a real paginated feed of the owner’s qualifying logs (same eligibility rule; default sort `recent`; title poster on each card). **Profile Activity** remains a stub (“No activity yet.”).
+
+### Explicit non-goals (unchanged)
+
+- Activity-feed **emit** on new reviews / ratings / list adds
+- Follows / followers (counters stay **0**; no follow table)
+- Review **comments** / replies
 
 ## Alternatives considered
 
@@ -74,11 +106,12 @@ Client may keep an in-progress log draft in `sessionStorage` keyed by content re
 
 - Title Reviews and profile Reviews are the same eligibility rule.
 - Helpfulness ranking (`popular`) can differ from ADR-0015 title score on the same page.
-- Guests and hide-pref viewers need a reveal round-trip (`include_note_ids`) before spoiler text enters the tree.
-- Follows remain out of scope (no table); seed cannot fill followers/following.
+- Every non-author viewer needs an explicit reveal (tap → single-review GET, or `include_note_ids`) before spoiler text enters the tree, regardless of spoiler preference.
+- Title Activity consolidates Similar, Reviews, Ratings, and public Lists for a title; dedicated similar shelf URLs redirect there.
+- Follows and profile Activity feed remain out of scope (no table; Activity tab stub).
 
 ## Future evolution
 
 - Review comments / replies
-- Activity-feed emission for new reviews
-- Permalinks and histograms (still ADR-0015 for title stars)
+- Activity-feed emission for new reviews / ratings / list events (profile Activity tab)
+- Permalinks and histograms (title hero stars stay ADR-0015)
